@@ -1,10 +1,10 @@
 #Palikka
 
-A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a dead simple API.
+A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a dead simple AMD inspired API.
 
 ##Features
 
-* Lightweight (~1.5kb).
+* Lightweight, around 1.5kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase (JSDoc syntax).
 * Comprehensive unit tests (Qunit).
@@ -12,9 +12,21 @@ A hassle-free asynchronous JavaScript module loader that allows you to define an
 
 ## Usage
 
-```html
-<script src="https://code.jquery.com/jquery.min.js"></script>
+Include palikka.js file somewhere in your page and start defining and requiring modules.
 
+```javascript
+// Define module "foo" which requires module "bar"
+palikka.define('foo', ['bar'], function (bar) {
+  return 'foo';
+});
+// Define module "bar"
+palikka.define('bar', function () {
+  return 'bar';
+});
+// Require modules "foo" and "bar"
+palikka.require(['foo', 'bar'], function (foo, bar) {
+  alert(foo + bar); // "foobar"
+});
 ```
 
 ##API 0.1.0-1
