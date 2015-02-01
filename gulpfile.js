@@ -20,7 +20,21 @@ gulp.task('validate', function () {
 
 });
 
-gulp.task('test', function (cb) {
+gulp.task('test-phantom', function (cb) {
+
+  return gulp.src([paths.main, paths.tests])
+    .pipe(gulpKarma({
+      configFile: paths.karmaConf,
+      browsers: ['PhantomJS'],
+      action: 'run'
+    }))
+    .on('error', function (err) {
+      throw err;
+    });
+
+});
+
+gulp.task('test-all', function (cb) {
 
   return gulp.src([paths.main, paths.tests])
     .pipe(gulpKarma({
@@ -35,6 +49,6 @@ gulp.task('test', function (cb) {
 
 gulp.task('default', function (cb) {
 
-  runSequence('validate', 'test', cb);
+  runSequence('validate', 'test-phantom', cb);
 
 });

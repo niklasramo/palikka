@@ -13,6 +13,9 @@
     "type": "git",
     "url": "git@github.com:niklasramo/palikka.git"
   },
+  "scripts": {
+    "test": "gulp"
+  },
   "devDependencies": {
     "gulp": "^3.8.10",
     "gulp-jscs": "^1.4.0",
@@ -28,6 +31,7 @@
     "karma-firefox-launcher": "^0.1.4",
     "karma-ie-launcher": "^0.1.5",
     "karma-qunit": "^0.1.4",
-    "karma-story-reporter": "^0.3.1"
+    "karma-story-reporter": "^0.3.1",
+    "phantomjs": "^1.9.15"
   }
 }
