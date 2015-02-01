@@ -1,16 +1,8 @@
 /*!
- * Palikka v0.1.0-1
+ * Palikka v0.1.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
- * Date: 2015-01-31T19:58:15.743Z
- */
-
-/**
- * @todo A simple method to define multiple modules simultaneously and intelligently -> palikka.define(['jQuery', 'Selectize'])
- * @todo Create tests for detecting memory leaks.
- * @todo Some perf tests maybe?
- * @todo define(name, [deps], cb, [async]) VS define(name, [deps], [async], cb)
  */
 
 (function (global, undefined) {
@@ -32,40 +24,40 @@
    *
    * @public
    * @param {string} name - Name of the module.
-   * @param {array} [deps] - Optional. Define module dependencies as an array of strings.
-   * @param {function} cb - The module definition function which's return value will be stored as the module's value. Provides the dependency modules as arguments in the same order they were required.
-   * @param {function} [async] - Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
+   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+   * @param {function} defCallback - The module definition function which's return value will be stored as the module's value. Provides the dependency modules as arguments in the same order they were required.
+   * @param {function} [asyncCallback] - Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
    */
-
-  lib.define = function (name, deps, cb, async) {
+  lib.define = function (name, dependencies, defCallback, asyncCallback) {
 
     var
-    _deps = lib._typeof(deps, 'array') ? deps : [],
-    _cb = lib._typeof(deps, 'function') ? deps : cb,
-    _async = lib._typeof(deps, 'function') ? cb : async;
+    depsType = lib._typeof(dependencies),
+    deps = depsType === 'array' ? dependencies : depsType === 'string' ? [dependencies] : [],
+    defCb = depsType === 'function' ? dependencies : defCallback,
+    asyncCb = depsType === 'function' ? defCallback : asyncCallback;
 
-    if (!lib._typeof(_cb, 'function')) {
+    /** Name and definition callback function are required. */
+    if (!name || !lib._typeof(defCb, 'function')) {
       return;
     }
 
-    lib._loadDeps(_deps, function (depModules) {
+    lib._loadDeps(deps, function (depModules) {
 
-      if (lib._typeof(_async, 'function')) {
+      if (lib._typeof(asyncCb, 'function')) {
 
         var
-        asyncArgs = depModules.slice(0),
-        asyncCb = function () {
-          lib._register(name, _cb, depModules);
+        args = depModules.slice(0),
+        cb = function () {
+          lib._register(name, defCb, depModules);
         };
 
-        asyncArgs.unshift(asyncCb);
-
-        _async.apply(null, asyncArgs);
+        args.unshift(cb);
+        asyncCb.apply(null, args);
 
       }
       else {
 
-        lib._register(name, _cb, depModules);
+        lib._register(name, defCb, depModules);
 
       }
 
@@ -77,20 +69,48 @@
    * Require a module.
    *
    * @public
-   * @param {array} [deps] - Define module dependencies as an array of strings.
-   * @param {function} cb - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
+   * @param {array|string} dependencies - Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+   * @param {function} callback - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
    */
-  lib.require = function (deps, cb) {
+  lib.require = function (dependencies, callback) {
 
-    deps = lib._typeof(deps, 'array') ? deps : [];
+    var
+    depsType = lib._typeof(dependencies),
+    deps = depsType === 'array' ? dependencies : depsType === 'string' ? [dependencies] : [];
 
-    if (!lib._typeof(cb, 'function')) {
+    /** Callback function is required. */
+    if (!lib._typeof(callback, 'function')) {
       return;
     }
 
     lib._loadDeps(deps, function (depModules) {
-      cb.apply(null, depModules);
+      callback.apply(null, depModules);
     });
+
+  };
+
+  /**
+   * Import object properties as modules.
+   *
+   * @public
+   * @param {array|string} properties - Define property names to be imported.
+   * @param {object} [of=window] - Define the object where to look for the defined properties.
+   */
+  lib.get = function (properties, of) {
+
+    var
+    propsType = lib._typeof(properties),
+    props = propsType === 'array' ? properties : propsType === 'string' ? [properties] : [],
+    propsLength = props.length,
+    obj = of || global;
+
+    for (var i = 0; i < propsLength; i++) {
+      if (props[i] in obj) {
+        lib.define(props[i], function () {
+          return obj[props[i]];
+        });
+      }
+    }
 
   };
 
@@ -238,7 +258,7 @@
         ev.initEvent(type, false, true);
         root.dispatchEvent(ev);
       }
-      /** Future proofing, createEvent is deprecated.  */
+      /** Future proofing, createEvent is deprecated. */
       else {
         ev = new Event(type);
         root.dispatchEvent(ev);

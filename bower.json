@@ -1,8 +1,8 @@
 {
   "name": "Palikka",
-  "version": "0.1.0-1",
+  "version": "0.1.0",
   "description": "Asynchronous module loader for the browser.",
-  "keywords": "module,loader,async,asynchronous",
+  "keywords": "module,loader,async,asynchronous,amd",
   "homepage": "https://github.com/niklasramo/palikka",
   "license": "MIT",
   "authors": [{

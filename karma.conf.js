@@ -13,6 +13,7 @@ module.exports = function (config) {
   // plugins to use
   stn.plugins = [
     'karma-qunit',
+    'karma-phantomjs-launcher',
     'karma-chrome-launcher',
     'karma-firefox-launcher',
     'karma-ie-launcher',
@@ -75,7 +76,7 @@ module.exports = function (config) {
 
   // start these browsers
   // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-  stn.browsers = ['Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'];
+  stn.browsers = ['PhantomJS', 'Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'];
 
   // If browser does not capture in given timeout [ms], kill it
   stn.captureTimeout = 60000;

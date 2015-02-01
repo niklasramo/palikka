@@ -1,6 +1,10 @@
 #Palikka
 
-A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a dead simple AMD inspired API.
+A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a simple AMD style API.
+
+##Download
+
+[Palikka v0.1.0](palikka.js)
 
 ##Features
 
@@ -12,7 +16,7 @@ A hassle-free asynchronous JavaScript module loader that allows you to define an
 
 ## Usage
 
-Include palikka.js file somewhere in your page and start defining and requiring modules.
+Download palikka.js, include it somewhere in your page and start defining and requiring modules.
 
 ```javascript
 // Define module "foo" which requires module "bar"
@@ -29,28 +33,29 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 });
 ```
 
-##API 0.1.0-1
+##API 0.1.0
 
 * [.define()](#define)
 * [.require()](#require)
+* [.fetch()](#fetch)
 
 ###.define()
 
-Define a module.
+Define a module. All modules get stored in `palikka.modules` object. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
 
 **Syntax**
 
-`palikka.define( name [, deps] , cb [, async] )`
+`palikka.define( name [, dependencies] , defCallback [, asyncCallback] )`
 
 **Parameters**
 
 * **name** &nbsp;&mdash;&nbsp; *string*
   * Name of the module.
-* **deps** &nbsp;&mdash;&nbsp; *array*
-  * Optional. Define module dependencies as an array of strings.
-* **cb** &nbsp;&mdash;&nbsp; *function*
+* **dependencies** &nbsp;&mdash;&nbsp; *array / string*
+  * Optional. Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+* **defCallback** &nbsp;&mdash;&nbsp; *function*
   * The module definition function which's return value will be stored as the module's value. Provides the dependency modules as arguments in the same order they were required.
-* **async** &nbsp;&mdash;&nbsp; *function*
+* **asyncCallback** &nbsp;&mdash;&nbsp; *function*
   * Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
 
 &nbsp;
@@ -61,14 +66,31 @@ Require a module.
 
 **Syntax**
 
-`palikka.require( [deps] , cb)`
+`palikka.require( dependencies, callback)`
 
 **Parameters**
 
-* **deps** &nbsp;&mdash;&nbsp; *array*
-  * Optional. Define module dependencies as an array of strings.
-* **cb** &nbsp;&mdash;&nbsp; *function*
+* **dependencies** &nbsp;&mdash;&nbsp; *array / string*
+  * Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+* **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
+
+&nbsp;
+
+###.get()
+
+Import object properties as modules. Basically this is just a wrapper for define method that allows you to define multiple modules quickly.
+
+**Syntax**
+
+`palikka.get( properties [, of] )`
+
+**Parameters**
+
+* **properties** &nbsp;&mdash;&nbsp; *array / string*
+  * Define property names to be imported.
+* **of** &nbsp;&mdash;&nbsp; *object*
+  * Optional. Defaults to window. Define the object where to look for the defined properties.
 
 ##Examples
 
@@ -76,10 +98,15 @@ Here are some examples and tips to get you started.
 
 ```javascript
 // Modulize third party library to be used as a module.
-// The library should be included it in the site first though.
+// The library should be included in the page first though.
 palikka.define('jquery', function () {
   return jQuery;
 });
+
+// If you have multiple libraries on the page already initiated
+// and you want to import them as palikka modules all at once
+// use the .get() method to do that.
+palikka.get(['jQuery', 'Modernizr']);
 
 // Define a custom module that requires "jquery" module.
 palikka.define('foo', ['jquery'], function ($) {
