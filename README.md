@@ -4,7 +4,7 @@ A hassle-free asynchronous JavaScript module loader that allows you to define an
 
 ##Download
 
-[Palikka v0.1.0](palikka.js)
+**[Palikka v0.1.0](palikka.js)**
 
 ##Features
 
