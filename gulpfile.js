@@ -29,7 +29,12 @@ gulp.task('test-phantom', function (cb) {
     .pipe(gulpKarma({
       configFile: paths.karmaConf,
       browsers: ['PhantomJS'],
-      reporters: ['progress'],
+      preprocessors: {'palikka.js': ['coverage']},
+      reporters: ['progress', 'coverage'],
+      coverageReporter: {
+        type: 'lcov',
+        dir: paths.coverage
+      },
       action: 'run'
     }))
     .on('error', function (err) {
@@ -44,7 +49,12 @@ gulp.task('test-local', function (cb) {
     .pipe(gulpKarma({
       configFile: paths.karmaConf,
       browsers: ['PhantomJS', 'Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'],
-      reporters: ['progress'],
+      preprocessors: {'palikka.js': ['coverage']},
+      reporters: ['progress', 'coverage'],
+      coverageReporter: {
+        type: 'lcov',
+        dir: paths.coverage
+      },
       action: 'run'
     }))
     .on('error', function (err) {
@@ -78,7 +88,7 @@ gulp.task('test-ci', function (cb) {
       preprocessors: {'palikka.js': ['coverage']},
       reporters: ['progress', 'coverage', 'coveralls'],
       coverageReporter: {
-        type: 'lcovonly',
+        type: 'lcov',
         dir: paths.coverage
       },
       action: 'run'
