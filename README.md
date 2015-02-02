@@ -1,5 +1,8 @@
 #Palikka
 
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=master)](https://travis-ci.org/niklasramo/palikka)
+[![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
+
 A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a simple AMD style API.
 
 ##Download
