@@ -17,7 +17,10 @@ module.exports = function (config) {
     'karma-chrome-launcher',
     'karma-firefox-launcher',
     'karma-ie-launcher',
-    'karma-story-reporter'
+    'karma-sauce-launcher',
+    'karma-story-reporter',
+    'karma-coveralls',
+    'karma-coverage'
   ];
 
   // list of files / patterns to load in the browser
@@ -33,12 +36,10 @@ module.exports = function (config) {
   // test results reporter to use
   // possible values: 'dots', 'progress', 'story'
   // available reporters: https://npmjs.org/browse/keyword/karma-reporter
-  stn.reporters = [
-    'progress'
-  ];
+  stn.reporters = ['dots'];
 
   // web server port
-  stn.port = 9876;
+  stn.port = 8888;
 
   // enable / disable colors in the output (reporters and logs)
   stn.colors = true;
@@ -71,15 +72,36 @@ module.exports = function (config) {
     IE7: {
       base: 'IE',
       'x-ua-compatible': 'IE=EmulateIE7'
+    },
+    SL_Chrome: {
+      base: 'SauceLabs',
+      browserName: 'chrome'
+    },
+    SL_Firefox: {
+      base: 'SauceLabs',
+      browserName: 'firefox'
     }
   };
 
   // start these browsers
   // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-  stn.browsers = ['PhantomJS', 'Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'];
+  stn.browsers = [];
 
   // If browser does not capture in given timeout [ms], kill it
   stn.captureTimeout = 60000;
+
+  stn.browserDisconnectTolerance = 2;
+  stn.browserDisconnectTimeout = 10000;
+  stn.browserNoActivityTimeout = 120000;
+
+  stn.sauceLabs = {
+    recordVideo: false,
+    startConnect: true,
+    tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER,
+    build: process.env.TRAVIS_BUILD_NUMBER,
+    testName: process.env.COMMIT_MESSAGE,
+    tags: ['palikka', 'test']
+  };
 
   // Continuous Integration mode
   // if true, Karma captures browsers, runs the tests and exits

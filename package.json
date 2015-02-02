@@ -32,6 +32,10 @@
     "karma-ie-launcher": "^0.1.5",
     "karma-qunit": "^0.1.4",
     "karma-story-reporter": "^0.3.1",
-    "phantomjs": "^1.9.15"
+    "phantomjs": "^1.9.15",
+    "karma-sauce-launcher": "^0.2.10",
+    "karma-coveralls": "^0.1.5",
+    "karma-coverage": "^0.2.7",
+    "rimraf": "^2.2.8"
   }
 }
