@@ -60,7 +60,7 @@ gulp.task('test-sauce', function (cb) {
     .pipe(gulpKarma({
       configFile: paths.karmaConf,
       browsers: ['SL_Chrome', 'SL_Firefox'],
-      reporters: ['progress', 'saucelabs']
+      reporters: ['progress', 'saucelabs'],
       action: 'run'
     }))
     .on('error', function (err) {
