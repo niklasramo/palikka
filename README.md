@@ -40,7 +40,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 * [.define()](#define)
 * [.require()](#require)
-* [.fetch()](#fetch)
+* [.get()](#get)
 
 ###.define()
 
