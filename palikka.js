@@ -97,7 +97,7 @@
    * Require a module.
    *
    * @public
-   * @param {array|string} [dependencies] - Optinal. Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
+   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
    * @param {function} callback - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
    */
   lib.require = function (dependencies, callback) {
