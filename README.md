@@ -35,6 +35,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 ##API
 
 * [.define()](#define)
+* [.undefine()](#undefine)
 * [.require()](#require)
 * [.get()](#get)
 
@@ -78,7 +79,7 @@ Undefine a module. Please keep in mind that if any other `define` or `require` i
 
 **Returns** &nbsp;&mdash;&nbsp; *boolean*
 
-Returns `true` if undefinition was successful, otherwise returns `false`.
+Returns `false` if the module exists and is used as a dependency, otherwise returns `true`. Note that undefining a non-existent module returns `true` also.
 
 &nbsp;
 
@@ -88,12 +89,12 @@ Require a module.
 
 **Syntax**
 
-`palikka.require( dependencies, callback)`
+`palikka.require( [dependencies ,] callback)`
 
 **Parameters**
 
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
-  * Define dependencies as an array of modules ids. Optionally you can just specify a single module id as a string.
+  * Optional. Define dependencies as an array of modules ids. Optionally you can just specify a single module id as a string.
 * **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
 
@@ -175,7 +176,7 @@ palikka.require(['docready'], function ($) {
 
 ##Roadmap to version 1.0.0
 
-The library is already production ready and unit tested, but here are some things to consider and possibly implement before geting to 1.0.0 version.
+Palikka is already production ready and unit tested, but here are some things to consider and possibly implement before getting to v1.0.0.
 
 * **Module versioning**
   * Should we add some way to add version number to the module and make it possible to require spedific version(s) of a module? This would be especially helpful with third party libraries that are imported as modules. Naturally this would be a n optional feature.
