@@ -1,5 +1,5 @@
 /*!
- * Palikka v0.1.0
+ * Palikka v0.1.1
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -7,10 +7,13 @@
 
 (function (global, undefined) {
 
+  'use strict';
+
   var
   ns = 'palikka',
   lib = {},
   modules = {},
+  modulePrimaryKey = 0,
   doc = document,
   root = doc.documentElement,
   eventListenersSupported = root.addEventListener;
@@ -23,45 +26,70 @@
    * Define a module.
    *
    * @public
-   * @param {string} name - Name of the module.
-   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
-   * @param {function} defCallback - The module definition function which's return value will be stored as the module's value. Provides the dependency modules as arguments in the same order they were required.
-   * @param {function} [asyncCallback] - Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
+   * @param {string} id - ID of the module.
+   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
+   * @param {function|object} factory - If the factory argument is a function it is executed once and the return value is assigned as the value for the module. If the factory argument is a plain object it is directly assigned as the module's value.
+   * @param {function} [deferred] - Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
+   * @returns {boolean} Returns true if definition was successful, otherwise returns false.
    */
-  lib.define = function (name, dependencies, defCallback, asyncCallback) {
+  lib.define = function (id, dependencies, factory, deferred) {
 
     var
-    depsType = lib._typeof(dependencies),
-    deps = depsType === 'array' ? dependencies : depsType === 'string' ? [dependencies] : [],
-    defCb = depsType === 'function' ? dependencies : defCallback,
-    asyncCb = depsType === 'function' ? defCallback : asyncCallback;
+    idType = typeOf(id),
+    dependenciesType = typeOf(dependencies),
+    _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [],
+    _factory = dependenciesType === 'function' ? dependencies : factory,
+    _deferred = dependenciesType === 'function' ? factory : deferred,
+    _factoryType = typeOf(_factory),
+    isValidId = id && idType === 'string',
+    isValidFactory = _factoryType === 'object' || _factoryType === 'function',
+    primaryKey = isValidId && isValidFactory && lib._registerModule(id, _dependencies);
 
-    /** Name and definition callback function are required. */
-    if (!name || !lib._typeof(defCb, 'function')) {
-      return;
+    /** Return false if definition failed. */
+    if (!primaryKey) {
+      return false;
     }
 
-    lib._loadDeps(deps, function (depModules) {
+    /** Load dependencies. */
+    lib._loadDependencies(_dependencies, function (depModules, initModule) {
 
-      if (lib._typeof(asyncCb, 'function')) {
+      initModule = function () {
+        lib._initModule(id, _factory, depModules, primaryKey);
+      };
 
-        var
-        args = depModules.slice(0),
-        cb = function () {
-          lib._register(name, defCb, depModules);
-        };
-
-        args.unshift(cb);
-        asyncCb.apply(null, args);
-
+      if (typeOf(_deferred, 'function')) {
+        var args = depModules.slice(0);
+        args.unshift(initModule);
+        _deferred.apply(null, args);
       }
       else {
-
-        lib._register(name, defCb, depModules);
-
+        initModule();
       }
 
     });
+
+    /** Return true to indicate a succesful definition. */
+    return true;
+
+  };
+
+  /**
+   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined.
+   *
+   * @param {string} id
+   * @returns {boolean} Returns true if undefinition was successful, otherwise returns false.
+   */
+  lib.undefine = function (id) {
+
+    var
+    module = modules[id],
+    isLocked = module && module.locked;
+
+    if (module && !isLocked) {
+      delete modules[id];
+    }
+
+    return !isLocked;
 
   };
 
@@ -69,21 +97,21 @@
    * Require a module.
    *
    * @public
-   * @param {array|string} dependencies - Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+   * @param {array|string} dependencies - Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
    * @param {function} callback - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
    */
   lib.require = function (dependencies, callback) {
 
     var
-    depsType = lib._typeof(dependencies),
-    deps = depsType === 'array' ? dependencies : depsType === 'string' ? [dependencies] : [];
+    dependenciesType = typeOf(dependencies),
+    _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [];
 
     /** Callback function is required. */
-    if (!lib._typeof(callback, 'function')) {
+    if (!typeOf(callback, 'function')) {
       return;
     }
 
-    lib._loadDeps(deps, function (depModules) {
+    lib._loadDependencies(_dependencies, function (depModules) {
       callback.apply(null, depModules);
     });
 
@@ -99,7 +127,7 @@
   lib.get = function (properties, of) {
 
     var
-    propsType = lib._typeof(properties),
+    propsType = typeOf(properties),
     props = propsType === 'array' ? properties : propsType === 'string' ? [properties] : [],
     propsLength = props.length,
     obj = of || global;
@@ -115,47 +143,72 @@
   };
 
   /**
-   * Register module
+   * Register module.
    *
    * @private
-   * @param {string} name
-   * @param {function} cb
-   * @param {array} cbArgs
+   * @param {string} id
+   * @returns {number} Returns the modules primary key (positive number) if succesful, otherwise returns zero.
    */
-  lib._register = function (name, cb, cbArgs) {
+  lib._registerModule = function (id, dependencies) {
 
-    if (!modules.hasOwnProperty(name)) {
-      modules[name] = cb.apply(null, cbArgs);
-      lib._trigger(ns + name);
+    if (!modules[id]) {
+      var pk = ++modulePrimaryKey;
+      modules[id] = {
+        id: id,
+        pk: pk,
+        loaded: false,
+        locked: false,
+        factory: null,
+        dependencies: dependencies
+      };
+      return pk;
+    } else {
+      return 0;
     }
 
   };
 
   /**
-   * Load dependencies by their names and return a deferred object that will be resolved when the all dependencies are loaded.
+   * Initialize module.
    *
    * @private
-   * @param {array} deps
+   * @param {string} id
+   * @param {function} factory
+   * @param {array} dependencies
+   * @param {number} primaryKey
+   */
+  lib._initModule = function (id, factory, dependencies, primaryKey) {
+
+    if (modules[id] && modules[id].pk === primaryKey) {
+      modules[id].factory = typeOf(factory, 'object') ? factory : factory.apply(null, dependencies);
+      modules[id].loaded = true;
+      lib._trigger(ns + id);
+    }
+
+  };
+
+  /**
+   * Load dependencies by their IDs and return a deferred object that will be resolved when the all dependencies are loaded.
+   *
+   * @private
+   * @param {array} dependencies
    * @param {function} cb
    */
-  lib._loadDeps = function (deps, cb) {
+  lib._loadDependencies = function (dependencies, cb) {
 
     var
     depModules = [],
-    depsLength = deps.length,
+    depsLength = dependencies.length,
     depsReadyCounter = 0,
     depsReadyCallback = function () {
 
       if (depsLength) {
         for (var i = 0; i < depsLength; i++) {
-          var depName = deps[i];
-          depModules.push(modules[depName]);
+          depModules.push(modules[dependencies[i]].factory);
         }
       }
 
-      if (lib._typeof(cb, 'function')) {
-        cb(depModules);
-      }
+      cb(depModules);
 
     };
 
@@ -165,28 +218,35 @@
         (function (i) {
 
           var
-          depName = deps[i],
-          evName = ns + depName,
+          depId = dependencies[i],
+          evName = ns + depId,
           evHandler = function (e) {
 
-            /** IE 8/7 Hack  */
+            /** IE 8/7 Hack. */
             if (!eventListenersSupported && e && e.propertyName && e.propertyName !== evName) {
               return;
             }
 
+            /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded.  */
             ++depsReadyCounter;
 
+            /** If e argument is not 0 we assume this function is an event's callback. So let's be nice and clean up the redundant event listener. */
             if (e !== 0) {
               lib._off(evName, evHandler);
             }
 
+            /** Lock dependency module (can't be undefined anymore). */
+            modules[depId].locked = true;
+
+            /** If this was the last dependency left to load it's time to move on. */
             if (depsReadyCounter === depsLength) {
               depsReadyCallback();
             }
 
           };
 
-          if (modules.hasOwnProperty(depName)) {
+          /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
+          if (modules[depId] && modules[depId].loaded) {
             evHandler(0);
           }
           else {
@@ -217,7 +277,7 @@
     if (eventListenersSupported) {
       root.addEventListener(type, cb, false);
     }
-    /** IE 8/7 Hack */
+    /** IE 8/7 Hack. */
     else {
       root.attachEvent('onpropertychange', cb);
     }
@@ -236,7 +296,7 @@
     if (eventListenersSupported) {
       root.removeEventListener(type, cb, false);
     }
-    /** IE 8/7 Hack  */
+    /** IE 8/7 Hack. */
     else {
       root.detachEvent('onpropertychange', cb);
     }
@@ -263,7 +323,7 @@
         ev = new Event(type);
         root.dispatchEvent(ev);
       }
-    /** IE 8/7 Hack  */
+    /** IE 8/7 Hack.  */
     } else {
       root[type] = (root[type] || 0) + 1;
     }
@@ -279,12 +339,12 @@
    * @param {string} [compareType]
    * @returns {string|boolean} Returns boolean if type is defined.
    */
-  lib._typeof = function (obj, compareType) {
+  function typeOf (obj, compareType) {
 
     var type = typeof obj;
     type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
     return compareType ? type === compareType : type;
 
-  };
+  }
 
 })(this);

@@ -1,13 +1,13 @@
-#Palikka v0.1.0
+#Palikka v0.1.1
 
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=master)](https://travis-ci.org/niklasramo/palikka)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A hassle-free asynchronous JavaScript module loader that allows you to define and require modules in the browser with a simple AMD style API.
+A tiny JavaScript module system that allows you to define modules and manage dependencies between them. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader*, meaning that it does not load JavaScript files for you.
 
 ##Features
 
-* Lightweight, around 1.62kb minified.
+* Lightweight, around 2kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase (JSDoc syntax).
 * Comprehensive unit tests (Qunit).
@@ -44,18 +44,41 @@ Define a module. All modules get stored in `palikka.modules` object. Please avoi
 
 **Syntax**
 
-`palikka.define( name [, dependencies] , defCallback [, asyncCallback] )`
+`palikka.define( id [, dependencies] , factory [, deferred] )`
 
 **Parameters**
 
-* **name** &nbsp;&mdash;&nbsp; *string*
-  * Name of the module.
+* **id** &nbsp;&mdash;&nbsp; *string*
+  * Id of the module.
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
-  * Optional. Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
-* **defCallback** &nbsp;&mdash;&nbsp; *function*
-  * The module definition function which's return value will be stored as the module's value. Provides the dependency modules as arguments in the same order they were required.
-* **asyncCallback** &nbsp;&mdash;&nbsp; *function*
+  * Optional. Define dependencies as an array of modules ids. Optionally you can just specify a single module id as a string.
+* **factory** &nbsp;&mdash;&nbsp; *function / object*
+  * If the factory argument is a function it is executed once and the return value is assigned as the value for the module. If the factory argument is a plain object it is directly assigned as the module's value.
+* **deferred** &nbsp;&mdash;&nbsp; *function*
   * Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
+
+**Returns** &nbsp;&mdash;&nbsp; *boolean*
+
+Returns `true` if definition was successful, otherwise returns `false`.
+
+&nbsp;
+
+###.undefine()
+
+Undefine a module. Please keep in mind that if any other `define` or `require` instance depends on the module it cannot be undefined. Palikka has an internal system which marks the module as *locked* (can't be undefined) when the module is set as a dependency.
+
+**Syntax**
+
+`palikka.undefine( id  )`
+
+**Parameters**
+
+* **id** &nbsp;&mdash;&nbsp; *string*
+  * Id of the module.
+
+**Returns** &nbsp;&mdash;&nbsp; *boolean*
+
+Returns `true` if undefinition was successful, otherwise returns `false`.
 
 &nbsp;
 
@@ -70,7 +93,7 @@ Require a module.
 **Parameters**
 
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
-  * Define dependencies as an array of modules names. Optionally you can just specify a single module name as a string.
+  * Define dependencies as an array of modules ids. Optionally you can just specify a single module id as a string.
 * **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
 
@@ -130,20 +153,44 @@ palikka.define(
   }
 );
 
-// Tip! Create a module that provides jQuery object when document is ready.
+// Tip #1:
+// Plain objects can be imported directly as modules.
+// No need to use extra wrapper function here.
+palikka.define('heavy-metal', {rjd: 'Ronnie James Dio'});
+
+// Tip #2:
+// Create a module that provides jQuery object when document is ready.
 palikka.define(
   'docready',
   ['jquery'],
   function ($) { return $; },
   function (cb, $) { $(cb); }
 );
-
 // And require it like this.
 palikka.require(['docready'], function ($) {
-  alert('Document is ready!');
+  alert('Document is definitely ready!');
 });
 
 ```
+
+##Roadmap to version 1.0.0
+
+The library is already production ready and unit tested, but here are some things to consider and possibly implement before geting to 1.0.0 version.
+
+* **Module versioning**
+  * Should we add some way to add version number to the module and make it possible to require spedific version(s) of a module? This would be especially helpful with third party libraries that are imported as modules. Naturally this would be a n optional feature.
+* **Circular modules handling**
+  * Should we handle circular modules at all or not?
+* **Error reporting**
+  * Should the library's methods fail silently or output error messages?
+
+##Alternatives
+
+You should definitely check out these module systems too.
+
+* [RequireJS](http://requirejs.org/)
+* [Browserify](http://browserify.org/)
+* [modulejs](http://larsjung.de/modulejs/)
 
 ##License
 
