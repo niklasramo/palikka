@@ -1,6 +1,7 @@
 #Palikka v0.1.2
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=master)](https://travis-ci.org/niklasramo/palikka)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.1.2)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.1.2)](https://coveralls.io/r/niklasramo/palikka?branch=master)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
 A tiny JavaScript module system that allows you to define modules and manage dependencies between them. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader*, meaning that it does not load JavaScript files for you.
