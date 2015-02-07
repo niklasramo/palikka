@@ -1,11 +1,11 @@
 /*!
- * Palikka v0.1.1
+ * Palikka v0.1.2
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
 
-(function (global, undefined) {
+(function (glob, undefined) {
 
   'use strict';
 
@@ -13,14 +13,8 @@
   ns = 'palikka',
   lib = {},
   modules = {},
-  modulePrimaryKey = 0,
-  doc = document,
-  root = doc.documentElement,
-  eventListenersSupported = root.addEventListener;
-
-  /** Expose library to global object */
-  lib.modules = modules;
-  global[ns] = lib;
+  listeners = {},
+  modulePrimaryKey = 0;
 
   /**
    * Define a module.
@@ -35,12 +29,12 @@
   lib.define = function (id, dependencies, factory, deferred) {
 
     var
-    idType = typeOf(id),
-    dependenciesType = typeOf(dependencies),
+    idType = lib._typeof(id),
+    dependenciesType = lib._typeof(dependencies),
     _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [],
     _factory = dependenciesType === 'function' ? dependencies : factory,
     _deferred = dependenciesType === 'function' ? factory : deferred,
-    _factoryType = typeOf(_factory),
+    _factoryType = lib._typeof(_factory),
     isValidId = id && idType === 'string',
     isValidFactory = _factoryType === 'object' || _factoryType === 'function',
     primaryKey = isValidId && isValidFactory && lib._registerModule(id, _dependencies);
@@ -57,7 +51,7 @@
         lib._initModule(id, _factory, depModules, primaryKey);
       };
 
-      if (typeOf(_deferred, 'function')) {
+      if (lib._typeof(_deferred, 'function')) {
         var args = depModules.slice(0);
         args.unshift(initModule);
         _deferred.apply(null, args);
@@ -103,11 +97,11 @@
   lib.require = function (dependencies, callback) {
 
     var
-    dependenciesType = typeOf(dependencies),
+    dependenciesType = lib._typeof(dependencies),
     _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [];
 
     /** Callback function is required. */
-    if (!typeOf(callback, 'function')) {
+    if (!lib._typeof(callback, 'function')) {
       return;
     }
 
@@ -127,10 +121,10 @@
   lib.get = function (properties, of) {
 
     var
-    propsType = typeOf(properties),
+    propsType = lib._typeof(properties),
     props = propsType === 'array' ? properties : propsType === 'string' ? [properties] : [],
     propsLength = props.length,
-    obj = of || global;
+    obj = of || glob;
 
     for (var i = 0; i < propsLength; i++) {
       if (props[i] in obj) {
@@ -180,9 +174,9 @@
   lib._initModule = function (id, factory, dependencies, primaryKey) {
 
     if (modules[id] && modules[id].pk === primaryKey) {
-      modules[id].factory = typeOf(factory, 'object') ? factory : factory.apply(null, dependencies);
+      modules[id].factory = lib._typeof(factory, 'object') ? factory : factory.apply(null, dependencies);
       modules[id].loaded = true;
-      lib._trigger(ns + id);
+      lib._trigger(id);
     }
 
   };
@@ -219,20 +213,14 @@
 
           var
           depId = dependencies[i],
-          evName = ns + depId,
-          evHandler = function (e) {
-
-            /** IE 8/7 Hack. */
-            if (!eventListenersSupported && e && e.propertyName && e.propertyName !== evName) {
-              return;
-            }
+          evHandler = function (isDirectCall) {
 
             /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded.  */
             ++depsReadyCounter;
 
-            /** If e argument is not 0 we assume this function is an event's callback. So let's be nice and clean up the redundant event listener. */
-            if (e !== 0) {
-              lib._off(evName, evHandler);
+            /** If this is an event's callback, let's unbind the event listener. */
+            if (!isDirectCall) {
+              lib._off(depId, evHandler);
             }
 
             /** Lock dependency module (can't be undefined anymore). */
@@ -247,10 +235,10 @@
 
           /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
           if (modules[depId] && modules[depId].loaded) {
-            evHandler(0);
+            evHandler(1);
           }
           else {
-            lib._on(evName, evHandler);
+            lib._on(depId, evHandler);
           }
 
         })(i);
@@ -274,31 +262,31 @@
    */
   lib._on = function (type, cb) {
 
-    if (eventListenersSupported) {
-      root.addEventListener(type, cb, false);
-    }
-    /** IE 8/7 Hack. */
-    else {
-      root.attachEvent('onpropertychange', cb);
-    }
+    listeners[type] = listeners[type] || [];
+    listeners[type].push(cb);
 
   };
 
   /**
-   * Unbind custom event.
+   * Unbind custom event. If callback is not provided all listeners for the type will be removed, otherwise only the privded callback instances will be removed.
    *
    * @private
    * @param {string} type
-   * @param {function} cb
+   * @param {function} [cb]
    */
   lib._off = function (type, cb) {
 
-    if (eventListenersSupported) {
-      root.removeEventListener(type, cb, false);
-    }
-    /** IE 8/7 Hack. */
-    else {
-      root.detachEvent('onpropertychange', cb);
+    var typeListeners = listeners[type];
+    if (typeListeners) {
+      var i = typeListeners.length;
+      while (i--) {
+        if (!cb || typeListeners[i] === cb) {
+          typeListeners.splice(i, 1);
+        }
+      }
+      if (!typeListeners.length) {
+        delete listeners[type];
+      }
     }
 
   };
@@ -311,40 +299,41 @@
    */
   lib._trigger = function (type) {
 
-    var ev;
-    if (eventListenersSupported) {
-      if (doc.createEvent) {
-        ev = doc.createEvent('HTMLEvents');
-        ev.initEvent(type, false, true);
-        root.dispatchEvent(ev);
+    var typeListeners = listeners[type];
+    if (typeListeners) {
+      typeListeners = typeListeners.slice(0);
+      for (var i = 0, len = typeListeners.length; i < len; i++) {
+        typeListeners[i]();
       }
-      /** Future proofing, createEvent is deprecated. */
-      else {
-        ev = new Event(type);
-        root.dispatchEvent(ev);
-      }
-    /** IE 8/7 Hack.  */
-    } else {
-      root[type] = (root[type] || 0) + 1;
     }
 
   };
 
   /**
-   * Check the type of an object. Returns type of any object in lowercase letters. If comparison
-   * type is provided the function will compare the type directly and returns a boolean.
+   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
    *
    * @private
    * @param {object} obj
    * @param {string} [compareType]
    * @returns {string|boolean} Returns boolean if type is defined.
    */
-  function typeOf (obj, compareType) {
+  lib._typeof = function (obj, compareType) {
 
     var type = typeof obj;
     type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
     return compareType ? type === compareType : type;
 
+  };
+
+  /** Expose modules and listeners as private items of the public API. */
+  lib._modules = modules;
+  lib._listeners = listeners;
+
+  /** Publish library. */
+  if (typeof exports === 'object') {
+    module.exports = lib;
+  } else {
+    glob[ns] = lib;
   }
 
 })(this);

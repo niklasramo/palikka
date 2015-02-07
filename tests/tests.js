@@ -53,7 +53,7 @@
     );
 
     window.setTimeout(function () {
-      assert.strictEqual(palikka.modules.hasOwnProperty('a') && palikka.modules.a.loaded === false, true, 'module is registered before it is initiated');
+      assert.strictEqual(palikka._modules.hasOwnProperty('a') && palikka._modules.a.loaded === false, true, 'module is registered before it is initiated');
     }, 1000);
 
     // Test get method.
@@ -111,7 +111,7 @@
     });
     var udefRetSuccess = palikka.undefine('udef');
     assert.strictEqual(udefRetSuccess, true, 'succesful undefine returns true');
-    assert.strictEqual(palikka.modules['udef'], undefined, 'module can be undefined');
+    assert.strictEqual(palikka._modules['udef'], undefined, 'module can be undefined');
 
     palikka.require('udef', function (udef) {
       assert.strictEqual(udef, 'udef2', 'module cannot be undefined when it is depended on by a require instance');

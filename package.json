@@ -1,6 +1,6 @@
 {
   "name": "Palikka",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A tiny module system for the browser.",
   "keywords": ["module","amd","define","require"],
   "homepage": "https://github.com/niklasramo/palikka",
