@@ -1,20 +1,24 @@
 /*!
- * Palikka v0.1.2
+ * Palikka v0.1.3
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
 
-(function (glob, undefined) {
-
+(function (glob) {
   'use strict';
 
   var
   ns = 'palikka',
   lib = {},
   modules = {},
-  listeners = {},
+  events = new Eventizer(),
   modulePrimaryKey = 0;
+
+  /** Expose modules, events and EventHub class as private members of the public API. */
+  lib._modules = modules;
+  lib._events = events;
+  lib._Eventizer = Eventizer;
 
   /**
    * Define a module.
@@ -29,12 +33,13 @@
   lib.define = function (id, dependencies, factory, deferred) {
 
     var
-    idType = lib._typeof(id),
-    dependenciesType = lib._typeof(dependencies),
+    idType = typeOf(id),
+    dependenciesType = typeOf(dependencies),
+    isDependenciesSet = dependenciesType === 'array' || dependenciesType === 'string',
     _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [],
-    _factory = dependenciesType === 'function' ? dependencies : factory,
-    _deferred = dependenciesType === 'function' ? factory : deferred,
-    _factoryType = lib._typeof(_factory),
+    _factory = isDependenciesSet ? factory : dependencies,
+    _deferred = isDependenciesSet ? deferred : factory,
+    _factoryType = typeOf(_factory),
     isValidId = id && idType === 'string',
     isValidFactory = _factoryType === 'object' || _factoryType === 'function',
     primaryKey = isValidId && isValidFactory && lib._registerModule(id, _dependencies);
@@ -51,7 +56,7 @@
         lib._initModule(id, _factory, depModules, primaryKey);
       };
 
-      if (lib._typeof(_deferred, 'function')) {
+      if (typeOf(_deferred, 'function')) {
         var args = depModules.slice(0);
         args.unshift(initModule);
         _deferred.apply(null, args);
@@ -91,17 +96,17 @@
    * Require a module.
    *
    * @public
-   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
+   * @param {array|string} dependencies - Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
    * @param {function} callback - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
    */
   lib.require = function (dependencies, callback) {
 
     var
-    dependenciesType = lib._typeof(dependencies),
+    dependenciesType = typeOf(dependencies),
     _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [];
 
     /** Callback function is required. */
-    if (!lib._typeof(callback, 'function')) {
+    if (!typeOf(callback, 'function')) {
       return;
     }
 
@@ -121,7 +126,7 @@
   lib.get = function (properties, of) {
 
     var
-    propsType = lib._typeof(properties),
+    propsType = typeOf(properties),
     props = propsType === 'array' ? properties : propsType === 'string' ? [properties] : [],
     propsLength = props.length,
     obj = of || glob;
@@ -174,9 +179,9 @@
   lib._initModule = function (id, factory, dependencies, primaryKey) {
 
     if (modules[id] && modules[id].pk === primaryKey) {
-      modules[id].factory = lib._typeof(factory, 'object') ? factory : factory.apply(null, dependencies);
+      modules[id].factory = typeOf(factory, 'object') ? factory : factory.apply(null, dependencies);
       modules[id].loaded = true;
-      lib._trigger(id);
+      events.emit(id, [modules[id]]);
     }
 
   };
@@ -213,15 +218,15 @@
 
           var
           depId = dependencies[i],
-          evHandler = function (isDirectCall) {
-
-            /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded.  */
-            ++depsReadyCounter;
+          evHandler = function (ev) {
 
             /** If this is an event's callback, let's unbind the event listener. */
-            if (!isDirectCall) {
-              lib._off(depId, evHandler);
+            if (ev) {
+              events.off(depId, evHandler);
             }
+
+            /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded. */
+            ++depsReadyCounter;
 
             /** Lock dependency module (can't be undefined anymore). */
             modules[depId].locked = true;
@@ -235,10 +240,10 @@
 
           /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
           if (modules[depId] && modules[depId].loaded) {
-            evHandler(1);
+            evHandler();
           }
           else {
-            lib._on(depId, evHandler);
+            events.on(depId, evHandler);
           }
 
         })(i);
@@ -254,62 +259,6 @@
   };
 
   /**
-   * Bind custom event.
-   *
-   * @private
-   * @param {string} type
-   * @param {function} cb
-   */
-  lib._on = function (type, cb) {
-
-    listeners[type] = listeners[type] || [];
-    listeners[type].push(cb);
-
-  };
-
-  /**
-   * Unbind custom event. If callback is not provided all listeners for the type will be removed, otherwise only the privded callback instances will be removed.
-   *
-   * @private
-   * @param {string} type
-   * @param {function} [cb]
-   */
-  lib._off = function (type, cb) {
-
-    var typeListeners = listeners[type];
-    if (typeListeners) {
-      var i = typeListeners.length;
-      while (i--) {
-        if (!cb || typeListeners[i] === cb) {
-          typeListeners.splice(i, 1);
-        }
-      }
-      if (!typeListeners.length) {
-        delete listeners[type];
-      }
-    }
-
-  };
-
-  /**
-   * Trigger custom event.
-   *
-   * @private
-   * @param {string} type
-   */
-  lib._trigger = function (type) {
-
-    var typeListeners = listeners[type];
-    if (typeListeners) {
-      typeListeners = typeListeners.slice(0);
-      for (var i = 0, len = typeListeners.length; i < len; i++) {
-        typeListeners[i]();
-      }
-    }
-
-  };
-
-  /**
    * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
    *
    * @private
@@ -317,22 +266,131 @@
    * @param {string} [compareType]
    * @returns {string|boolean} Returns boolean if type is defined.
    */
-  lib._typeof = function (obj, compareType) {
+  function typeOf(obj, compareType) {
 
     var type = typeof obj;
     type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
     return compareType ? type === compareType : type;
 
-  };
+  }
 
-  /** Expose modules and listeners as private items of the public API. */
-  lib._modules = modules;
-  lib._listeners = listeners;
+  /**
+   * Creates a new Eventizer that allows you to bind, unbind and trigger events.
+   *
+   * @example
+   * // Create event controller object.
+   * var events = new Eventizer();
+   * // Create a callback function for event binder.
+   * var cb = function (ev, foo, bar) {
+   *   alert(this === events && ev.type === 'foo' && ev.fn === cb && foo === 'foo' && bar === 'bar'); // true
+   * };
+   * // Bind event 'foo'.
+   * events.on('foo', cb);
+   * // Trigger event 'foo' with arguments.
+   * events.emit('foo', ['foo', 'bar']);
+   * // Remove all 'foo' event's listeners that equal to cb.
+   * events.off('foo', cb);
+   * // Remove all event listeners of 'foo' event.
+   * events.off('foo');
+   *
+   * @class
+   * @param {object} [listeners={}]
+   */
+  function Eventizer (listeners) {
 
-  /** Publish library. */
-  if (typeof exports === 'object') {
+    this._listeners = listeners || {};
+
+    /**
+     * Bind custom event.
+     *
+     * @private
+     * @param {string} type
+     * @param {function} cb
+     */
+    this.on = function (type, cb) {
+
+      var listeners = this._listeners;
+      listeners[type] = listeners[type] || [];
+      listeners[type].push(cb);
+
+    };
+
+    /**
+     * Unbind event. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
+     *
+     * @private
+     * @param {string} type
+     * @param {function} [cb]
+     */
+    this.off = function (type, cb) {
+
+      var
+      listeners = this._listeners,
+      typeStack = listeners[type],
+      i;
+
+      if (typeStack) {
+
+        i = typeStack.length;
+
+        while (i--) {
+          if (!cb || (cb && typeStack[i] === cb)) {
+            typeStack.splice(i, 1);
+          }
+        }
+
+        if (!typeStack.length) {
+          delete listeners[type];
+        }
+
+      }
+
+    };
+
+    /**
+     * Emit event.
+     *
+     * @private
+     * @param {string} type
+     * @param {array} [args]
+     */
+    this.emit = function (type, args) {
+
+      var
+      listeners = this._listeners,
+      typeStack = listeners[type],
+      cb;
+
+      if (typeStack) {
+
+        typeStack = typeStack.slice(0);
+
+        for (var i = 0, len = typeStack.length; i < len; i++) {
+          cb = typeStack[i];
+          if (typeof cb === 'function') {
+            args = args || [];
+            args.unshift({type: type, fn: cb});
+            cb.apply(this, args);
+          }
+        }
+
+      }
+
+    };
+
+  }
+
+  /**
+   * Publish library using adapted UMD pattern.
+   * https://github.com/umdjs/umd
+   */
+  if (typeof define === 'function' && define.amd) {
+    define([], lib);
+  }
+  else if (typeof exports === 'object') {
     module.exports = lib;
-  } else {
+  }
+  else {
     glob[ns] = lib;
   }
 
