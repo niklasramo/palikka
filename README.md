@@ -16,7 +16,7 @@ A tiny JavaScript module system that allows you to define modules and manage dep
 
 ## Usage
 
-Include [palikka.js](palikka.js) somewhere in your page and start defining and requiring modules.
+Include [palikka.js](https://github.com/niklasramo/palikka/blob/v0.1.3/palikka.js) somewhere in your page and start defining and requiring modules.
 
 ```javascript
 // Define module "foo" which requires module "bar"
@@ -137,7 +137,7 @@ palikka.define('foo', ['jQuery'], function ($) {
   return 'foo';
 });
 
-// Require "jquery" and "foo" and make magic happen.
+// Require "jQuery" and "foo" and make magic happen.
 palikka.require(['jQuery', 'foo'], function ($, foo) {
   $('body').html(foo);
 });
@@ -176,7 +176,9 @@ palikka.require('docReady', function ($) {
 });
 
 // Tip #3:
-// Create a module that uses Palikka's built-in event system to trigger events.
+// Using Palikka's built-in event system to emit and listen events.
+// Note that the event system is still work in progress and may be subject to changes.
+// Please refer to the palikka.js source code for more detailed API documentation. 
 palikka.define('moduleA', function () {
 
   var m = {};
@@ -184,9 +186,9 @@ palikka.define('moduleA', function () {
   // Initiate event system.
   palikka._Eventizer.call(m);
 
-  // Emit "someevent" event with "foo" and "bar" arguments every second.
+  // Emit "tick" event with "foo" and "bar" arguments every second.
   window.setInterval(function () {
-    m.emit('someevent', ['foo', 'bar']);
+    m.emit('tick', ['foo', 'bar']);
   }, 1000);
 
   return m;
@@ -196,17 +198,18 @@ palikka.define('moduleB', ['moduleA'], function (moduleA) {
 
   var m = {};
 
-  // Bind "someevent" event.
-  moduleA.on('someevent', function (ev, foo, bar) {
+  // Bind a listener to moduleA's "tick" event.
+  moduleA.on('tick', function (ev, foo, bar) {
 
     // Event data
+    console.log(this); // moduleA object
     console.log(ev.type); // Event type
     console.log(ev.fn); // The callback function
     console.log(foo); // "foo"
     console.log(bar); // "bar"
 
-    // Unbind "someevent" event
-    moduleA.off('someevent', ev.fn);
+    // Unbind specific listener from moduleA's "tick" event.
+    moduleA.off('tick', ev.fn);
 
   });
 
@@ -220,6 +223,8 @@ palikka.define('moduleB', ['moduleA'], function (moduleA) {
 
 Palikka is already production ready and unit tested, but here are some things to consider and possibly implement before getting to v1.0.0.
 
+* **Event system**
+  * The built-in event system, which is used to emit and listen module initiation events, is initiated with a reusable event controller class which could be useful for allowing modules to create their own private event systems easily. So it might make sense to bring this functionality as a part of the public API instead of hiding it as a private member. However, Palikka is not intended as an event emitter library so maybe this is a bad idea.
 * **Module versioning**
   * Should we add some way to add version number to the module and make it possible to require spedific version(s) of a module? This would be especially helpful with third party libraries that are imported as modules. Naturally this would be a n optional feature.
 * **Circular modules handling**
