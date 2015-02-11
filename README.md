@@ -132,7 +132,7 @@ palikka.define('jQuery', function () {
 // use the .get() method to do that.
 palikka.get(['jQuery', 'Modernizr']);
 
-// Define a custom module that requires "jquery" module.
+// Define a custom module that requires "jQuery" module.
 palikka.define('foo', ['jQuery'], function ($) {
   return 'foo';
 });
@@ -173,6 +173,45 @@ palikka.define(
 );
 palikka.require('docReady', function ($) {
   alert('Document is definitely ready!');
+});
+
+// Tip #3:
+// Create a module that uses Palikka's built-in event system to trigger events.
+palikka.define('moduleA', function () {
+
+  var m = {};
+
+  // Initiate event system.
+  palikka._Eventizer.call(m);
+
+  // Emit "someevent" event with "foo" and "bar" arguments every second.
+  window.setInterval(function () {
+    m.emit('someevent', ['foo', 'bar']);
+  }, 1000);
+
+  return m;
+
+});
+palikka.define('moduleB', ['moduleA'], function (moduleA) {
+
+  var m = {};
+
+  // Bind "someevent" event.
+  moduleA.on('someevent', function (ev, foo, bar) {
+
+    // Event data
+    console.log(ev.type); // Event type
+    console.log(ev.fn); // The callback function
+    console.log(foo); // "foo"
+    console.log(bar); // "bar"
+
+    // Unbind "someevent" event
+    moduleA.off('someevent', ev.fn);
+
+  });
+
+  return m;
+
 });
 
 ```
