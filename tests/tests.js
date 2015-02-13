@@ -322,7 +322,7 @@
 
   Q.module('.get()');
 
-  Q.test(testName('Importing global object\'s properties and plain object\s properties.'), function (assert) {
+  Q.test(testName('Importing global object\'s properties and plain object\'s properties.'), function (assert) {
 
     assert.expect(5);
 
@@ -343,6 +343,123 @@
       assert.strictEqual(a, 'a');
       assert.strictEqual(b, 'b');
     });
+
+  });
+
+  Q.module('._events');
+
+  Q.test(testName('Triggering, binding and unbinding module initiation events.'), function (assert) {
+
+    var done = assert.async();
+    assert.expect(9);
+
+    var cb = function (ev, module) {
+      assert.strictEqual(this, palikka._events);
+      assert.strictEqual(ev.type, 'a');
+      assert.strictEqual(ev.fn, cb);
+      assert.strictEqual(palikka._modules['a'], module);
+    };
+
+    /** Test binding. */
+    palikka._events.on('a', cb);
+    palikka.define('a', function () {
+      return 'foobar';
+    });
+
+    /** Test triggering. */
+    palikka._events.emit('a', [palikka._modules['a']]);
+
+    /** Test unbinding. */
+    palikka._events.off('a');
+    assert.strictEqual(palikka._events._listeners['a'], undefined);
+
+    done();
+
+  });
+
+  Q.module('._Eventizer');
+
+  Q.test(testName('Triggering, binding and unbinding events.'), function (assert) {
+
+    var done = assert.async();
+    assert.expect(12);
+
+    palikka.define('a', function () {
+
+      var m = {};
+
+      /** Initiate Eventizer using call method. */
+      palikka._Eventizer.call(m);
+
+      /** Initiate another Eventizer using new keyword. */
+      m.events = new palikka._Eventizer();
+
+      /** Emit "tick" event with "foo" and "bar" arguments. */
+      m.ticker = window.setInterval(function () {
+        m.emit('tick', ['foo', 'bar']);
+      }, 100);
+
+      /** Emit "tock" event with "foo" and "bar" arguments. */
+      m.tocker = window.setInterval(function () {
+        m.events.emit('tock', ['foo', 'bar']);
+      }, 100);
+
+      return m;
+
+    });
+    palikka.define('b', ['a'], function (a) {
+
+      var
+      m = {},
+      counter = 0,
+      tickCb = function (ev, foo, bar) {
+
+        assert.strictEqual(this, a);
+        assert.strictEqual(ev.type, 'tick');
+        assert.strictEqual(ev.fn, tickCb);
+        assert.strictEqual(foo, 'foo');
+        assert.strictEqual(bar, 'bar');
+
+        /** Unbind specific listener from module a's "tick" event. */
+        a.off('tick', ev.fn);
+
+      },
+      tockCb = function (ev, foo, bar) {
+
+        assert.strictEqual(this, a.events);
+        assert.strictEqual(ev.type, 'tock');
+        assert.strictEqual(ev.fn, tockCb);
+        assert.strictEqual(foo, 'foo');
+        assert.strictEqual(bar, 'bar');
+
+        /** Unbind specific listener from module a's "tick" event. */
+        a.events.off('tock', ev.fn);
+
+      };
+
+      /** Bind a listener to a's "tick" event. */
+      a.on('tick', tickCb);
+
+      /** Bind a listener to a.events' "tock" event. */
+      a.events.on('tock', tockCb);
+
+      /** Bind tick event 5 times (to test unbinding all events at once). */
+      window.setTimeout(function () {
+        for (var i = 0; i < 5; i++) {
+          a.on('tick', function () {});
+        }
+        assert.strictEqual(a._listeners['tick'].length, 5);
+        a.off('tick');
+        assert.strictEqual(a._listeners['tick'], undefined);
+        a.ticker = clearInterval(a.ticker);
+        a.tocker = clearInterval(a.tocker);
+        done();
+      }, 1000);
+
+      return m;
+
+    });
+
 
   });
 

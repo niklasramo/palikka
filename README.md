@@ -13,6 +13,7 @@ A tiny JavaScript module system that allows you to define modules and manage dep
 * Well documented codebase (JSDoc syntax).
 * Comprehensive unit tests (Qunit).
 * No dependencies.
+* Works in browser and Node.js.
 
 ## Usage
 
@@ -42,7 +43,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ###.define()
 
-Define a module. All modules get stored in `palikka.modules` object. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
+Define a module. All modules get stored in `palikka._modules` object. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
 
 **Syntax**
 
@@ -158,9 +159,9 @@ palikka.define(
 // Tip #1:
 // Plain objects can be imported directly as modules.
 // No need to use extra wrapper function here.
-palikka.define('heavyMetal', {rjd: 'Ronnie James Dio'});
+palikka.define('heavyMetal', {legend: 'Ronnie James Dio'});
 palikka.require('heavyMetal', function (heavyMetal) {
-  alert(heavyMetal.rjd); // Ronnie James Dio
+  alert(heavyMetal.legend); // Ronnie James Dio
 });
 
 // Tip #2:
@@ -178,7 +179,7 @@ palikka.require('docReady', function ($) {
 // Tip #3:
 // Using Palikka's built-in event system to emit and listen events.
 // Note that the event system is still work in progress and may be subject to changes.
-// Please refer to the palikka.js source code for more detailed API documentation. 
+// Please refer to the palikka.js source code for more detailed API documentation.
 palikka.define('moduleA', function () {
 
   var m = {};
@@ -218,19 +219,6 @@ palikka.define('moduleB', ['moduleA'], function (moduleA) {
 });
 
 ```
-
-##Roadmap to version 1.0.0
-
-Palikka is already production ready and unit tested, but here are some things to consider and possibly implement before getting to v1.0.0.
-
-* **Event system**
-  * The built-in event system, which is used to emit and listen module initiation events, is initiated with a reusable event controller class which could be useful for allowing modules to create their own private event systems easily. So it might make sense to bring this functionality as a part of the public API instead of hiding it as a private member. However, Palikka is not intended as an event emitter library so maybe this is a bad idea.
-* **Module versioning**
-  * Should we add some way to add version number to the module and make it possible to require spedific version(s) of a module? This would be especially helpful with third party libraries that are imported as modules. Naturally this would be a n optional feature.
-* **Circular modules handling**
-  * Should we handle circular modules at all or not?
-* **Error reporting**
-  * Should the library's methods fail silently or output error messages?
 
 ##Alternatives
 
