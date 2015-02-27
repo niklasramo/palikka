@@ -1,4 +1,4 @@
-#Palikka v0.2.0
+#Palikka v0.2.0-1
 
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.2.0-1)](https://travis-ci.org/niklasramo/palikka)
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.2.0-1)](https://coveralls.io/r/niklasramo/palikka?branch=v0.2.0-1)
