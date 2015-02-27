@@ -1,5 +1,5 @@
 /*!
- * Palikka v0.1.3
+ * Palikka v0.2.0-1
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -12,71 +12,76 @@
   ns = 'palikka',
   lib = {},
   modules = {},
-  events = new Eventizer(),
-  modulePrimaryKey = 0;
+  modulePrimaryKey = 0,
+  evInit = 'initiate',
+  evReg = 'register';
 
-  /** Expose modules, events and EventHub class as private members of the public API. */
+  /** Create event system. */
+  Eventizer.call(lib);
+
+  /** Add module container object to palikka as a private object. */
   lib._modules = modules;
-  lib._events = events;
+
+  /** Add Eventizer to palikka as a private method. */
   lib._Eventizer = Eventizer;
 
   /**
-   * Define a module.
+   * Define a module. Returns true if module registration was successful, otherwise returns false. This method has two modes. If dependencies are provided as an array or a string the factory function will receive each dependecny module as an individual argument in the same order they are defined. However, if dependencies are provided as an object the factory function will receive a single argument: an object which contains references to the dependency modules. There are two ways to initiate a module within the factory callback. The simple way is just returning the module's value within the factory callback, but the value must be something else than undefined. If you need to set the module's value to undefined or use asynchronous initiation you need to call the init function mannually. The factory callback always receives the initiation function as it's context (this keyword), which sets the first function argument as the module's value when it is executed.
    *
    * @public
-   * @param {string} id - ID of the module.
-   * @param {array|string} [dependencies] - Optional. Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
-   * @param {function|object} factory - If the factory argument is a function it is executed once and the return value is assigned as the value for the module. If the factory argument is a plain object it is directly assigned as the module's value.
-   * @param {function} [deferred] - Optional. Define a function which will delay the registration of the module until the resolver callback function is executed (provided as the first function argument). Dependency modules are also provided as arguments following the callback function.
-   * @returns {boolean} Returns true if definition was successful, otherwise returns false.
+   * @param {string} id
+   * @param {array|string|object} [dependencies]
+   * @param {function|object} factory
+   * @returns {boolean}
    */
-  lib.define = function (id, dependencies, factory, deferred) {
+  lib.define = function (id, dependencies, factory) {
 
     var
-    idType = typeOf(id),
-    dependenciesType = typeOf(dependencies),
-    isDependenciesSet = dependenciesType === 'array' || dependenciesType === 'string',
-    _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [],
-    _factory = isDependenciesSet ? factory : dependencies,
-    _deferred = isDependenciesSet ? deferred : factory,
-    _factoryType = typeOf(_factory),
-    isValidId = id && idType === 'string',
-    isValidFactory = _factoryType === 'object' || _factoryType === 'function',
-    primaryKey = isValidId && isValidFactory && lib._registerModule(id, _dependencies);
+    hasDeps = factory,
+    depIds = hasDeps ? lib._sanitizeDependencies(dependencies) : [],
+    factory = hasDeps ? factory : dependencies,
+    factoryType = typeOf(factory),
+    isValidId = id && typeOf(id, 'string'),
+    isValidFactory = factoryType === 'object' || factoryType === 'function',
+    primaryKey = isValidId && isValidFactory && lib._registerModule(id, depIds),
+    initModule,
+    moduleData;
 
-    /** Return false if definition failed. */
+    /** Return false if module registration failed. */
     if (!primaryKey) {
       return false;
     }
 
     /** Load dependencies. */
-    lib._loadDependencies(_dependencies, function (depModules, initModule) {
+    lib._loadDependencies(depIds, function (depModules) {
 
-      initModule = function () {
-        lib._initModule(id, _factory, depModules, primaryKey);
+      initModule = function (moduleData) {
+        lib._initModule(id, primaryKey, moduleData);
       };
 
-      if (typeOf(_deferred, 'function')) {
-        var args = depModules.slice(0);
-        args.unshift(initModule);
-        _deferred.apply(null, args);
+      if (factoryType === 'function') {
+        /** Init the module instantly if it returns a value (something else than undefined). */
+        moduleData = factory.apply(initModule, lib._factoryArgs(depIds, depModules, hasDeps ? dependencies : undefined));
+        if (moduleData !== undefined) {
+          initModule(moduleData);
+        }
       }
       else {
-        initModule();
+        initModule(factory);
       }
 
     });
 
-    /** Return true to indicate a succesful definition. */
+    /** Return true to indicate a succesful module registration. */
     return true;
 
   };
 
   /**
-   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined.
+   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns true if undefinition was successful, otherwise returns false.
    *
    * @param {string} id
-   * @returns {boolean} Returns true if undefinition was successful, otherwise returns false.
+   * @returns {boolean}
    */
   lib.undefine = function (id) {
 
@@ -96,34 +101,31 @@
    * Require a module.
    *
    * @public
-   * @param {array|string} dependencies - Define dependencies as an array of modules IDs. Optionally you can just specify a single module ID as a string.
-   * @param {function} callback - The callback function that will be executed after all dependencies have loaded. Provides the dependency modules as arguments in the same order they were required.
+   * @param {array|string|object} dependencies
+   * @param {function} callback
    */
   lib.require = function (dependencies, callback) {
 
-    var
-    dependenciesType = typeOf(dependencies),
-    _dependencies = dependenciesType === 'array' ? dependencies : dependenciesType === 'string' ? [dependencies] : [];
+    var depIds = lib._sanitizeDependencies(dependencies);
 
-    /** Callback function is required. */
     if (!typeOf(callback, 'function')) {
       return;
     }
 
-    lib._loadDependencies(_dependencies, function (depModules) {
-      callback.apply(null, depModules);
+    lib._loadDependencies(depIds, function (depModules) {
+      callback.apply(null, lib._factoryArgs(depIds, depModules, dependencies));
     });
 
   };
 
   /**
-   * Import object properties as modules.
+   * Assign properties of an object to be defined as modules. In essence this is just a wrapper for define method that allows you to define multiple modules quickly. Very useful for importing third party libraries into Palikka's context as modules.
    *
    * @public
-   * @param {array|string} properties - Define property names to be imported.
-   * @param {object} [of=window] - Define the object where to look for the defined properties.
+   * @param {array|string} properties
+   * @param {object} [of=window]
    */
-  lib.get = function (properties, of) {
+  lib.assign = function (properties, of) {
 
     var
     propsType = typeOf(properties),
@@ -134,7 +136,7 @@
     for (var i = 0; i < propsLength; i++) {
       if (props[i] in obj) {
         lib.define(props[i], function () {
-          return obj[props[i]];
+          this(obj[props[i]]);
         });
       }
     }
@@ -142,11 +144,11 @@
   };
 
   /**
-   * Register module.
+   * Register a module. Returns the modules primary key (a positive integer) if succesful, otherwise returns zero.
    *
    * @private
    * @param {string} id
-   * @returns {number} Returns the modules primary key (positive number) if succesful, otherwise returns zero.
+   * @returns {number}
    */
   lib._registerModule = function (id, dependencies) {
 
@@ -157,9 +159,11 @@
         pk: pk,
         loaded: false,
         locked: false,
-        factory: null,
+        data: undefined,
         dependencies: dependencies
       };
+      lib.emit(evReg + '-' + id, [modules[id]]);
+      lib.emit(evReg, [modules[id]]);
       return pk;
     } else {
       return 0;
@@ -168,32 +172,32 @@
   };
 
   /**
-   * Initialize module.
+   * Initialize a module.
    *
    * @private
    * @param {string} id
-   * @param {function} factory
-   * @param {array} dependencies
    * @param {number} primaryKey
+   * @param {*} data
    */
-  lib._initModule = function (id, factory, dependencies, primaryKey) {
+  lib._initModule = function (id, primaryKey, data) {
 
-    if (modules[id] && modules[id].pk === primaryKey) {
-      modules[id].factory = typeOf(factory, 'object') ? factory : factory.apply(null, dependencies);
+    if (modules[id] && modules[id].pk === primaryKey && !modules[id].loaded) {
+      modules[id].data = data;
       modules[id].loaded = true;
-      events.emit(id, [modules[id]]);
+      lib.emit(evInit + '-' + id, [modules[id]]);
+      lib.emit(evInit, [modules[id]]);
     }
 
   };
 
   /**
-   * Load dependencies by their IDs and return a deferred object that will be resolved when the all dependencies are loaded.
+   * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
    *
    * @private
    * @param {array} dependencies
-   * @param {function} cb
+   * @param {function} callback
    */
-  lib._loadDependencies = function (dependencies, cb) {
+  lib._loadDependencies = function (dependencies, callback) {
 
     var
     depModules = [],
@@ -203,11 +207,11 @@
 
       if (depsLength) {
         for (var i = 0; i < depsLength; i++) {
-          depModules.push(modules[dependencies[i]].factory);
+          depModules.push(modules[dependencies[i]].data);
         }
       }
 
-      cb(depModules);
+      callback(depModules);
 
     };
 
@@ -218,11 +222,12 @@
 
           var
           depId = dependencies[i],
+          evName = evInit + '-' + depId,
           evHandler = function (ev) {
 
             /** If this is an event's callback, let's unbind the event listener. */
             if (ev) {
-              events.off(depId, evHandler);
+              lib.off(evName, evHandler);
             }
 
             /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded. */
@@ -243,7 +248,7 @@
             evHandler();
           }
           else {
-            events.on(depId, evHandler);
+            lib.on(evName, evHandler);
           }
 
         })(i);
@@ -258,13 +263,76 @@
 
   };
 
+
+  /**
+   * Sanitize dependencies argument of define and require methods.
+   *
+   * @private
+   * @param {array|string|object} dependencies
+   * @returns {array}
+   */
+  lib._sanitizeDependencies = function (dependencies) {
+
+    var
+    type = typeOf(dependencies),
+    ret = [];
+
+    if (type === 'object') {
+      for (var prop in dependencies) {
+        ret.push(prop);
+      }
+    }
+    else {
+      ret = type === 'array' ? dependencies : type === 'string' ? [dependencies] : ret;
+    }
+
+    return ret;
+
+  };
+
+  /**
+   * Create arguments for define method's factory argument.
+   *
+   * @private
+   * @param {array} depIds
+   * @param {array} depModules
+   * @param {object} [depObj]
+   * @returns {array}
+   */
+  lib._factoryArgs = function (depIds, depModules, depObj) {
+
+    var
+    depId,
+    depAlias,
+    ret;
+
+    if (typeOf(depObj, 'object')) {
+      ret = {};
+      for (var i = 0, len = depIds.length; i < len; i++) {
+        depId = depIds[i];
+        depAlias = depObj[depId];
+        if (typeOf(depAlias, 'string')) {
+          depAlias = depAlias ? depAlias : depId;
+          ret[depAlias] = depModules[i];
+        }
+      }
+      ret = [ret];
+    }
+    else {
+      ret = depModules;
+    }
+
+    return ret;
+
+  };
+
   /**
    * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
    *
    * @private
    * @param {object} obj
    * @param {string} [compareType]
-   * @returns {string|boolean} Returns boolean if type is defined.
+   * @returns {string|boolean}
    */
   function typeOf(obj, compareType) {
 
@@ -277,52 +345,36 @@
   /**
    * Creates a new Eventizer that allows you to bind, unbind and trigger events.
    *
-   * @example
-   * // Create event controller object.
-   * var events = new Eventizer();
-   * // Create a callback function for event binder.
-   * var cb = function (ev, foo, bar) {
-   *   alert(this === events && ev.type === 'foo' && ev.fn === cb && foo === 'foo' && bar === 'bar'); // true
-   * };
-   * // Bind event 'foo'.
-   * events.on('foo', cb);
-   * // Trigger event 'foo' with arguments.
-   * events.emit('foo', ['foo', 'bar']);
-   * // Remove all 'foo' event's listeners that equal to cb.
-   * events.off('foo', cb);
-   * // Remove all event listeners of 'foo' event.
-   * events.off('foo');
-   *
    * @class
-   * @param {object} [listeners={}]
+   * @param {object} [listeners]
    */
-  function Eventizer (listeners) {
+  function Eventizer(listeners) {
 
     this._listeners = listeners || {};
 
     /**
-     * Bind custom event.
+     * Bind custom event listener.
      *
      * @private
      * @param {string} type
-     * @param {function} cb
+     * @param {function} callback
      */
-    this.on = function (type, cb) {
+    this.on = function (type, callback) {
 
       var listeners = this._listeners;
       listeners[type] = listeners[type] || [];
-      listeners[type].push(cb);
+      listeners[type].push(callback);
 
     };
 
     /**
-     * Unbind event. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
+     * Unbind an event listener. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
      *
      * @private
      * @param {string} type
-     * @param {function} [cb]
+     * @param {function} [callback]
      */
-    this.off = function (type, cb) {
+    this.off = function (type, callback) {
 
       var
       listeners = this._listeners,
@@ -334,7 +386,7 @@
         i = typeStack.length;
 
         while (i--) {
-          if (!cb || (cb && typeStack[i] === cb)) {
+          if (!callback || (callback && typeStack[i] === callback)) {
             typeStack.splice(i, 1);
           }
         }
@@ -359,18 +411,18 @@
       var
       listeners = this._listeners,
       typeStack = listeners[type],
-      cb;
+      callback;
 
       if (typeStack) {
 
         typeStack = typeStack.slice(0);
 
         for (var i = 0, len = typeStack.length; i < len; i++) {
-          cb = typeStack[i];
-          if (typeof cb === 'function') {
+          callback = typeStack[i];
+          if (typeof callback === 'function') {
             args = args || [];
-            args.unshift({type: type, fn: cb});
-            cb.apply(this, args);
+            args.unshift({type: type, fn: callback});
+            callback.apply(this, args);
           }
         }
 
@@ -381,7 +433,7 @@
   }
 
   /**
-   * Publish library using adapted UMD pattern.
+   * Publish library using an adapted UMD pattern.
    * https://github.com/umdjs/umd
    */
   if (typeof define === 'function' && define.amd) {
