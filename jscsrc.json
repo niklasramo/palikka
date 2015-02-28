@@ -56,7 +56,6 @@
     "mark": "'",
     "escape": true
   },
-  "validateLineBreaks": "LF",
   "plugins": [
     "jscs-jsdoc"
   ],

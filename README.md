@@ -1,7 +1,7 @@
-#Palikka v0.2.0-1
+#Palikka v0.2.0
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.2.0-1)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.2.0-1)](https://coveralls.io/r/niklasramo/palikka?branch=v0.2.0-1)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.2.0)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.2.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.2.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
 A tiny JavaScript module system that allows you to define modules and manage dependencies between them. Palikka makes sure that modules are loaded synchronously, respecting the dependencies, even if your module definitions are included in a mixed order. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader*, meaning that it does not load JavaScript files for you.
@@ -41,8 +41,6 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ##API
 
-**Public methods**
-
 * [.define()](#define)
 * [.undefine()](#undefine)
 * [.require()](#require)
@@ -55,9 +53,11 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 * [.emit()](#emit)
 * [._Eventizer()](#_eventizer)
 
+&nbsp;
+
 ###.define()
 
-Define a module. When a module is defined Palikka will instantly register the module, reserving the defined id for the module. If the id is already taken the module will not be registered. After all the dependencies, if any, have loaded the factory function is executed with the dependency modules as function arguments and init function set as context (this keyword). Palikka then waits for the init function to be executed with the module's value provided as the first argument. All modules are stored in `palikka._modules` object, which holds all the data about the modules. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
+Define a module. All modules are stored in `palikka._modules` object, which holds all the data about the modules. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
 
 **Syntax**
 
@@ -68,13 +68,61 @@ Define a module. When a module is defined Palikka will instantly register the mo
 * **id** &nbsp;&mdash;&nbsp; *string*
   * Id of the module.
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string / object*
-  * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string. Alternatively you can provide an object of key value pairs where the key represents the dependency's id and the value represents the dependency's alias in the context data of factory function. Leave the alias as an empty string if you want to use the module's id as the alias. If you just want to load the dependency but not use it within the factory function, provide any other than string value as the module's alias (null for example).
+  * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string. Alternatively you can provide an object of key value pairs where the key represents the dependency's id and the value represents the dependency's property name in the dependencies argument of factory function. Leave the alias as an empty string if you want to use the module's id as the alias. If you just want to load the dependency but not use it within the factory function, provide any other than string value as the module's alias (null for example).
 * **factory** &nbsp;&mdash;&nbsp; *function / object*
   * If the factory argument is a plain object it is directly assigned as the module's value. If the argument is a function it is executed once after all dependencies have loaded and it receives the defined dependency modules as it's function arguments. If dependencies are defined as an object their references are stored in a single data object which is accesible via the first function argument. In other cases the dependency modules are provided as direct references in the function arguments (in the same order they are defined in dependency argument). The "this" keyword within factory's context refers to the module's initiation function which must be executed in order to initiate the module. The first argument of the initiation function will be assigned as the module's value.
 
 **Returns** &nbsp;&mdash;&nbsp; *boolean*
 
 Returns `true` if module registration was successful, otherwise returns `false`.
+
+**Usage**
+
+```javascript
+// Define a module by using the init function
+// which is always provided as factory's context.
+palikka.define('foo', function () {
+  this('foo');
+});
+
+// Define a module by returning the module's value.
+palikka.define('foo', function () {
+  return 'foo';
+});
+
+// Define a plain object as module.
+palikka.define('foo', {foo: 'foo'});
+
+// Define a module with dependencies.
+palikka.define('foobar', ['foo'], function (foo) {
+  this(foo + 'bar'); // "foobar"
+});
+
+// Define module a module using delayed initiation.
+palikka.define(
+  'slow',
+  function () {
+    var init = this;
+    window.setTimeout(function () {
+      init('slow');
+    }, 2000);
+  }
+);
+
+// Define a module with a dependencies as an object.
+palikka.define(
+  'x',
+  {
+    jQuery: '$',
+    foo: '',
+    bar: null
+  },
+  function (deps) {
+    // deps has props '$' and 'foo'.
+    this('dependant');
+  }
+);
+```
 
 &nbsp;
 
@@ -95,6 +143,25 @@ Undefine a module. Please keep in mind that if any other `define` or `require` i
 
 Returns `false` if the module exists and is used as a dependency, otherwise returns `true`. Note that undefining a non-existent module returns `true` also.
 
+**Usage**
+
+```javascript
+palikka.define('foo', function () {
+  this('foo');
+});
+palikka.define('bar', ['foo'], function () {
+  this('bar');
+});
+
+// "foo" module can not be undefined since
+// it is required by module "bar" already.
+palikka.undefine('foo'); // Returns false
+
+// "bar" module can be undefined since it is
+// not required by other modules yet.
+palikka.undefine('bar'); // Return true
+```
+
 &nbsp;
 
 ###.require()
@@ -112,6 +179,20 @@ Require a module.
 * **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Receives the required dependency modules as it's function arguments. If dependencies are defined as an object the module references are stored in a single data object which is accesible via the first function argument. In other cases the dependency modules are provided as function arguments in the same order they are defined in dependency argument.
 
+**Usage**
+
+```javascript
+palikka.define('foo', function () {
+  this('foo');
+});
+palikka.define('bar', function () {
+  this('bar');
+});
+palikka.require(['foo', 'bar'], function (foo, bar) {
+  // Do your stuff here.
+});
+```
+
 &nbsp;
 
 ###.assign()
@@ -128,6 +209,25 @@ Assign properties of an object to be defined as modules. In essence this is just
   * Define property names to be imported.
 * **of** &nbsp;&mdash;&nbsp; *object*
   * Optional. Defaults to `window` in browser and `global` in node. Define the object where to look for the defined properties.
+
+**Usage**
+
+```javascript
+var obj = {
+  a: 'a',
+  b: 'b'
+};
+window.foo = 'foo';
+window.bar = 'bar';
+
+// By default assign looks the properties
+// from window/global object.
+palikka.assign(['foo', 'bar']);
+
+// You can tell assign method the object
+// where to look the properties from.
+palikka.assign(['a', 'b'], obj);
+```
 
 &nbsp;
 
@@ -206,130 +306,47 @@ var eventSystem1 = new palikka._Eventizer();
 // Initiate using an existing object.
 var eventSystem2 = {};
 palikka._Eventizer.call(eventSystem2);
-```
 
-&nbsp;
+// Create a private event system for a module.
+palikka.define('foo', function () {
 
-##Examples
+  var m = {
+    foo: 'foo'
+  };
 
-Here are some examples and tips to get you started.
-
-```javascript
-// Modulize third party library to be used as a module.
-// The library should be included in the page first though.
-palikka.define('jQuery', function () {
-  this(jQuery);
-});
-
-// If you have multiple libraries on the page already initiated
-// and you want to import them as palikka modules all at once
-// use the .assign() method to do that.
-palikka.assign(['jQuery', 'Modernizr']);
-
-// Define a custom module that requires "jQuery" module.
-palikka.define('foo', ['jQuery'], function ($) {
-  this('foo');
-});
-
-// Require "jQuery" and "foo" and make magic happen.
-palikka.require(['jQuery', 'foo'], function ($, foo) {
-  $('body').html(foo);
-});
-
-// Define a custom module that will wait for
-// two seconds before it gets registered.
-palikka.define(
-  'bar',
-  ['jQuery', 'foo'],
-  function ($, foo) {
-    var init = this;
-    window.setTimeout(function () {
-      init(foo + 'bar'); // foobar
-    }, 2000);
-  }
-);
-
-// Tip #1:
-// Plain objects can be imported directly as modules.
-// No need to use extra wrapper function here.
-palikka.define('heavyMetal', {legend: 'Ronnie James Dio'});
-palikka.require('heavyMetal', function (heavyMetal) {
-  alert(heavyMetal.legend); // Ronnie James Dio
-});
-
-// Tip #2:
-// Create a module that provides jQuery object when document is ready.
-palikka.define(
-  'docReady',
-  ['jQuery'],
-  function ($) {
-    var init = this;
-    $(function () { init($); });
-  }
-);
-palikka.require('docReady', function ($) {
-  alert('Document is definitely ready!');
-});
-
-// Tip #3:
-// Use Palikka's built-in event system creator "Eventizer" to
-// create a private event system for your module.
-palikka.define('moduleA', function () {
-
-  var m = {};
-
-  // Initiate event system.
+  // Initiate event system for m object.
   palikka._Eventizer.call(m);
 
-  // Emit "tick" event with "foo" and "bar" arguments every second.
+  // Emit "tick" event with "a" and "b" arguments every second.
   window.setInterval(function () {
-    m.emit('tick', ['foo', 'bar']);
+    m.emit('tick', ['a', 'b']);
   }, 1000);
 
   this(m);
 
 });
-palikka.define('moduleB', ['moduleA'], function (moduleA) {
+palikka.require(['foo'], function (foo) {
 
-  var m = {};
-
-  // Bind a listener to moduleA's "tick" event.
-  moduleA.on('tick', function (ev, foo, bar) {
+  // Bind a listener to foo's "tick" event.
+  foo.on('tick', function (ev, a, b) {
 
     // Event data
-    console.log(this); // moduleA object
+    console.log(this); // foo module
     console.log(ev.type); // Event type
-    console.log(ev.fn); // The callback function
-    console.log(foo); // "foo"
-    console.log(bar); // "bar"
+    console.log(ev.fn); // Event listener callback function
+    console.log(a); // "a"
+    console.log(b); // "b"
 
-    // Unbind specific listener from moduleA's "tick" event.
-    moduleA.off('tick', ev.fn);
+    // Let's unbind the event listener after first execution.
+    foo.off('tick', ev.fn);
 
   });
 
-  this(m);
-
 });
 
-// Tip #4:
-// Define a large list of dependencies as an object instead
-// of an array for more control.
-palikka.define(
-  'bigModule',
-  {
-    jQuery: '$',
-    foo: '',
-    bar: null
-  },
-  function (deps) {
-    // deps has props '$' and 'foo'.
-    // Module 'bar' is required, but not accessbile within factory function.
-    this('bigModuleValue');
-  }
-);
-
 ```
+
+&nbsp;
 
 ##Alternatives
 

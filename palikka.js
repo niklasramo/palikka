@@ -1,5 +1,5 @@
 /*!
- * Palikka v0.2.0-1
+ * Palikka v0.2.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -262,7 +262,6 @@
     }
 
   };
-
 
   /**
    * Sanitize dependencies argument of define and require methods.

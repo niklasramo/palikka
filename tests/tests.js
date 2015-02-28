@@ -70,6 +70,22 @@
 
   });
 
+  Q.test(testName('Returning module\'s value.'), function (assert) {
+
+    assert.expect(2);
+
+    palikka.define('a', function () {
+      return 'a';
+    });
+    assert.strictEqual(getVal('a'), 'a');
+
+    palikka.define('b', function () {
+      return undefined;
+    });
+    assert.strictEqual(getVal('b'), undefined);
+
+  });
+
   Q.test(testName('Dependencies argument.'), function (assert) {
 
     assert.expect(12);
