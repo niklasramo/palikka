@@ -91,7 +91,7 @@ palikka.define('foobar', ['foo', 'bar'], function (foo, bar) {
   return foo + bar.bar;
 });
 
-// Define module a module using async initiation.
+// Define a module using async initiation.
 palikka.define('async', function () {
   var init = this.async();
   window.setTimeout(function () {
@@ -130,10 +130,10 @@ Returns `false` if the module exists and is used as a dependency, otherwise retu
 
 ```javascript
 palikka.define('foo', function () {
-  this('foo');
+  return 'foo';
 });
 palikka.define('bar', ['foo'], function () {
-  this('bar');
+  return 'bar';
 });
 
 // "foo" module can not be undefined since
@@ -166,10 +166,10 @@ Require a module.
 
 ```javascript
 palikka.define('foo', function () {
-  this('foo');
+  return 'foo';
 });
 palikka.define('bar', function () {
-  this('bar');
+  return 'bar';
 });
 palikka.require(['foo', 'bar'], function (foo, bar) {
   // Do your stuff here.
@@ -269,7 +269,7 @@ palikka.define('foo', function () {
     m.emit('tick', ['a', 'b']);
   }, 1000);
 
-  this(m);
+  return m;
 
 });
 palikka.require(['foo'], function (foo) {
