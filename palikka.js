@@ -1,9 +1,24 @@
 /*!
- * Palikka v0.2.0
+ * Palikka v0.3.0-beta
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
+
+/*
+  IDEAS/TODOS:
+  ------------
+  - Is require method needed and is it functionality in sync with the name? Could it be integrated to define method?
+  - Should define method return an array of fail/success ids?
+  - A method that shows per module that which dependencies have loaded and which are pending.
+  - Forced undefine.
+  - Undefine multiple modules at once.
+  - A method that returns a module's value, e.g. ".get()".
+  - Add a minified version to the project repo and improve the build system in general (more automation).
+  - Create a separate 0.3.0 branch for this release and adopt a better way to manage the repo.
+  - Better test coverage (improved tests for return values).
+  - Allow specifying the context for eventizer emit method?
+*/
 
 (function (glob) {
   'use strict';
@@ -26,54 +41,30 @@
   lib._Eventizer = Eventizer;
 
   /**
-   * Define a module. Returns true if module registration was successful, otherwise returns false. This method has two modes. If dependencies are provided as an array or a string the factory function will receive each dependecny module as an individual argument in the same order they are defined. However, if dependencies are provided as an object the factory function will receive a single argument: an object which contains references to the dependency modules. There are two ways to initiate a module within the factory callback. The simple way is just returning the module's value within the factory callback, but the value must be something else than undefined. If you need to set the module's value to undefined or use asynchronous initiation you need to call the init function mannually. The factory callback always receives the initiation function as it's context (this keyword), which sets the first function argument as the module's value when it is executed.
+   * Define a single module or multiple modules. Returns an integer which represents the number of succesful module registrations.
    *
    * @public
-   * @param {string} id
-   * @param {array|string|object} [dependencies]
+   * @param {string|array} ids
+   * @param {array|string} [dependencies]
    * @param {function|object} factory
-   * @returns {boolean}
+   * @returns {number}
    */
-  lib.define = function (id, dependencies, factory) {
+  lib.define = function (ids, dependencies, factory) {
+
+    ids = typeOf(ids, 'array') ? ids : [ids];
 
     var
-    hasDeps = factory,
-    depIds = hasDeps ? lib._sanitizeDependencies(dependencies) : [],
-    factory = hasDeps ? factory : dependencies,
-    factoryType = typeOf(factory),
-    isValidId = id && typeOf(id, 'string'),
-    isValidFactory = factoryType === 'object' || factoryType === 'function',
-    primaryKey = isValidId && isValidFactory && lib._registerModule(id, depIds),
-    initModule,
-    moduleData;
+    ret = 0,
+    len = ids.length,
+    i;
 
-    /** Return false if module registration failed. */
-    if (!primaryKey) {
-      return false;
+    for (i = 0; i < len; i++) {
+      if (defineSingle(ids[i], dependencies, factory)) {
+        ++ret;
+      }
     }
 
-    /** Load dependencies. */
-    lib._loadDependencies(depIds, function (depModules) {
-
-      initModule = function (moduleData) {
-        lib._initModule(id, primaryKey, moduleData);
-      };
-
-      if (factoryType === 'function') {
-        /** Init the module instantly if it returns a value (something else than undefined). */
-        moduleData = factory.apply(initModule, lib._factoryArgs(depIds, depModules, hasDeps ? dependencies : undefined));
-        if (moduleData !== undefined) {
-          initModule(moduleData);
-        }
-      }
-      else {
-        initModule(factory);
-      }
-
-    });
-
-    /** Return true to indicate a succesful module registration. */
-    return true;
+    return ret;
 
   };
 
@@ -101,47 +92,118 @@
    * Require a module.
    *
    * @public
-   * @param {array|string|object} dependencies
+   * @param {array|string} dependencies
    * @param {function} callback
    */
   lib.require = function (dependencies, callback) {
 
-    var depIds = lib._sanitizeDependencies(dependencies);
-
-    if (!typeOf(callback, 'function')) {
-      return;
+    if (typeOf(callback, 'function')) {
+      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
+        callback.apply(null, depModules);
+      });
     }
-
-    lib._loadDependencies(depIds, function (depModules) {
-      callback.apply(null, lib._factoryArgs(depIds, depModules, dependencies));
-    });
 
   };
 
   /**
-   * Assign properties of an object to be defined as modules. In essence this is just a wrapper for define method that allows you to define multiple modules quickly. Very useful for importing third party libraries into Palikka's context as modules.
+   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
+   *
+   * @private
+   * @param {object} obj
+   * @param {string} [compareType]
+   * @returns {string|boolean}
+   */
+  function typeOf(obj, compareType) {
+
+    var type = typeof obj;
+    type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
+    return compareType ? type === compareType : type;
+
+  }
+
+  /**
+   * Define a module. Returns true if module registration was successful, otherwise returns false.
    *
    * @public
-   * @param {array|string} properties
-   * @param {object} [of=window]
+   * @param {string} id
+   * @param {array|string} [dependencies]
+   * @param {function|object} factory
+   * @returns {boolean}
    */
-  lib.assign = function (properties, of) {
+  function defineSingle(id, dependencies, factory) {
 
     var
-    propsType = typeOf(properties),
-    props = propsType === 'array' ? properties : propsType === 'string' ? [properties] : [],
-    propsLength = props.length,
-    obj = of || glob;
+    hasDeps = factory,
+    depIds = hasDeps ? sanitizeDependencies(dependencies) : [],
+    factory = hasDeps ? factory : dependencies,
+    factoryType = typeOf(factory),
+    isValidId = id && typeOf(id, 'string'),
+    isValidFactory = factoryType === 'object' || factoryType === 'function',
+    primaryKey = isValidId && isValidFactory && registerModule(id, depIds),
+    init,
+    async,
+    factoryCtx,
+    moduleData;
 
-    for (var i = 0; i < propsLength; i++) {
-      if (props[i] in obj) {
-        lib.define(props[i], function () {
-          this(obj[props[i]]);
-        });
-      }
+    /** Return false if module registration failed. */
+    if (!primaryKey) {
+      return false;
     }
 
-  };
+    loadDependencies(depIds, function (depModules) {
+
+      init = function (data) {
+        initModule(id, primaryKey, arguments.length ? data : moduleData);
+      };
+
+      if (factoryType === 'function') {
+
+        factoryCtx = {
+          id: id,
+          dependencies: {},
+          async: function () {
+            async = 1;
+            return init;
+          }
+        };
+
+        for (var i = 0, len = depIds.length; i < len; i++) {
+          factoryCtx.dependencies[depIds[i]] = depModules[i];
+        }
+
+        moduleData = factory.apply(factoryCtx, depModules);
+
+        if (!async) {
+          init(moduleData);
+        }
+
+      }
+      else {
+
+        init(factory);
+
+      }
+
+    });
+
+    /** Return true to indicate a succesful module registration. */
+    return true;
+
+  }
+
+  /**
+   * Sanitize dependencies argument of define and require methods.
+   *
+   * @private
+   * @param {array|string} dependencies
+   * @returns {array}
+   */
+  function sanitizeDependencies(dependencies) {
+
+    var type = typeOf(dependencies);
+    return type === 'array' ? dependencies : type === 'string' ? [dependencies] : [];
+
+  }
 
   /**
    * Register a module. Returns the modules primary key (a positive integer) if succesful, otherwise returns zero.
@@ -150,7 +212,7 @@
    * @param {string} id
    * @returns {number}
    */
-  lib._registerModule = function (id, dependencies) {
+  function registerModule(id, dependencies) {
 
     if (!modules[id]) {
       var pk = ++modulePrimaryKey;
@@ -169,7 +231,7 @@
       return 0;
     }
 
-  };
+  }
 
   /**
    * Initialize a module.
@@ -179,7 +241,7 @@
    * @param {number} primaryKey
    * @param {*} data
    */
-  lib._initModule = function (id, primaryKey, data) {
+  function initModule(id, primaryKey, data) {
 
     if (modules[id] && modules[id].pk === primaryKey && !modules[id].loaded) {
       modules[id].data = data;
@@ -188,7 +250,7 @@
       lib.emit(evInit, [modules[id]]);
     }
 
-  };
+  }
 
   /**
    * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
@@ -197,7 +259,7 @@
    * @param {array} dependencies
    * @param {function} callback
    */
-  lib._loadDependencies = function (dependencies, callback) {
+  function loadDependencies(dependencies, callback) {
 
     var
     depModules = [],
@@ -260,84 +322,6 @@
       depsReadyCallback();
 
     }
-
-  };
-
-  /**
-   * Sanitize dependencies argument of define and require methods.
-   *
-   * @private
-   * @param {array|string|object} dependencies
-   * @returns {array}
-   */
-  lib._sanitizeDependencies = function (dependencies) {
-
-    var
-    type = typeOf(dependencies),
-    ret = [];
-
-    if (type === 'object') {
-      for (var prop in dependencies) {
-        ret.push(prop);
-      }
-    }
-    else {
-      ret = type === 'array' ? dependencies : type === 'string' ? [dependencies] : ret;
-    }
-
-    return ret;
-
-  };
-
-  /**
-   * Create arguments for define method's factory argument.
-   *
-   * @private
-   * @param {array} depIds
-   * @param {array} depModules
-   * @param {object} [depObj]
-   * @returns {array}
-   */
-  lib._factoryArgs = function (depIds, depModules, depObj) {
-
-    var
-    depId,
-    depAlias,
-    ret;
-
-    if (typeOf(depObj, 'object')) {
-      ret = {};
-      for (var i = 0, len = depIds.length; i < len; i++) {
-        depId = depIds[i];
-        depAlias = depObj[depId];
-        if (typeOf(depAlias, 'string')) {
-          depAlias = depAlias ? depAlias : depId;
-          ret[depAlias] = depModules[i];
-        }
-      }
-      ret = [ret];
-    }
-    else {
-      ret = depModules;
-    }
-
-    return ret;
-
-  };
-
-  /**
-   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
-   *
-   * @private
-   * @param {object} obj
-   * @param {string} [compareType]
-   * @returns {string|boolean}
-   */
-  function typeOf(obj, compareType) {
-
-    var type = typeof obj;
-    type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
-    return compareType ? type === compareType : type;
 
   }
 

@@ -1,14 +1,14 @@
-#Palikka v0.2.0
+#Palikka v0.3.0-beta
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.2.0)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.2.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.2.0)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.0-beta)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0-beta)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0-beta)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A tiny JavaScript module system that allows you to define modules and manage dependencies between them. Palikka makes sure that modules are loaded synchronously, respecting the dependencies, even if your module definitions are included in a mixed order. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader*, meaning that it does not load JavaScript files for you.
+A tiny JavaScript module system that allows you to define modules and manage dependencies between them. Palikka makes sure that modules are loaded synchronously, respecting the dependencies, even if your module definitions are included in a mixed order. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader* (it does not load JavaScript files for you).
 
 ##Features
 
-* Lightweight, around 2.4kb minified.
+* Lightweight, around 2kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase (JSDoc syntax).
 * Comprehensive unit tests (Qunit).
@@ -22,12 +22,12 @@ Include [palikka.js](https://github.com/niklasramo/palikka/blob/v0.2.0/palikka.j
 ```javascript
 // Define module "foo" which requires module "bar"
 palikka.define('foo', ['bar'], function (bar) {
-  this('foo');
+  return 'foo';
 });
 
-// Define module "bar" using delayed initiation
+// Define module "bar" using async initiation
 palikka.define('bar', function () {
-  var init = this;
+  var init = this.async();
   window.setTimeout(function () {
     init('bar');
   }, 1000);
@@ -44,7 +44,6 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 * [.define()](#define)
 * [.undefine()](#undefine)
 * [.require()](#require)
-* [.assign()](#assign)
 
 **Event system**
 
@@ -65,63 +64,47 @@ Define a module. All modules are stored in `palikka._modules` object, which hold
 
 **Parameters**
 
-* **id** &nbsp;&mdash;&nbsp; *string*
-  * Id of the module.
-* **dependencies** &nbsp;&mdash;&nbsp; *array / string / object*
-  * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string. Alternatively you can provide an object of key value pairs where the key represents the dependency's id and the value represents the dependency's property name in the dependencies argument of factory function. Leave the alias as an empty string if you want to use the module's id as the alias. If you just want to load the dependency but not use it within the factory function, provide any other than string value as the module's alias (null for example).
+* **id** &nbsp;&mdash;&nbsp; *array / string*
+  * Module id(s). Each module must have a unique id.
+* **dependencies** &nbsp;&mdash;&nbsp; *array / string*
+  * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string.
 * **factory** &nbsp;&mdash;&nbsp; *function / object*
-  * If the factory argument is a plain object it is directly assigned as the module's value. If the argument is a function it is executed once after all dependencies have loaded and it receives the defined dependency modules as it's function arguments. If dependencies are defined as an object their references are stored in a single data object which is accesible via the first function argument. In other cases the dependency modules are provided as direct references in the function arguments (in the same order they are defined in dependency argument). The "this" keyword within factory's context refers to the module's initiation function which must be executed in order to initiate the module. The first argument of the initiation function will be assigned as the module's value.
+  * If the factory is a plain object it is directly assigned as the module's value. If the argument is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the defined dependency modules as it's function arguments. The factory callback's context object (this keyword) contains the following properties: id (string, module's id), dependencies (object, list of the dependencies), async (function, defers module initiation).
 
-**Returns** &nbsp;&mdash;&nbsp; *boolean*
+**Returns** &nbsp;&mdash;&nbsp; *number*
 
-Returns `true` if module registration was successful, otherwise returns `false`.
+Returns an integer which represents the number of succesful module registrations.
 
 **Usage**
 
 ```javascript
-// Define a module by using the init function
-// which is always provided as factory's context.
-palikka.define('foo', function () {
-  this('foo');
-});
-
-// Define a module by returning the module's value.
+// Define a single module.
 palikka.define('foo', function () {
   return 'foo';
 });
 
 // Define a plain object as module.
-palikka.define('foo', {foo: 'foo'});
+palikka.define('bar', {bar: 'bar'});
 
 // Define a module with dependencies.
-palikka.define('foobar', ['foo'], function (foo) {
-  this(foo + 'bar'); // "foobar"
+palikka.define('foobar', ['foo', 'bar'], function (foo, bar) {
+  return foo + bar.bar;
 });
 
-// Define module a module using delayed initiation.
-palikka.define(
-  'slow',
-  function () {
-    var init = this;
-    window.setTimeout(function () {
-      init('slow');
-    }, 2000);
-  }
-);
+// Define module a module using async initiation.
+palikka.define('async', function () {
+  var init = this.async();
+  window.setTimeout(function () {
+    init('I am an asynchronous module!');
+  }, 2000);
+});
 
-// Define a module with a dependencies as an object.
-palikka.define(
-  'x',
-  {
-    jQuery: '$',
-    foo: '',
-    bar: null
-  },
-  function (deps) {
-    // deps has props '$' and 'foo'.
-    this('dependant');
-  }
-);
+// Define multiple modules at once.
+// Handy for importing third party libraries.
+var obj = {a: 'a', b: 'b'};
+palikka.define(['a', 'b'], function () {
+  return obj[this.id];
+});
 ```
 
 &nbsp;
@@ -191,42 +174,6 @@ palikka.define('bar', function () {
 palikka.require(['foo', 'bar'], function (foo, bar) {
   // Do your stuff here.
 });
-```
-
-&nbsp;
-
-###.assign()
-
-Assign properties of an object to be defined as modules. In essence this is just a wrapper for define method that allows you to define multiple modules quickly. Very useful for importing third party libraries into Palikka's context as modules.
-
-**Syntax**
-
-`palikka.assign( properties [, of] )`
-
-**Parameters**
-
-* **properties** &nbsp;&mdash;&nbsp; *array / string*
-  * Define property names to be imported.
-* **of** &nbsp;&mdash;&nbsp; *object*
-  * Optional. Defaults to `window` in browser and `global` in node. Define the object where to look for the defined properties.
-
-**Usage**
-
-```javascript
-var obj = {
-  a: 'a',
-  b: 'b'
-};
-window.foo = 'foo';
-window.bar = 'bar';
-
-// By default assign looks the properties
-// from window/global object.
-palikka.assign(['foo', 'bar']);
-
-// You can tell assign method the object
-// where to look the properties from.
-palikka.assign(['a', 'b'], obj);
 ```
 
 &nbsp;

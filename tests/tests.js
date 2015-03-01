@@ -55,7 +55,7 @@
     assert.expect(1);
 
     palikka.define('a', function () {
-      this('a');
+      return 'a';
     });
     assert.strictEqual(getVal('a'), 'a');
 
@@ -70,32 +70,44 @@
 
   });
 
-  Q.test(testName('Returning module\'s value.'), function (assert) {
+  Q.test(testName('Defining multiple modules.'), function (assert) {
 
-    assert.expect(2);
+    assert.expect(8);
 
-    palikka.define('a', function () {
-      return 'a';
+    window.foo = 'foo';
+    window.bar = 'bar';
+    var obj = {a: 'a', b: 'b'};
+
+    palikka.define(['foo', 'bar'], function() {
+      return window[this.id];
     });
-    assert.strictEqual(getVal('a'), 'a');
 
-    palikka.define('b', function () {
-      return undefined;
+
+    palikka.define(['a', 'b'], ['foo', 'bar'], function (foo, bar) {
+      assert.strictEqual(foo, 'foo');
+      assert.strictEqual(bar, 'bar');
+      return obj[this.id];
     });
-    assert.strictEqual(getVal('b'), undefined);
+
+    palikka.require(['foo', 'bar', 'a', 'b'], function (foo, bar, a, b) {
+      assert.strictEqual(foo, 'foo');
+      assert.strictEqual(bar, 'bar');
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+    });
 
   });
 
   Q.test(testName('Dependencies argument.'), function (assert) {
 
-    assert.expect(12);
+    assert.expect(8);
 
     /** Dependencies as an array. */
 
     palikka.define('a', ['b', 'c'], function (b, c) {
       assert.strictEqual(b, 'b');
       assert.strictEqual(c, 'c');
-      this('a');
+      return 'a';
     });
 
     assert.strictEqual(getVal('a'), undefined);
@@ -104,34 +116,15 @@
 
     palikka.define('b', 'c', function (c) {
       assert.strictEqual(c, 'c');
-      this('b');
+      return 'b';
     });
 
     assert.strictEqual(getVal('b'), undefined);
 
-    /** Dependencies as an object. */
-
-    palikka.define(
-      'd',
-      {
-        a: 'aa',
-        b: '',
-        c: null
-      },
-      function (deps) {
-        assert.strictEqual(deps.aa, 'a');
-        assert.strictEqual(deps.b, 'b');
-        assert.strictEqual(deps.c, undefined);
-        this('d');
-      }
-    );
-
-    assert.strictEqual(getVal('d'), undefined);
-
     /** No dependencies. */
 
     palikka.define('c', function () {
-      this('c');
+      return 'c';
     });
 
     assert.strictEqual(getVal('c'), 'c');
@@ -149,7 +142,7 @@
       'a',
       ['b', 'c'],
       function (b, c) {
-        var init = this;
+        var init = this.async();
         assert.strictEqual(b, 'b');
         assert.strictEqual(c, 'c');
         window.setTimeout(function () {
@@ -164,7 +157,7 @@
       'b',
       'c',
       function (c) {
-        var init = this;
+        var init = this.async();
         assert.strictEqual(c, 'c');
         window.setTimeout(function () {
           init('b');
@@ -177,7 +170,7 @@
     palikka.define(
       'c',
       function () {
-        var init = this;
+        var init = this.async();
         window.setTimeout(function () {
           init('c');
         }, 1000);
@@ -212,7 +205,7 @@
     palikka.define(
       'a',
       function () {
-        var init = this;
+        var init = this.async();
         window.setTimeout(function () {
           init('a');
         }, 500);
@@ -234,8 +227,8 @@
     var success = palikka.define('a', {a:'a'});
     var fail = palikka.define('b');
 
-    assert.strictEqual(success, true);
-    assert.strictEqual(fail, false);
+    assert.strictEqual(success, 1);
+    assert.strictEqual(fail, 0);
 
   });
 
@@ -244,21 +237,21 @@
     var done = assert.async();
     assert.expect(3);
 
-    palikka.define('a', function () { this('a1'); });
-    palikka.define('a', function () { this('a2'); });
+    palikka.define('a', function () { return 'a1'; });
+    palikka.define('a', function () { return 'a2'; });
 
     assert.strictEqual(getVal('a'), 'a1');
 
     palikka.define(
       'b',
       function () {
-        var init = this;
+        var init = this.async();
         window.setTimeout(function () {
           init('b1');
         }, 500);
       }
     );
-    palikka.define('b', function () { this('b2'); });
+    palikka.define('b', function () { return 'b2'; });
 
     assert.strictEqual(getVal('b'), undefined);
     window.setTimeout(function () {
@@ -275,11 +268,11 @@
     assert.expect(6);
 
     palikka.define('a', 'b', function () {
-      this('a');
+      return 'a';
     });
 
     palikka.define('b', function () {
-      this('b');
+      return 'b';
     });
 
     var undefineB = palikka.undefine('b');
@@ -310,21 +303,21 @@
     var test;
 
     palikka.define('a', function () {
-      this('a');
+      return 'a';
     });
 
     palikka.define('b', function () {
-      this('b');
+      return 'b';
     });
 
     palikka.define('c', function () {
-      this('c');
+      return 'c';
     });
 
     palikka.define(
       'd',
       function () {
-        var init = this;
+        var init = this.async();
         window.setTimeout(function () {
           init('d');
         }, 500);
@@ -360,32 +353,6 @@
       done();
     });
     assert.strictEqual(test, true);
-
-  });
-
-  Q.module('.assign()');
-
-  Q.test(testName('Importing global object\'s properties and plain object\'s properties.'), function (assert) {
-
-    assert.expect(5);
-
-    window.foo = 'foo';
-    window.bar = 'bar';
-    var obj = {a: 'a', b: 'b'};
-
-    palikka.assign('foo');
-    palikka.require('foo', function (foo) {
-      assert.strictEqual(foo, 'foo');
-    });
-
-    palikka.assign(['foo', 'bar']);
-    palikka.assign(['a', 'b'], obj);
-    palikka.require(['foo', 'bar', 'a', 'b'], function (foo, bar, a, b) {
-      assert.strictEqual(foo, 'foo');
-      assert.strictEqual(bar, 'bar');
-      assert.strictEqual(a, 'a');
-      assert.strictEqual(b, 'b');
-    });
 
   });
 
@@ -430,7 +397,7 @@
     palikka.on('initiate-a', initCb);
     palikka.on('initiate', initCb2);
     palikka.define('a', function () {
-      this('foobar');
+      return 'foobar';
     });
 
     /** Test triggering. */
@@ -471,7 +438,7 @@
         m.events.emit('tock', ['foo', 'bar']);
       }, 100);
 
-      this(m);
+      return m;
 
     });
     palikka.define('b', ['a'], function (a) {
@@ -523,7 +490,7 @@
         done();
       }, 1000);
 
-      this(m);
+      return m;
 
     });
 
