@@ -8,16 +8,43 @@
 /*
   IDEAS/TODOS:
   ------------
+
   - Is require method needed and is it functionality in sync with the name? Could it be integrated to define method?
+    -> Yep, it's needed, and no it should not be integrated to define. Wontfix.
+
   - Should define method return an array of fail/success ids?
+    -> Yep, done.
+
   - A method that shows per module that which dependencies have loaded and which are pending.
+    -> Hmm... probably not needed. This is pretty easy to do without a separate function already.
+
   - Forced undefine.
+    -> Wontfix, the library is not used correctly if this is needed.
+
   - Undefine multiple modules at once.
+    -> Done.
+
   - A method that returns a module's value, e.g. ".get()".
+    -> Basically this would be shotcut for palikka._modules[moduleId].value -> Not necessary, wontfix.
+
   - Add a minified version to the project repo and improve the build system in general (more automation).
+    -> Yep, good idea. TODO
+
   - Create a separate 0.3.0 branch for this release and adopt a better way to manage the repo.
+    -> Done.
+
   - Better test coverage (improved tests for return values).
+    -> Yep needed, test for node/amd compatibility.
+
   - Allow specifying the context for eventizer emit method?
+    -> Not needed, wontfix.
+
+  - Easier importing of third party libs.
+    -> A must have. TODO
+
+  - A simple deferred system =)
+    -> Yep, let's do this, if it does not bloat the codebase.
+
 */
 
 (function (glob) {
@@ -40,27 +67,32 @@
   /** Add Eventizer to palikka as a private method. */
   lib._Eventizer = Eventizer;
 
+  /** Add Deferred to palikka as a private method. */
+  lib._Deferred = Deferred;
+
   /**
-   * Define a single module or multiple modules. Returns an integer which represents the number of succesful module registrations.
+   * Define a single module or multiple modules. Returns an array that contains id's of all modules that were succesfully registered.
    *
    * @public
    * @param {string|array} ids
    * @param {array|string} [dependencies]
    * @param {function|object} factory
-   * @returns {number}
+   * @returns {array}
    */
   lib.define = function (ids, dependencies, factory) {
 
     ids = typeOf(ids, 'array') ? ids : [ids];
 
     var
-    ret = 0,
+    ret = [],
     len = ids.length,
+    id,
     i;
 
     for (i = 0; i < len; i++) {
-      if (defineSingle(ids[i], dependencies, factory)) {
-        ++ret;
+      id = defineSingle(ids[i], dependencies, factory);
+      if (id) {
+        ret.push(id);
       }
     }
 
@@ -69,22 +101,37 @@
   };
 
   /**
-   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns true if undefinition was successful, otherwise returns false.
+   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
    *
-   * @param {string} id
-   * @returns {boolean}
+   * @param {string|array} ids
+   * @returns {array}
    */
-  lib.undefine = function (id) {
+  lib.undefine = function (ids) {
+
+    ids = typeOf(ids, 'array') ? ids : [ids];
 
     var
-    module = modules[id],
-    isLocked = module && module.locked;
+    ret = [],
+    len = ids.length,
+    id,
+    module,
+    isLocked,
+    i;
 
-    if (module && !isLocked) {
-      delete modules[id];
+    for (i = 0; i < len; i++) {
+
+      id = ids[i];
+      module = modules[id];
+      isLocked = module && module.locked;
+
+      if (module && !isLocked) {
+        delete modules[id];
+        ret.push(id);
+      }
+
     }
 
-    return !isLocked;
+    return ret;
 
   };
 
@@ -105,6 +152,20 @@
 
   };
 
+  /*
+
+  TODO
+
+  lib.deferred = function () {
+
+  };
+
+  lib.when = function (deferreds) {
+
+  };
+
+  */
+
   /**
    * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
    *
@@ -122,13 +183,13 @@
   }
 
   /**
-   * Define a module. Returns true if module registration was successful, otherwise returns false.
+   * Define a module. Returns module's id if module registration was successful, otherwise returns false.
    *
    * @public
    * @param {string} id
    * @param {array|string} [dependencies]
    * @param {function|object} factory
-   * @returns {boolean}
+   * @returns {boolean|string}
    */
   function defineSingle(id, dependencies, factory) {
 
@@ -186,8 +247,8 @@
 
     });
 
-    /** Return true to indicate a succesful module registration. */
-    return true;
+    /** Return module id to indicate a succesful module registration. */
+    return id;
 
   }
 
@@ -410,6 +471,128 @@
         }
 
       }
+
+    };
+
+  }
+
+  /**
+   * Create a deferred object (in need of extensive testing and review).
+   *
+   * @public
+   * @returns {object}
+   */
+
+  function Deferred() {
+
+    var
+    ev = new Eventizer(),
+    args = [];
+
+    this.state = 'pending';
+
+    this.resolve = function () {
+
+      if (this.state === 'pending') {
+        args = arguments;
+        this.state = 'resolved';
+        ev.emit('resolve', args);
+      }
+
+      return this;
+
+    };
+
+    this.reject = function () {
+
+      if (this.state === 'pending') {
+        args = arguments;
+        this.state = 'rejected';
+        ev.emit('reject', args);
+      }
+
+      return this;
+
+    };
+
+    this.done = function (callback) {
+
+      var that = this;
+
+      if (that.state === 'resolved') {
+        callback.apply(that, args);
+      }
+
+      if (that.state === 'pending') {
+        ev.on('resolve', function (e) {
+          callback.apply(that, args);
+          ev.off('resolve', e.fn);
+        });
+      }
+
+      return that;
+
+    };
+
+    this.fail = function (callback) {
+
+      var that = this;
+
+      if (that.state === 'rejected') {
+        callback.apply(that, args);
+      }
+
+      if (that.state === 'pending') {
+        ev.on('reject', function (e) {
+          callback.apply(that, args);
+          ev.off('reject', e.fn);
+        });
+      }
+
+      return that;
+
+    };
+
+    this.always = function (callback) {
+
+      var that = this;
+
+      if (that.state !== 'pending') {
+
+        callback.apply(that, args);
+
+      }
+      else {
+
+        ev.on('resolve', function (e) {
+          callback.apply(that, args);
+          ev.off('resolve', e.fn);
+        });
+
+        ev.on('reject', function (e) {
+          callback.apply(that, args);
+          ev.off('reject', e.fn);
+        });
+
+      }
+
+      return that;
+
+    };
+
+    this.then = function (callback) {
+
+      var
+      that = this,
+      next = new Deferred();
+
+      if (typeof callback === 'function') {
+        that.always(function () {
+          callback.apply({prev: that, next: next}, arguments);
+        });
+      }
+
+      return next;
 
     };
 
