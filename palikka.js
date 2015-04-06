@@ -45,6 +45,15 @@
   - A simple deferred system =)
     -> Yep, let's do this, if it does not bloat the codebase.
 
+  - Palikka should not be limited to be only a module library, but instead provide all functionality that is a natural part of the flow.
+    -> Event system
+    -> Typechecker
+    -> Modules (requires events)
+    -> Deferreds (requires events)
+    -> Something else (generators/task.js)...?
+
+  - Event system callbacks should make sure the arguments are transformed into a true array in case they are provided with arguments array.
+
 */
 
 (function (glob) {
@@ -53,22 +62,50 @@
   var
   ns = 'palikka',
   lib = {},
+
+  /** Modules */
   modules = {},
   modulePrimaryKey = 0,
-  evInit = 'initiate',
-  evReg = 'register';
+  evInitiate = 'initiate',
+  evRegister = 'register',
 
-  /** Create event system. */
+  /** Deferred */
+  evResolve = 'resolve',
+  evReject = 'rejecte',
+  statePending = 'pending',
+  stateResolved = 'resolved',
+  stateRejected = 'rejected',
+  deferredCallbacks = ['done', 'fail', 'always'];
+
+  /** Eventize library. */
   Eventizer.call(lib);
 
-  /** Add module container object to palikka as a private object. */
+  /**
+   * Module storage object.
+   *
+   * @public
+   * @static
+   * @type {object}
+   */
   lib._modules = modules;
 
-  /** Add Eventizer to palikka as a private method. */
-  lib._Eventizer = Eventizer;
+  /**
+   * @public
+   * @see typeOf
+   */
+  lib.typeOf = typeOf;
 
-  /** Add Deferred to palikka as a private method. */
-  lib._Deferred = Deferred;
+  /**
+   * @public
+   * @see Eventizer
+   */
+  lib.Eventizer = Eventizer;
+
+  /**
+   * @public
+   * @see Deferred
+   */
+  lib.Deferred = Deferred;
 
   /**
    * Define a single module or multiple modules. Returns an array that contains id's of all modules that were succesfully registered.
@@ -83,18 +120,14 @@
 
     ids = typeOf(ids, 'array') ? ids : [ids];
 
-    var
-    ret = [],
-    len = ids.length,
-    id,
-    i;
+    var ret = [];
 
-    for (i = 0; i < len; i++) {
-      id = defineSingle(ids[i], dependencies, factory);
+    arrayEach(ids, function (id) {
+      id = defineSingle(id, dependencies, factory);
       if (id) {
         ret.push(id);
       }
-    }
+    });
 
     return ret;
 
@@ -110,18 +143,12 @@
 
     ids = typeOf(ids, 'array') ? ids : [ids];
 
-    var
-    ret = [],
-    len = ids.length,
-    id,
-    module,
-    isLocked,
-    i;
+    var ret = [];
 
-    for (i = 0; i < len; i++) {
+    arrayEach(ids, function (id) {
 
-      id = ids[i];
-      module = modules[id];
+      var
+      module = modules[id],
       isLocked = module && module.locked;
 
       if (module && !isLocked) {
@@ -129,7 +156,7 @@
         ret.push(id);
       }
 
-    }
+    });
 
     return ret;
 
@@ -152,20 +179,6 @@
 
   };
 
-  /*
-
-  TODO
-
-  lib.deferred = function () {
-
-  };
-
-  lib.when = function (deferreds) {
-
-  };
-
-  */
-
   /**
    * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
    *
@@ -179,6 +192,39 @@
     var type = typeof obj;
     type = type === 'object' ? ({}).toString.call(obj).split(' ')[1].replace(']', '').toLowerCase() : type;
     return compareType ? type === compareType : type;
+
+  }
+
+  /**
+   * Clone array or function's arguments object.
+   *
+   * @private
+   * @param {array} array
+   * @returns {array}
+   */
+  function cloneArray(array) {
+
+    return array instanceof Array ? array.slice(0) : Array.prototype.slice.call(array);
+
+  }
+
+  /**
+   * Loop array items.
+   *
+   * @private
+   * @param {array} array
+   * @param {function} callback
+   * @returns {array}
+   */
+  function arrayEach(array, callback) {
+
+    if (typeOf(callback, 'function')) {
+      for (var i = 0, len = array.length; i < len; i++) {
+        callback(array[i], i);
+      }
+    }
+
+    return array;
 
   }
 
@@ -228,9 +274,9 @@
           }
         };
 
-        for (var i = 0, len = depIds.length; i < len; i++) {
-          factoryCtx.dependencies[depIds[i]] = depModules[i];
-        }
+        arrayEach(depIds, function (depId, i) {
+          factoryCtx.dependencies[depId] = depModules[i];
+        });
 
         moduleData = factory.apply(factoryCtx, depModules);
 
@@ -285,8 +331,8 @@
         data: undefined,
         dependencies: dependencies
       };
-      lib.emit(evReg + '-' + id, [modules[id]]);
-      lib.emit(evReg, [modules[id]]);
+      lib.emit(evRegister + '-' + id, [modules[id]]);
+      lib.emit(evRegister, [modules[id]]);
       return pk;
     } else {
       return 0;
@@ -307,14 +353,15 @@
     if (modules[id] && modules[id].pk === primaryKey && !modules[id].loaded) {
       modules[id].data = data;
       modules[id].loaded = true;
-      lib.emit(evInit + '-' + id, [modules[id]]);
-      lib.emit(evInit, [modules[id]]);
+      lib.emit(evInitiate + '-' + id, [modules[id]]);
+      lib.emit(evInitiate, [modules[id]]);
     }
 
   }
 
   /**
    * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
+   * TODO: Use deferreds here to reduce codebase size.
    *
    * @private
    * @param {array} dependencies
@@ -328,11 +375,9 @@
     depsReadyCounter = 0,
     depsReadyCallback = function () {
 
-      if (depsLength) {
-        for (var i = 0; i < depsLength; i++) {
-          depModules.push(modules[dependencies[i]].data);
-        }
-      }
+      arrayEach(dependencies, function (depId) {
+        depModules.push(modules[depId].data);
+      });
 
       callback(depModules);
 
@@ -340,42 +385,39 @@
 
     if (depsLength) {
 
-      for (var i = 0; i < depsLength; i++) {
-        (function (i) {
+      arrayEach(dependencies, function (depId, i) {
 
-          var
-          depId = dependencies[i],
-          evName = evInit + '-' + depId,
-          evHandler = function (ev) {
+        var
+        evName = evInitiate + '-' + depId,
+        evHandler = function (ev) {
 
-            /** If this is an event's callback, let's unbind the event listener. */
-            if (ev) {
-              lib.off(evName, evHandler);
-            }
-
-            /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded. */
-            ++depsReadyCounter;
-
-            /** Lock dependency module (can't be undefined anymore). */
-            modules[depId].locked = true;
-
-            /** If this was the last dependency left to load it's time to move on. */
-            if (depsReadyCounter === depsLength) {
-              depsReadyCallback();
-            }
-
-          };
-
-          /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
-          if (modules[depId] && modules[depId].loaded) {
-            evHandler();
-          }
-          else {
-            lib.on(evName, evHandler);
+          /** If this is an event's callback, let's unbind the event listener. */
+          if (ev) {
+            lib.off(evName, evHandler);
           }
 
-        })(i);
-      }
+          /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded. */
+          ++depsReadyCounter;
+
+          /** Lock dependency module (can't be undefined anymore). */
+          modules[depId].locked = true;
+
+          /** If this was the last dependency left to load it's time to move on. */
+          if (depsReadyCounter === depsLength) {
+            depsReadyCallback();
+          }
+
+        };
+
+        /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
+        if (modules[depId] && modules[depId].loaded) {
+          evHandler();
+        }
+        else {
+          lib.on(evName, evHandler);
+        }
+
+      });
 
     }
     else {
@@ -387,21 +429,39 @@
   }
 
   /**
-   * Creates a new Eventizer that allows you to bind, unbind and trigger events.
+   * A tiny event system that binds basic on/off/emit functionality to an object.
+   *
+   * @typedef {object} Eventizer
+   * @property {object} _listeners
+   * @property {function} on
+   * @property {function} off
+   * @property {function} emit
+   */
+
+  /**
+   * Creates a new Eventizer instance that allows you to bind, unbind and emit events.
    *
    * @class
    * @param {object} [listeners]
    */
   function Eventizer(listeners) {
 
+    /**
+     * An object where all the instance's callbacks (listeners) are stored in.
+     *
+     * @public
+     * @static
+     * @type {object}
+     */
     this._listeners = listeners || {};
 
     /**
-     * Bind custom event listener.
+     * Bind an event listener.
      *
-     * @private
+     * @public
      * @param {string} type
      * @param {function} callback
+     * @returns {Eventizer} The instance on which this method was called.
      */
     this.on = function (type, callback) {
 
@@ -409,190 +469,336 @@
       listeners[type] = listeners[type] || [];
       listeners[type].push(callback);
 
+      return this;
+
     };
 
     /**
      * Unbind an event listener. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
      *
-     * @private
+     * @public
      * @param {string} type
      * @param {function} [callback]
+     * @returns {Eventizer} The instance on which this method was called.
      */
     this.off = function (type, callback) {
 
       var
       listeners = this._listeners,
-      typeStack = listeners[type],
+      typeCallbacks = listeners[type],
       i;
 
-      if (typeStack) {
+      if (typeCallbacks) {
 
-        i = typeStack.length;
+        i = typeCallbacks.length;
 
         while (i--) {
-          if (!callback || (callback && typeStack[i] === callback)) {
-            typeStack.splice(i, 1);
+          if (!callback || (callback && typeCallbacks[i] === callback)) {
+            typeCallbacks.splice(i, 1);
           }
         }
 
-        if (!typeStack.length) {
+        if (!typeCallbacks.length) {
           delete listeners[type];
         }
 
       }
+
+      return this;
 
     };
 
     /**
      * Emit event.
      *
-     * @private
+     * @public
      * @param {string} type
      * @param {array} [args]
+     * @param {*} [ctx]
+     * @returns {Eventizer} The instance on which this method was called.
      */
-    this.emit = function (type, args) {
+    this.emit = function (type, args, ctx) {
 
       var
-      listeners = this._listeners,
-      typeStack = listeners[type],
-      callback;
+      that = this,
+      typeCallbacks = that._listeners[type];
 
-      if (typeStack) {
-
-        typeStack = typeStack.slice(0);
-
-        for (var i = 0, len = typeStack.length; i < len; i++) {
-          callback = typeStack[i];
-          if (typeof callback === 'function') {
+      if (typeCallbacks) {
+        arrayEach(typeCallbacks.slice(0), function (callback) {
+          if (typeOf(callback, 'function')) {
             args = args || [];
             args.unshift({type: type, fn: callback});
-            callback.apply(this, args);
+            ctx = typeOf(ctx, 'undefined') ? that : ctx;
+            callback.apply(ctx, args);
           }
-        }
-
+        });
       }
+
+      return that;
 
     };
 
   }
 
   /**
-   * Create a deferred object (in need of extensive testing and review).
+   * A chainable Deferred object.
    *
-   * @public
-   * @returns {object}
+   * @typedef {object} Deferred
+   * @property {string} state
+   * @property {Deferred|undefined} prev
+   * @property {function} resolve
+   * @property {function} reject
+   * @property {function} done
+   * @property {function} fail
+   * @property {function} always
+   * @property {function} then
+   * @property {function} join
    */
 
+  /**
+   * Create a deferred object.
+   *
+   * @class
+   */
   function Deferred() {
 
     var
-    ev = new Eventizer(),
-    args = [];
 
-    this.state = 'pending';
+    /**
+     * A private event hub for the Deferred instance.
+     *
+     * @private
+     * @static
+     * @type {Eventizer}
+     */
+    _ev = new Eventizer(),
 
+    /**
+     * When the Deferred instance is resolved or rejected the provided arguments are stored here.
+     *
+     * @private
+     * @static
+     * @type {array}
+     */
+    _args = [];
+
+    /**
+     * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'resolved' or 'rejected'.
+     *
+     * @public
+     * @static
+     * @type {string}
+     */
+    this.state = statePending;
+
+    /**
+     * When Deferreds are chained with 'then' method this property will point to the previous Deferred in the chain.
+     *
+     * @public
+     * @static
+     * @type {Deferred|undefined}
+     */
+    this.prev = undefined;
+
+    /**
+     * Resolve Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
+     *
+     * @public
+     * @returns {Deferred} The instance on which this method was called.
+     */
     this.resolve = function () {
 
-      if (this.state === 'pending') {
-        args = arguments;
-        this.state = 'resolved';
-        ev.emit('resolve', args);
+      if (this.state === statePending) {
+        _args = arguments;
+        this.state = stateResolved;
+        _ev.emit(evResolve, _args);
       }
 
       return this;
 
     };
 
+    /**
+     * Reject deferred. All provided arguments will be passed directly to 'fail' and 'always' callback functions.
+     *
+     * @public
+     * @returns {Deferred} The instance on which this method was called.
+     */
     this.reject = function () {
 
-      if (this.state === 'pending') {
-        args = arguments;
-        this.state = 'rejected';
-        ev.emit('reject', args);
+      if (this.state === statePending) {
+        _args = arguments;
+        this.state = stateRejected;
+        _ev.emit(evReject, _args);
       }
 
       return this;
 
     };
 
+    /**
+     * Execute a callback function when the Deferred instance is resolved.
+     *
+     * @public
+     * @param {function} callback
+     * @returns {Deferred} The instance on which this method was called.
+     */
     this.done = function (callback) {
 
       var that = this;
 
-      if (that.state === 'resolved') {
-        callback.apply(that, args);
-      }
+      if (typeOf(callback, 'function')) {
 
-      if (that.state === 'pending') {
-        ev.on('resolve', function (e) {
-          callback.apply(that, args);
-          ev.off('resolve', e.fn);
-        });
+        if (that.state === stateResolved) {
+          callback.apply(that, _args);
+        }
+
+        if (that.state === statePending) {
+          _ev.on(evResolve, function (e) {
+            callback.apply(that, _args);
+            _ev.off(evResolve, e.fn);
+          });
+        }
+
       }
 
       return that;
 
     };
 
+    /**
+     * Execute a callback function when the Deferred instance is rejected.
+     *
+     * @public
+     * @param {function} callback
+     * @returns {Deferred} The instance on which this method was called.
+     */
     this.fail = function (callback) {
 
       var that = this;
 
-      if (that.state === 'rejected') {
-        callback.apply(that, args);
-      }
+      if (typeOf(callback, 'function')) {
 
-      if (that.state === 'pending') {
-        ev.on('reject', function (e) {
-          callback.apply(that, args);
-          ev.off('reject', e.fn);
-        });
+        if (that.state === stateRejected) {
+          callback.apply(that, _args);
+        }
+
+        if (that.state === statePending) {
+          _ev.on(evReject, function (e) {
+            callback.apply(that, _args);
+            _ev.off(evReject, e.fn);
+          });
+        }
+
       }
 
       return that;
 
     };
 
+    /**
+     * Execute a callback function when the Deferred instance is resolved or rejected.
+     *
+     * @public
+     * @param {function} callback
+     * @returns {Deferred} The instance on which this method was called.
+     */
     this.always = function (callback) {
 
-      var that = this;
-
-      if (that.state !== 'pending') {
-
-        callback.apply(that, args);
-
-      }
-      else {
-
-        ev.on('resolve', function (e) {
-          callback.apply(that, args);
-          ev.off('resolve', e.fn);
-        });
-
-        ev.on('reject', function (e) {
-          callback.apply(that, args);
-          ev.off('reject', e.fn);
-        });
-
-      }
-
-      return that;
+      return this.done(callback).fail(callback);
 
     };
 
-    this.then = function (callback) {
+    /**
+     * @typedef {object} thenCallbacks
+     * @property {function} [done]
+     * @property {function} [fail]
+     * @property {function} [always]
+     */
+
+    /**
+     * Chain Deferreds.
+     *
+     * @public
+     * @param {function|thenCallbacks} [doneCallback]
+     * @param {function} [failCallback]
+     * @param {function} [alwaysCallback]
+     * @returns {Deferred} Creates a new Deferred instance.
+     */
+    this.then = function () {
 
       var
       that = this,
-      next = new Deferred();
+      next = new Deferred(),
+      args = cloneArray(arguments),
+      argsObj = typeOf(args[0], 'object') ? args[0] : false;
 
-      if (typeof callback === 'function') {
-        that.always(function () {
-          callback.apply({prev: that, next: next}, arguments);
-        });
-      }
+      next.prev = that;
+
+      arrayEach(deferredCallbacks, function (cbName, i) {
+
+        var cb = argsObj ? argsObj[cbName] : args[i];
+
+        if (typeOf(cb, 'function')) {
+          that[cbName](function () {
+            cb.apply(next, arguments);
+          });
+        }
+
+      });
 
       return next;
+
+    };
+
+    /**
+     * Combine Deferreds.
+     *
+     * @todo resolveOnFirst & rejectOnFirst
+     *
+     * @public
+     * @param {Deferred|array} [deferreds]
+     * @param {boolean} [resolveOnFirst=false]
+     * @param {boolean} [rejectOnFirst=true]
+     * @returns {Deferred} A new Deferred instance.
+     */
+    this.join = function (deferreds, resolveOnFirst, rejectOnFirst) {
+
+      deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
+      deferreds.unshift(this);
+
+      var
+      master = new Deferred(),
+      masterArgs = [],
+      counter = deferreds.length,
+      inc = 0,
+      doneHandler = function () {
+        --counter;
+        masterArgs[inc] = this instanceof Deferred ? arguments : undefined;
+        if (!counter) {
+          master.resolve.apply(master, masterArgs);
+        }
+      },
+      failHandler = function () {
+        master.reject.apply(master, arguments);
+      };
+
+      if (counter) {
+        arrayEach(deferreds, function (deferred, i) {
+          inc = i;
+          if (deferred instanceof Deferred) {
+            deferred.done(doneHandler).fail(failHandler);
+          }
+          else {
+            doneHandler.call(0);
+          }
+        });
+      }
+      else {
+        master.resolve();
+      }
+
+      return master;
 
     };
 
@@ -602,10 +808,10 @@
    * Publish library using an adapted UMD pattern.
    * https://github.com/umdjs/umd
    */
-  if (typeof define === 'function' && define.amd) {
+  if (typeOf(define, 'function') && define.amd) {
     define([], lib);
   }
-  else if (typeof exports === 'object') {
+  else if (typeOf(exports, 'object')) {
     module.exports = lib;
   }
   else {
