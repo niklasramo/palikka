@@ -8,52 +8,9 @@
 /*
   IDEAS/TODOS:
   ------------
-
-  - Is require method needed and is it functionality in sync with the name? Could it be integrated to define method?
-    -> Yep, it's needed, and no it should not be integrated to define. Wontfix.
-
-  - Should define method return an array of fail/success ids?
-    -> Yep, done.
-
-  - A method that shows per module that which dependencies have loaded and which are pending.
-    -> Hmm... probably not needed. This is pretty easy to do without a separate function already.
-
-  - Forced undefine.
-    -> Wontfix, the library is not used correctly if this is needed.
-
-  - Undefine multiple modules at once.
-    -> Done.
-
-  - A method that returns a module's value, e.g. ".get()".
-    -> Basically this would be shotcut for palikka._modules[moduleId].value -> Not necessary, wontfix.
-
   - Add a minified version to the project repo and improve the build system in general (more automation).
-    -> Yep, good idea. TODO
-
-  - Create a separate 0.3.0 branch for this release and adopt a better way to manage the repo.
-    -> Done.
-
   - Better test coverage (improved tests for return values).
-    -> Yep needed, test for node/amd compatibility.
-
-  - Allow specifying the context for eventizer emit method?
-    -> Not needed, wontfix.
-
   - Easier importing of third party libs.
-    -> A must have. TODO
-
-  - A simple deferred system =)
-    -> Yep, let's do this, if it does not bloat the codebase.
-
-  - Palikka should not be limited to be only a module library, but instead provide all functionality that is a natural part of the flow.
-    -> Event system
-    -> Typechecker
-    -> Modules (requires events)
-    -> Deferreds (requires events)
-    -> Something else (generators/task.js)...?
-
-  - Event system callbacks should make sure the arguments are transformed into a true array in case they are provided with arguments array.
-
 */
 
 (function (glob) {
@@ -71,11 +28,10 @@
 
   /** Deferred */
   evResolve = 'resolve',
-  evReject = 'rejecte',
+  evReject = 'reject',
   statePending = 'pending',
   stateResolved = 'resolved',
-  stateRejected = 'rejected',
-  deferredCallbacks = ['done', 'fail', 'always'];
+  stateRejected = 'rejected';
 
   /** Eventize library. */
   Eventizer.call(lib);
@@ -521,12 +477,14 @@
 
       var
       that = this,
-      typeCallbacks = that._listeners[type];
+      typeCallbacks = that._listeners[type],
+      argsType;
 
       if (typeCallbacks) {
         arrayEach(typeCallbacks.slice(0), function (callback) {
           if (typeOf(callback, 'function')) {
-            args = args || [];
+            argsType = typeOf(args);
+            args = argsType === 'array' ? args : argsType === 'arguments' ? cloneArray(args) : [];
             args.unshift({type: type, fn: callback});
             ctx = typeOf(ctx, 'undefined') ? that : ctx;
             callback.apply(ctx, args);
@@ -541,26 +499,12 @@
   }
 
   /**
-   * A chainable Deferred object.
-   *
-   * @typedef {object} Deferred
-   * @property {string} state
-   * @property {Deferred|undefined} prev
-   * @property {function} resolve
-   * @property {function} reject
-   * @property {function} done
-   * @property {function} fail
-   * @property {function} always
-   * @property {function} then
-   * @property {function} join
-   */
-
-  /**
    * Create a deferred object.
    *
    * @class
+   * @param {function} callback
    */
-  function Deferred() {
+  function Deferred(callback) {
 
     var
 
@@ -643,7 +587,7 @@
      * @param {function} callback
      * @returns {Deferred} The instance on which this method was called.
      */
-    this.done = function (callback) {
+    this.whenResolved = function (callback) {
 
       var that = this;
 
@@ -673,7 +617,7 @@
      * @param {function} callback
      * @returns {Deferred} The instance on which this method was called.
      */
-    this.fail = function (callback) {
+    this.whenRejected = function (callback) {
 
       var that = this;
 
@@ -703,47 +647,74 @@
      * @param {function} callback
      * @returns {Deferred} The instance on which this method was called.
      */
-    this.always = function (callback) {
+    this.whenSettled = function (callback) {
 
-      return this.done(callback).fail(callback);
+      return this.whenResolved(callback).whenRejected(callback);
 
     };
-
-    /**
-     * @typedef {object} thenCallbacks
-     * @property {function} [done]
-     * @property {function} [fail]
-     * @property {function} [always]
-     */
 
     /**
      * Chain Deferreds.
      *
      * @public
-     * @param {function|thenCallbacks} [doneCallback]
-     * @param {function} [failCallback]
-     * @param {function} [alwaysCallback]
+     * @param {function} [whenResolved]
+     * @param {function} [whenRejected]
      * @returns {Deferred} Creates a new Deferred instance.
      */
-    this.then = function () {
+    this.then = function (whenResolved, whenRejected) {
 
       var
       that = this,
       next = new Deferred(),
-      args = cloneArray(arguments),
-      argsObj = typeOf(args[0], 'object') ? args[0] : false;
+      ret;
 
-      next.prev = that;
+      that.whenResolved(function () {
 
-      arrayEach(deferredCallbacks, function (cbName, i) {
+        try {
 
-        var cb = argsObj ? argsObj[cbName] : args[i];
+          if (typeOf(whenResolved, 'function')) {
 
-        if (typeOf(cb, 'function')) {
-          that[cbName](function () {
-            cb.apply(next, arguments);
-          });
+            ret = whenResolved.apply(that, arguments);
+
+            if (ret instanceof Deferred) {
+
+              ret
+              .whenResolved(function () {
+                next.resolve.apply(next, arguments);
+              })
+              .whenRejected(function () {
+                next.reject.apply(next, arguments);
+              });
+
+            }
+            else {
+
+              next.resolve.call(next, ret);
+
+            }
+
+          }
+          else {
+
+            next.resolve.apply(next, arguments);
+
+          }
+
+        } catch (e) {
+
+          next.reject.call(next, e);
+
         }
+
+      });
+
+      that.whenRejected(function () {
+
+        if (typeOf(whenRejected, 'function')) {
+          whenRejected.apply(that, arguments);
+        }
+
+        next.reject.apply(next, arguments);
 
       });
 
@@ -755,6 +726,8 @@
      * Combine Deferreds.
      *
      * @todo resolveOnFirst & rejectOnFirst
+     * @todo emit an event whenever a subdeferred is resolved/rejected
+     * @todo this should be chainable with then call somehow...
      *
      * @public
      * @param {Deferred|array} [deferreds]
@@ -772,14 +745,14 @@
       masterArgs = [],
       counter = deferreds.length,
       inc = 0,
-      doneHandler = function () {
+      resolvedHandler = function () {
         --counter;
         masterArgs[inc] = this instanceof Deferred ? arguments : undefined;
         if (!counter) {
           master.resolve.apply(master, masterArgs);
         }
       },
-      failHandler = function () {
+      rejectedHandler = function () {
         master.reject.apply(master, arguments);
       };
 
@@ -787,10 +760,12 @@
         arrayEach(deferreds, function (deferred, i) {
           inc = i;
           if (deferred instanceof Deferred) {
-            deferred.done(doneHandler).fail(failHandler);
+            deferred
+            .whenResolved(resolvedHandler)
+            .whenRejected(rejectedHandler);
           }
           else {
-            doneHandler.call(0);
+            resolvedHandler.call(0);
           }
         });
       }
@@ -802,16 +777,20 @@
 
     };
 
+    if (typeOf(callback, 'function')) {
+      callback.call(this, this.resolve, this.reject);
+    }
+
   }
 
   /**
    * Publish library using an adapted UMD pattern.
    * https://github.com/umdjs/umd
    */
-  if (typeOf(define, 'function') && define.amd) {
+  if (typeOf(glob.define, 'function') && define.amd) {
     define([], lib);
   }
-  else if (typeOf(exports, 'object')) {
+  else if (typeOf(glob.exports, 'object')) {
     module.exports = lib;
   }
   else {

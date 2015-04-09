@@ -133,7 +133,7 @@
 
   });
 
-  Q.test(testName('Deferred argument.'), function (assert) {
+  Q.test(testName('Async module initiation.'), function (assert) {
 
     var done = assert.async();
     assert.expect(12);
@@ -197,6 +197,36 @@
 
   });
 
+  Q.test(testName('Define factory context.'), function (assert) {
+
+    assert.expect(11);
+
+    var
+    moduleIds = ['a', 'b', 'c'],
+    i = 0;
+
+    palikka.define(['a', 'b', 'c'], ['e'], function () {
+
+      assert.strictEqual(this.id, moduleIds[i]);
+      assert.strictEqual(this.dependencies.e === 'eVal', true);
+      assert.strictEqual(typeof this.async === 'function', true);
+
+      ++i;
+
+      return this.id + 'Val';
+    });
+
+    palikka.define('e', function () {
+
+      assert.strictEqual(this.id, 'e');
+      assert.strictEqual(typeof this.dependencies === 'object', true);
+
+      return this.id + 'Val';
+
+    });
+
+  });
+
   Q.test(testName('Internal module registration and initiation logic.'), function (assert) {
 
     var done = assert.async();
@@ -222,13 +252,19 @@
 
   Q.test(testName('Return values of successful and failed definitions.'), function (assert) {
 
-    assert.expect(2);
+    assert.expect(7);
 
-    var success = palikka.define('a', {a:'a'});
-    var fail = palikka.define('b');
+    var success = palikka.define('a', {});
+    var successMultiple = palikka.define(['b', 'c'], {});
+    var fail = palikka.define('d');
 
-    assert.strictEqual(success, 1);
-    assert.strictEqual(fail, 0);
+    assert.strictEqual(success instanceof Array, true);
+    assert.strictEqual(successMultiple instanceof Array, true);
+    assert.strictEqual(fail instanceof Array, true);
+    assert.strictEqual(success[0], 'a');
+    assert.strictEqual(successMultiple[0], 'b');
+    assert.strictEqual(successMultiple[1], 'c');
+    assert.strictEqual(fail[0], undefined);
 
   });
 
@@ -265,9 +301,9 @@
 
   Q.test(testName('Undefining locked, unlocked and non-existent module.'), function (assert) {
 
-    assert.expect(6);
+    assert.expect(12);
 
-    palikka.define('a', 'b', function () {
+    palikka.define(['a', 'c', 'd'], 'b', function () {
       return 'a';
     });
 
@@ -275,21 +311,32 @@
       return 'b';
     });
 
-    var undefineB = palikka.undefine('b');
-    var undefineA = palikka.undefine('a');
-    var undefineC = palikka.undefine('c');
+    var undefLocked = palikka.undefine('b');
+    var undefSingle = palikka.undefine('a');
+    var undefMultiple = palikka.undefine(['c', 'd']);
+    var undefUndefined = palikka.undefine('x');
+
+    /** Make sure that all return an array. */
+    assert.strictEqual(undefLocked instanceof Array, true);
+    assert.strictEqual(undefSingle instanceof Array, true);
+    assert.strictEqual(undefMultiple instanceof Array, true);
+    assert.strictEqual(undefUndefined instanceof Array, true);
 
     /** Locked */
-    assert.strictEqual(undefineB, false);
+    assert.strictEqual(undefLocked.length === 0 && undefLocked[0] === undefined, true);
     assert.strictEqual(palikka._modules['b'] !== undefined, true);
 
-    /** Unlocked */
-    assert.strictEqual(undefineA, true);
+    /** Unlocked - Single */
+    assert.strictEqual(undefSingle.length === 1 && undefSingle[0] === 'a', true);
     assert.strictEqual(palikka._modules['a'] === undefined, true);
 
-    /** Non-existent */
-    assert.strictEqual(undefineC, true);
-    assert.strictEqual(palikka._modules['c'] === undefined, true);
+    /** Unlocked - Multiple */
+    assert.strictEqual(undefMultiple.length === 2 && undefMultiple[0] === 'c' && undefMultiple[1] === 'd', true);
+    assert.strictEqual(palikka._modules['c'] === undefined && palikka._modules['d'] === undefined, true);
+
+    /** Undefined */
+    assert.strictEqual(undefUndefined.length === 0 && undefUndefined[0] === undefined, true);
+    assert.strictEqual(palikka._modules['x'] === undefined, true);
 
   });
 
@@ -411,9 +458,64 @@
 
   });
 
-  Q.module('._Eventizer()');
+  Q.module('.typeOf()');
 
-  Q.test(testName('Event system creator.'), function (assert) {
+  Q.test(testName('Promise system.'), function (assert) {
+
+    assert.expect(24);
+
+    // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+
+    // Primitive (immutable) values
+
+    assert.strictEqual(palikka.typeOf(undefined), 'undefined');
+    assert.strictEqual(palikka.typeOf(null), 'null');
+    assert.strictEqual(palikka.typeOf(true), 'boolean');
+    assert.strictEqual(palikka.typeOf(false), 'boolean');
+    assert.strictEqual(palikka.typeOf(new Boolean()), 'boolean');
+    assert.strictEqual(palikka.typeOf(''), 'string');
+    assert.strictEqual(palikka.typeOf('1'), 'string');
+    assert.strictEqual(palikka.typeOf(new String()), 'string');
+    assert.strictEqual(palikka.typeOf(-1), 'number');
+    assert.strictEqual(palikka.typeOf(0), 'number');
+    assert.strictEqual(palikka.typeOf(1), 'number');
+    assert.strictEqual(palikka.typeOf(NaN), 'number');
+    assert.strictEqual(palikka.typeOf(Infinity), 'number');
+    assert.strictEqual(palikka.typeOf(new Number()), 'number');
+    if (window.Symbol) {
+      assert.strictEqual(palikka.typeOf(Symbol()), 'symbol');
+    }
+    else {
+      assert.strictEqual(true, true);
+    }
+
+    // Objects
+
+    assert.strictEqual(palikka.typeOf({}), 'object');
+    assert.strictEqual(palikka.typeOf(new Object()), 'object');
+
+    assert.strictEqual(palikka.typeOf([]), 'array');
+    assert.strictEqual(palikka.typeOf(new Array()), 'array');
+
+    assert.strictEqual(palikka.typeOf(function () {}), 'function');
+    assert.strictEqual(palikka.typeOf(new Function()), 'function');
+
+    assert.strictEqual(palikka.typeOf(new Date()), 'date');
+
+    // Specials
+
+    assert.strictEqual(palikka.typeOf(JSON), 'json');
+    assert.strictEqual(palikka.typeOf(arguments), 'arguments');
+
+    // DOM (todo)
+
+  });
+
+  Q.module('.Eventizer()');
+
+  Q.test(testName('Event system.'), function (assert) {
+
+    /* TODO: context param test */
 
     var done = assert.async();
     assert.expect(12);
@@ -423,10 +525,10 @@
       var m = {};
 
       /** Initiate Eventizer using call method. */
-      palikka._Eventizer.call(m);
+      palikka.Eventizer.call(m);
 
       /** Initiate another Eventizer using new keyword. */
-      m.events = new palikka._Eventizer();
+      m.events = new palikka.Eventizer();
 
       /** Emit "tick" event with "foo" and "bar" arguments. */
       m.ticker = window.setInterval(function () {
@@ -435,7 +537,7 @@
 
       /** Emit "tock" event with "foo" and "bar" arguments. */
       m.tocker = window.setInterval(function () {
-        m.events.emit('tock', ['foo', 'bar']);
+        m.events.emit('tock', ['foo', 'bar'], ['test']);
       }, 100);
 
       return m;
@@ -460,7 +562,7 @@
       },
       tockCb = function (ev, foo, bar) {
 
-        assert.strictEqual(this, a.events);
+        assert.strictEqual(this[0], 'test');
         assert.strictEqual(ev.type, 'tock');
         assert.strictEqual(ev.fn, tockCb);
         assert.strictEqual(foo, 'foo');
@@ -494,6 +596,102 @@
 
     });
 
+
+  });
+
+  Q.module('.Deferred()');
+
+  Q.test(testName('Resolving synchronous deferred.'), function (assert) {
+
+    assert.expect(6);
+
+    var d1 = new palikka.Deferred();
+
+    d1
+    .whenResolved(function (a, b, c) {
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+      assert.strictEqual(c, 'c');
+    })
+    .whenRejected(function (a, b, c) {
+      assert.strictEqual(true, true);
+    })
+    .whenSettled(function (a, b, c) {
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+      assert.strictEqual(c, 'c');
+    })
+    .resolve('a', 'b', 'c');
+
+  });
+
+  Q.test(testName('Rejecting synchronous deferred.'), function (assert) {
+
+    assert.expect(6);
+
+    var d1 = new palikka.Deferred();
+
+    d1
+    .whenResolved(function (a, b, c) {
+      assert.strictEqual(true, true);
+    })
+    .whenRejected(function (a, b, c) {
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+      assert.strictEqual(c, 'c');
+    })
+    .whenSettled(function (a, b, c) {
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+      assert.strictEqual(c, 'c');
+    })
+    .reject('a', 'b', 'c');
+
+  });
+
+  Q.test(testName('Chaining synchronous deferreds with .then().'), function (assert) {
+
+    assert.expect(10);
+
+    var d1 = new palikka.Deferred();
+
+    d1
+    .then(function (a, b, c) {
+      assert.strictEqual(a, 'a');
+      assert.strictEqual(b, 'b');
+      assert.strictEqual(c, 'c');
+      return 'd';
+    }, function () {
+      assert.strictEqual(true, true);
+    })
+    .then(function (d) {
+      assert.strictEqual(d, 'd');
+      return new palikka.Deferred().resolve('e', 'f', 'g');
+    }, function () {
+      assert.strictEqual(true, true);
+    })
+    .whenRejected(function (e) {
+      assert.strictEqual(true, true);
+    })
+    .whenResolved(function (e, f, g) {
+      assert.strictEqual(e, 'e');
+      assert.strictEqual(f, 'f');
+      assert.strictEqual(g, 'g');
+    })
+    .then(function () {
+      throw new Error('fail');
+    })
+    .then(null, function (e) {
+      assert.strictEqual(e.message, 'fail');
+    })
+    .then(null, function (e) {
+      assert.strictEqual(e.message, 'fail');
+    })
+    .whenRejected(function (e) {
+      assert.strictEqual(e.message, 'fail');
+    });
+
+    d1.resolve('a', 'b', 'c');
 
   });
 
