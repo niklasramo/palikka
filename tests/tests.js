@@ -462,14 +462,16 @@
 
   Q.test(testName('Promise system.'), function (assert) {
 
-    assert.expect(24);
+    assert.expect(22);
 
     // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
 
     // Primitive (immutable) values
 
+    // http://stackoverflow.com/questions/14218670/why-are-null-and-undefined-of-the-type-domwindow
+    assert.strictEqual(palikka.typeOf(null), 'null'); // TODO: In IE8/7 -> 'object', in phantom -> 'domwindow'
+
     assert.strictEqual(palikka.typeOf(undefined), 'undefined');
-    assert.strictEqual(palikka.typeOf(null), 'null');
     assert.strictEqual(palikka.typeOf(true), 'boolean');
     assert.strictEqual(palikka.typeOf(false), 'boolean');
     assert.strictEqual(palikka.typeOf(new Boolean()), 'boolean');
@@ -505,7 +507,7 @@
     // Specials
 
     assert.strictEqual(palikka.typeOf(JSON), 'json');
-    assert.strictEqual(palikka.typeOf(arguments), 'arguments');
+    assert.strictEqual(palikka.typeOf(arguments), 'arguments'); // TODO: In IE8/7 -> 'object'
 
     // DOM (todo)
 
@@ -601,97 +603,77 @@
 
   Q.module('.Deferred()');
 
-  Q.test(testName('Resolving synchronous deferred.'), function (assert) {
+  Q.test(testName('Deferred system.'), function (assert) {
 
-    assert.expect(6);
+    var done = assert.async();
+    assert.expect(21);
 
-    var d1 = new palikka.Deferred();
+    var defer = new palikka.Deferred(function (resolve, reject) {
+      window,setTimeout(function () {
+        resolve('a', 'b', 'c');
+      }, 500);
+    });
 
-    d1
-    .whenResolved(function (a, b, c) {
-      assert.strictEqual(a, 'a');
-      assert.strictEqual(b, 'b');
-      assert.strictEqual(c, 'c');
-    })
-    .whenRejected(function (a, b, c) {
-      assert.strictEqual(true, true);
-    })
-    .whenSettled(function (a, b, c) {
-      assert.strictEqual(a, 'a');
-      assert.strictEqual(b, 'b');
-      assert.strictEqual(c, 'c');
-    })
-    .resolve('a', 'b', 'c');
-
-  });
-
-  Q.test(testName('Rejecting synchronous deferred.'), function (assert) {
-
-    assert.expect(6);
-
-    var d1 = new palikka.Deferred();
-
-    d1
-    .whenResolved(function (a, b, c) {
-      assert.strictEqual(true, true);
-    })
-    .whenRejected(function (a, b, c) {
-      assert.strictEqual(a, 'a');
-      assert.strictEqual(b, 'b');
-      assert.strictEqual(c, 'c');
-    })
-    .whenSettled(function (a, b, c) {
-      assert.strictEqual(a, 'a');
-      assert.strictEqual(b, 'b');
-      assert.strictEqual(c, 'c');
-    })
-    .reject('a', 'b', 'c');
-
-  });
-
-  Q.test(testName('Chaining synchronous deferreds with .then().'), function (assert) {
-
-    assert.expect(10);
-
-    var d1 = new palikka.Deferred();
-
-    d1
+    defer
     .then(function (a, b, c) {
+      assert.strictEqual(this, defer);
+      assert.strictEqual(this._chain.length, 0);
       assert.strictEqual(a, 'a');
       assert.strictEqual(b, 'b');
       assert.strictEqual(c, 'c');
       return 'd';
     }, function () {
-      assert.strictEqual(true, true);
+      assert.strictEqual(1, 0);
     })
     .then(function (d) {
+      assert.strictEqual(this._chain.length, 1);
+      assert.strictEqual(this._chain[0], defer);
       assert.strictEqual(d, 'd');
-      return new palikka.Deferred().resolve('e', 'f', 'g');
+      var ret = new palikka.Deferred();
+      window.setTimeout(function () {
+        ret.resolve('e', 'f', 'g');
+      }, 500);
+      return ret;
     }, function () {
-      assert.strictEqual(true, true);
+      assert.strictEqual(1, 0);
     })
     .whenRejected(function (e) {
-      assert.strictEqual(true, true);
+      assert.strictEqual(1, 0);
     })
     .whenResolved(function (e, f, g) {
       assert.strictEqual(e, 'e');
       assert.strictEqual(f, 'f');
       assert.strictEqual(g, 'g');
     })
+    .whenSettled(function (e, f, g) {
+      assert.strictEqual(e, 'e');
+      assert.strictEqual(f, 'f');
+      assert.strictEqual(g, 'g');
+    })
     .then(function () {
+      assert.strictEqual(this._chain.length, 2);
       throw new Error('fail');
     })
-    .then(null, function (e) {
+    .then(function () {
+      assert.strictEqual(1, 0);
+    }, function (e) {
+      assert.strictEqual(this._chain.length, 3);
       assert.strictEqual(e.message, 'fail');
     })
     .then(null, function (e) {
+      assert.strictEqual(this._chain.length, 4);
       assert.strictEqual(e.message, 'fail');
+    })
+    .whenResolved(function (e) {
+      assert.strictEqual(1, 0);
     })
     .whenRejected(function (e) {
       assert.strictEqual(e.message, 'fail');
+    })
+    .whenSettled(function (e) {
+      assert.strictEqual(e.message, 'fail');
+      done();
     });
-
-    d1.resolve('a', 'b', 'c');
 
   });
 

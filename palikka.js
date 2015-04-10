@@ -17,23 +17,33 @@
   'use strict';
 
   var
+
+  /** Define name of the library. */
   ns = 'palikka',
+
+  /** Public API interface. */
   lib = {},
 
-  /** Modules */
+  /** Modules container. */
   modules = {},
+
+  /** Primary key index for modules. */
   modulePrimaryKey = 0,
+
+  /** Module events. */
   evInitiate = 'initiate',
   evRegister = 'register',
 
-  /** Deferred */
+  /** Deferred events. */
   evResolve = 'resolve',
   evReject = 'reject',
+
+  /** Deferred states. */
   statePending = 'pending',
   stateResolved = 'resolved',
   stateRejected = 'rejected';
 
-  /** Eventize library. */
+  /** Create event system for the library. */
   Eventizer.call(lib);
 
   /**
@@ -341,7 +351,7 @@
 
     if (depsLength) {
 
-      arrayEach(dependencies, function (depId, i) {
+      arrayEach(dependencies, function (depId) {
 
         var
         evName = evInitiate + '-' + depId,
@@ -465,11 +475,11 @@
     };
 
     /**
-     * Emit event.
+     * Emit event. Optionally one can provide context and additional arguments for the callback functions.
      *
      * @public
      * @param {string} type
-     * @param {array} [args]
+     * @param {array|arguments} [args]
      * @param {*} [ctx]
      * @returns {Eventizer} The instance on which this method was called.
      */
@@ -484,7 +494,7 @@
         arrayEach(typeCallbacks.slice(0), function (callback) {
           if (typeOf(callback, 'function')) {
             argsType = typeOf(args);
-            args = argsType === 'array' ? args : argsType === 'arguments' ? cloneArray(args) : [];
+            args = argsType === 'array' || argsType === 'arguments' ? cloneArray(args) : [];
             args.unshift({type: type, fn: callback});
             ctx = typeOf(ctx, 'undefined') ? that : ctx;
             callback.apply(ctx, args);
@@ -509,22 +519,31 @@
     var
 
     /**
+     * Cache 'this' instance.
+     *
+     * @private
+     * @static
+     * @type {Deferred}
+     */
+    instance = this,
+
+    /**
      * A private event hub for the Deferred instance.
      *
      * @private
      * @static
      * @type {Eventizer}
      */
-    _ev = new Eventizer(),
+    evHub = new Eventizer();
 
     /**
-     * When the Deferred instance is resolved or rejected the provided arguments are stored here.
+     * When Deferreds are chained with 'then' method this property will contain all the Deferreds in the then' chain before the current instance.
      *
-     * @private
+     * @public
      * @static
      * @type {array}
      */
-    _args = [];
+    this._chain = [];
 
     /**
      * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'resolved' or 'rejected'.
@@ -536,13 +555,13 @@
     this.state = statePending;
 
     /**
-     * When Deferreds are chained with 'then' method this property will point to the previous Deferred in the chain.
+     * When the Deferred instance is resolved or rejected the provided arguments are stored here.
      *
      * @public
      * @static
-     * @type {Deferred|undefined}
+     * @type {array}
      */
-    this.prev = undefined;
+    this.args = [];
 
     /**
      * Resolve Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
@@ -553,9 +572,9 @@
     this.resolve = function () {
 
       if (this.state === statePending) {
-        _args = arguments;
+        this.args = cloneArray(arguments);
         this.state = stateResolved;
-        _ev.emit(evResolve, _args);
+        evHub.emit(evResolve, this.args);
       }
 
       return this;
@@ -571,9 +590,9 @@
     this.reject = function () {
 
       if (this.state === statePending) {
-        _args = arguments;
+        this.args = cloneArray(arguments);
         this.state = stateRejected;
-        _ev.emit(evReject, _args);
+        evHub.emit(evReject, this.args);
       }
 
       return this;
@@ -594,13 +613,13 @@
       if (typeOf(callback, 'function')) {
 
         if (that.state === stateResolved) {
-          callback.apply(that, _args);
+          callback.apply(that, that.args);
         }
 
         if (that.state === statePending) {
-          _ev.on(evResolve, function (e) {
-            callback.apply(that, _args);
-            _ev.off(evResolve, e.fn);
+          evHub.on(evResolve, function (e) {
+            callback.apply(that, that.args);
+            evHub.off(evResolve, e.fn);
           });
         }
 
@@ -624,13 +643,13 @@
       if (typeOf(callback, 'function')) {
 
         if (that.state === stateRejected) {
-          callback.apply(that, _args);
+          callback.apply(that, that.args);
         }
 
         if (that.state === statePending) {
-          _ev.on(evReject, function (e) {
-            callback.apply(that, _args);
-            _ev.off(evReject, e.fn);
+          evHub.on(evReject, function (e) {
+            callback.apply(that, that.args);
+            evHub.off(evReject, e.fn);
           });
         }
 
@@ -668,6 +687,9 @@
       next = new Deferred(),
       ret;
 
+      next._chain = cloneArray(that._chain);
+      next._chain.push(that);
+
       that.whenResolved(function () {
 
         try {
@@ -677,7 +699,6 @@
             ret = whenResolved.apply(that, arguments);
 
             if (ret instanceof Deferred) {
-
               ret
               .whenResolved(function () {
                 next.resolve.apply(next, arguments);
@@ -685,12 +706,9 @@
               .whenRejected(function () {
                 next.reject.apply(next, arguments);
               });
-
             }
             else {
-
               next.resolve.call(next, ret);
-
             }
 
           }
@@ -725,10 +743,6 @@
     /**
      * Combine Deferreds.
      *
-     * @todo resolveOnFirst & rejectOnFirst
-     * @todo emit an event whenever a subdeferred is resolved/rejected
-     * @todo this should be chainable with then call somehow...
-     *
      * @public
      * @param {Deferred|array} [deferreds]
      * @param {boolean} [resolveOnFirst=false]
@@ -747,13 +761,17 @@
       inc = 0,
       resolvedHandler = function () {
         --counter;
-        masterArgs[inc] = this instanceof Deferred ? arguments : undefined;
-        if (!counter) {
+        masterArgs[inc] = this instanceof Deferred ? cloneArray(arguments) : undefined;
+        if (resolveOnFirst === true || counter === 0) {
           master.resolve.apply(master, masterArgs);
         }
       },
       rejectedHandler = function () {
-        master.reject.apply(master, arguments);
+        --counter;
+        masterArgs[inc] = this instanceof Deferred ? cloneArray(arguments) : undefined;
+        if (rejectOnFirst === undefined || rejectOnFirst === true || counter === 0) {
+          master.reject.apply(master, arguments);
+        }
       };
 
       if (counter) {
@@ -778,7 +796,11 @@
     };
 
     if (typeOf(callback, 'function')) {
-      callback.call(this, this.resolve, this.reject);
+      callback.call(this, function () {
+        instance.resolve.apply(instance, arguments);
+      }, function () {
+        instance.reject.apply(instance, arguments);
+      });
     }
 
   }
