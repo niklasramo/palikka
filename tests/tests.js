@@ -460,17 +460,13 @@
 
   Q.module('.typeOf()');
 
-  Q.test(testName('Promise system.'), function (assert) {
+  Q.test(testName('Type checker system.'), function (assert) {
 
-    assert.expect(22);
-
-    // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+    assert.expect(24);
 
     // Primitive (immutable) values
 
-    // http://stackoverflow.com/questions/14218670/why-are-null-and-undefined-of-the-type-domwindow
-    assert.strictEqual(palikka.typeOf(null), 'null'); // TODO: In IE8/7 -> 'object', in phantom -> 'domwindow'
-
+    assert.strictEqual(palikka.typeOf(null), 'null');
     assert.strictEqual(palikka.typeOf(undefined), 'undefined');
     assert.strictEqual(palikka.typeOf(true), 'boolean');
     assert.strictEqual(palikka.typeOf(false), 'boolean');
@@ -507,7 +503,7 @@
     // Specials
 
     assert.strictEqual(palikka.typeOf(JSON), 'json');
-    assert.strictEqual(palikka.typeOf(arguments), 'arguments'); // TODO: In IE8/7 -> 'object'
+    assert.strictEqual(palikka.typeOf(arguments), 'arguments');
 
     // DOM (todo)
 
@@ -526,8 +522,8 @@
 
       var m = {};
 
-      /** Initiate Eventizer using call method. */
-      palikka.Eventizer.call(m);
+      /** Initiate Eventizer using eventize method. */
+      palikka.eventize(m);
 
       /** Initiate another Eventizer using new keyword. */
       m.events = new palikka.Eventizer();
