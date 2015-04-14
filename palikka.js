@@ -6,14 +6,12 @@
  */
 
 /*
-  IDEAS/TODOS:
-  ------------
-  - Every module should be a deferred/promise instance to simplify it's management logic.
-    -> Should modules be a subcall of deferreds?
+  TODO
+  ----
   - Add a minified version to the project repo and improve the build system in general (more automation).
   - Better test coverage (improved tests for return values).
   - Easier importing of third party libs.
-  - Should Deferred be called Promise instead?
+  - Deferred vs Promise... what's the real difference?
   - Aim for 5k max minified file size + a killer performance.
 */
 
@@ -31,9 +29,6 @@
   /** Modules container. */
   modules = {},
 
-  /** Primary key index for modules. */
-  modulePrimaryKey = 0,
-
   /** Module events. */
   evInitiate = 'initiate',
   evRegister = 'register',
@@ -46,432 +41,6 @@
   statePending = 'pending',
   stateResolved = 'resolved',
   stateRejected = 'rejected';
-
-  /**
-   * Module storage object.
-   *
-   * @protected
-   * @type {object}
-   */
-  lib._modules = modules;
-
-  /**
-   * @public
-   * @see typeOf
-   */
-  lib.typeOf = typeOf;
-
-  /**
-   * @public
-   * @see Eventizer
-   */
-  lib.Eventizer = Eventizer;
-
-  /**
-   * @public
-   * @see Deferred
-   */
-  lib.Deferred = Deferred;
-
-  /**
-   * Define a single module or multiple modules. Returns an array that contains id's of all modules that were succesfully registered.
-   *
-   * @public
-   * @param {string|array} ids
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
-   * @returns {array}
-   */
-  lib.define = function (ids, dependencies, factory) {
-
-    ids = typeOf(ids, 'array') ? ids : [ids];
-
-    var ret = [];
-
-    arrayEach(ids, function (id) {
-
-      id = defineSingle(id, dependencies, factory);
-
-      if (id) {
-        ret.push(id);
-      }
-
-    });
-
-    return ret;
-
-  };
-
-  /**
-   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
-   *
-   * @public
-   * @param {string|array} ids
-   * @returns {array}
-   */
-  lib.undefine = function (ids) {
-
-    ids = typeOf(ids, 'array') ? ids : [ids];
-
-    var ret = [];
-
-    arrayEach(ids, function (id) {
-
-      var
-      module = modules[id],
-      isLocked = module && module.locked;
-
-      if (module && !isLocked) {
-        delete modules[id];
-        ret.push(id);
-      }
-
-    });
-
-    return ret;
-
-  };
-
-  /**
-   * Require a module.
-   *
-   * @public
-   * @param {array|string} dependencies
-   * @param {function} callback
-   */
-  lib.require = function (dependencies, callback) {
-
-    if (typeOf(callback, 'function')) {
-      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
-        callback.apply(null, depModules);
-      });
-    }
-
-  };
-
-  /**
-   * Eventize an object (if provided) or return a new Eventizer instance.
-   *
-   * @public
-   * @param {object} [obj]
-   * @param {object} [listeners]
-   * @returns {object|Eventizer}
-   */
-  lib.eventize = function (obj, listeners) {
-
-    var eventizer = new Eventizer(listeners);
-    if (typeOf(obj, 'object')) {
-      obj._listeners = eventizer._listeners;
-      obj.on = eventizer.on;
-      obj.off = eventizer.off;
-      obj.emit = eventizer.emit;
-      return obj;
-    }
-    else {
-      return eventizer;
-    }
-
-  };
-
-  /**
-   * Return a new Deferred instance.
-   *
-   * @public
-   * @param {function} [callback]
-   * @returns {Deferred}
-   */
-  lib.deferred = function (callback) {
-
-    return new Deferred(callback);
-
-  };
-
-  /**
-   * Return a new Deferred instance which will be resolved/rejected when the provided deferreds are resolved/rejected.
-   *
-   * @public
-   * @param {Deferred|array} [deferreds]
-   * @param {boolean} [resolveOnFirst=false]
-   * @param {boolean} [rejectOnFirst=true]
-   * @returns {Deferred}
-   */
-  lib.when = function (deferreds, resolveOnFirst, rejectOnFirst) {
-
-    return Deferred.prototype.join.apply(0, arguments);
-
-  };
-
-  /**
-   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
-   *
-   * @private
-   * @param {object} obj
-   * @param {string} [isType]
-   * @returns {string|boolean}
-   */
-  function typeOf(obj, isType) {
-
-    var type = obj === null ? 'null' : // IE 7/8 fix -> null check
-               obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
-               typeof obj;
-
-    type = type !== 'object' ? type : Object.prototype.toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
-
-    // IE 7/8 fix -> arguments check
-    if (type === 'object') {
-      try {
-        type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
-      } catch (e) {}
-    }
-
-    return isType ? type === isType : type;
-
-  }
-
-  /**
-   * Clone array or arguments object or alternatively copy values from an array to another array. If a non-array value is provided as the 'from' param a new empty array will be returned. If 'to' param is provided it will be emptied and populated with 'from' array's values.
-   *
-   * @private
-   * @param {array} from
-   * @param {array} [to]
-   * @returns {array}
-   */
-  function copyArray(from, to) {
-
-    var
-    fromType = typeOf(from),
-    ret = fromType === 'array' ? from.slice(0) : fromType === 'arguments' ? Array.prototype.slice.call(from) : [];
-
-    if (typeOf(to, 'array')) {
-      to.length = 0;
-      arrayEach(ret, function (fromVal) {
-        to.push(fromVal);
-      });
-      ret = to;
-    }
-
-    return ret;
-
-  }
-
-  /**
-   * Loop array items.
-   *
-   * @private
-   * @param {array} array
-   * @param {function} callback
-   * @returns {array}
-   */
-  function arrayEach(array, callback) {
-
-    if (typeOf(callback, 'function')) {
-      for (var i = 0, len = array.length; i < len; i++) {
-        callback(array[i], i);
-      }
-    }
-
-    return array;
-
-  }
-
-  /**
-   * Define a module. Returns module's id if module registration was successful, otherwise returns false.
-   *
-   * @private
-   * @param {string} id
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
-   * @returns {boolean|string}
-   */
-  function defineSingle(id, dependencies, factory) {
-
-    var
-    hasDeps = factory,
-    depIds = hasDeps ? sanitizeDependencies(dependencies) : [],
-    factory = hasDeps ? factory : dependencies,
-    factoryType = typeOf(factory),
-    isValidId = id && typeOf(id, 'string'),
-    isValidFactory = factoryType === 'object' || factoryType === 'function',
-    primaryKey = isValidId && isValidFactory && registerModule(id, depIds),
-    init,
-    async,
-    factoryCtx,
-    moduleData;
-
-    /** Return false if module registration failed. */
-    if (!primaryKey) {
-      return false;
-    }
-
-    loadDependencies(depIds, function (depModules) {
-
-      init = function (data) {
-        initModule(id, primaryKey, arguments.length ? data : moduleData);
-      };
-
-      if (factoryType === 'function') {
-
-        factoryCtx = {
-          id: id,
-          dependencies: {},
-          async: function () {
-            async = 1;
-            return init;
-          }
-        };
-
-        arrayEach(depIds, function (depId, i) {
-          factoryCtx.dependencies[depId] = depModules[i];
-        });
-
-        moduleData = factory.apply(factoryCtx, depModules);
-
-        if (!async) {
-          init(moduleData);
-        }
-
-      }
-      else {
-
-        init(factory);
-
-      }
-
-    });
-
-    /** Return module id to indicate a succesful module registration. */
-    return id;
-
-  }
-
-  /**
-   * Sanitize dependencies argument of define and require methods.
-   *
-   * @private
-   * @param {array|string} dependencies
-   * @returns {array}
-   */
-  function sanitizeDependencies(dependencies) {
-
-    var type = typeOf(dependencies);
-    return type === 'array' ? dependencies : type === 'string' ? [dependencies] : [];
-
-  }
-
-  /**
-   * Register a module. Returns the modules primary key (a positive integer) if succesful, otherwise returns zero.
-   *
-   * @private
-   * @param {string} id
-   * @returns {number}
-   */
-  function registerModule(id, dependencies) {
-
-    if (!modules[id]) {
-      var pk = ++modulePrimaryKey;
-      modules[id] = {
-        id: id,
-        pk: pk,
-        loaded: false,
-        locked: false,
-        data: undefined,
-        dependencies: dependencies
-      };
-      lib.emit(evRegister + '-' + id, [modules[id]]);
-      lib.emit(evRegister, [modules[id]]);
-      return pk;
-    } else {
-      return 0;
-    }
-
-  }
-
-  /**
-   * Initialize a module.
-   *
-   * @private
-   * @param {string} id
-   * @param {number} primaryKey
-   * @param {*} data
-   */
-  function initModule(id, primaryKey, data) {
-
-    if (modules[id] && modules[id].pk === primaryKey && !modules[id].loaded) {
-      modules[id].data = data;
-      modules[id].loaded = true;
-      lib.emit(evInitiate + '-' + id, [modules[id]]);
-      lib.emit(evInitiate, [modules[id]]);
-    }
-
-  }
-
-  /**
-   * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
-   *
-   * @private
-   * @param {array} dependencies
-   * @param {function} callback
-   */
-  function loadDependencies(dependencies, callback) {
-
-    var
-    depModules = [],
-    depsLength = dependencies.length,
-    depsReadyCounter = 0,
-    depsReadyCallback = function () {
-
-      arrayEach(dependencies, function (depId) {
-        depModules.push(modules[depId].data);
-      });
-
-      callback(depModules);
-
-    };
-
-    if (depsLength) {
-
-      arrayEach(dependencies, function (depId) {
-
-        var
-        evName = evInitiate + '-' + depId,
-        evHandler = function (ev) {
-
-          /** If this is an event's callback, let's unbind the event listener. */
-          if (ev) {
-            lib.off(evName, evHandler);
-          }
-
-          /** Let's increment loaded dependencies counter so we can later on in this function deduce if all dependencies are loaded. */
-          ++depsReadyCounter;
-
-          /** Lock dependency module (can't be undefined anymore). */
-          modules[depId].locked = true;
-
-          /** If this was the last dependency left to load it's time to move on. */
-          if (depsReadyCounter === depsLength) {
-            depsReadyCallback();
-          }
-
-        };
-
-        /** If dependency module is already loaded let's move on, otherwise let's keep on waiting. */
-        if (modules[depId] && modules[depId].loaded) {
-          evHandler();
-        }
-        else {
-          lib.on(evName, evHandler);
-        }
-
-      });
-
-    }
-    else {
-
-      depsReadyCallback();
-
-    }
-
-  }
 
   /**
    * Creates a new Eventizer instance that allows you to bind, unbind and emit events.
@@ -561,17 +130,19 @@
 
     var
     that = this,
-    typeCallbacks = that._listeners[type],
-    argsType;
+    typeCallbacks = that._listeners[type];
 
     if (typeCallbacks) {
       arrayEach(typeCallbacks.slice(0), function (callback) {
         if (typeOf(callback, 'function')) {
-          argsType = typeOf(args);
-          args = copyArray(args);
-          args.unshift({type: type, fn: callback});
-          ctx = typeOf(ctx, 'undefined') ? that : ctx;
-          callback.apply(ctx, args);
+
+          var
+          cbArgs = copyArray(args),
+          cbCtx = typeOf(ctx, 'undefined') ? that : ctx;
+
+          cbArgs.unshift({type: type, fn: callback});
+          callback.apply(cbCtx, cbArgs);
+
         }
       });
     }
@@ -692,7 +263,7 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.whenResolved = function (callback) {
+  Deferred.prototype.onResolved = function (callback) {
 
     var that = this;
 
@@ -723,7 +294,7 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.whenRejected = function (callback) {
+  Deferred.prototype.onRejected = function (callback) {
 
     var that = this;
 
@@ -754,9 +325,9 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.whenSettled = function (callback) {
+  Deferred.prototype.onSettled = function (callback) {
 
-    return this.whenResolved(callback).whenRejected(callback);
+    return this.onResolved(callback).onRejected(callback);
 
   };
 
@@ -779,7 +350,7 @@
     copyArray(that._chain, next._chain);
     next._chain.push(that);
 
-    that.whenResolved(function () {
+    that.onResolved(function () {
 
       try {
 
@@ -789,10 +360,10 @@
 
           if (ret instanceof Deferred) {
             ret
-            .whenResolved(function () {
+            .onResolved(function () {
               next.resolve.apply(next, arguments);
             })
-            .whenRejected(function () {
+            .onRejected(function () {
               next.reject.apply(next, arguments);
             });
           }
@@ -815,7 +386,7 @@
 
     });
 
-    that.whenRejected(function () {
+    that.onRejected(function () {
 
       if (typeOf(whenRejected, 'function')) {
         whenRejected.apply(that, arguments);
@@ -872,8 +443,8 @@
         inc = i;
         if (deferred instanceof Deferred) {
           deferred
-          .whenResolved(resolvedHandler)
-          .whenRejected(rejectedHandler);
+          .onResolved(resolvedHandler)
+          .onRejected(rejectedHandler);
         }
         else {
           resolvedHandler.call(0);
@@ -888,7 +459,433 @@
 
   };
 
-  /** Eventize the library. */
+  /**
+   * Create a module object.
+   *
+   * @class
+   * @private
+   * @param {string} id
+   * @param {array} dependencies
+   * @param {function|object} factory
+   */
+  function Module(id, dependencies, factory) {
+
+    var
+    that = this;
+
+    // Module data.
+    this.id = id;
+    this.value = undefined;
+    this.loaded = false;
+    this.locked = false;
+    this.dependencies = dependencies;
+    this.factory = factory;
+
+    // Add module to modules object.
+    modules[id] = this;
+
+    // Emit register events.
+    lib.emit(evRegister + '-' + id, [this]);
+    lib.emit(evRegister, [this]);
+
+    // Initiate.
+    loadDependencies(dependencies, function (depModules) {
+      that.process(depModules);
+    });
+
+  }
+
+  /**
+   * Process module factory.
+   *
+   * @public
+   * @memberof Module
+   * @param {array} depModules
+   * @returns {Module} The instance on which this method was called.
+   */
+  Module.prototype.process = function (depModules) {
+
+    var
+    that = this,
+    factoryCtx,
+    factoryValue,
+    factoryAsync,
+    factoryInit = function (val) {
+      that.initiate(arguments.length ? val : factoryValue);
+    };
+
+    if (typeOf(that.factory, 'function')) {
+
+      factoryCtx = {
+        id: that.id,
+        dependencies: {},
+        async: function () {
+          factoryAsync = true;
+          return factoryInit;
+        }
+      };
+
+      arrayEach(that.dependencies, function (depId) {
+        factoryCtx.dependencies[depId] = modules[depId].value;
+      });
+
+      factoryValue = that.factory.apply(factoryCtx, depModules);
+
+      if (!factoryAsync) {
+        factoryInit(factoryValue);
+      }
+
+    }
+    else {
+
+      factoryInit(that.factory);
+
+    }
+
+    return that;
+
+  };
+
+  /**
+   * Initiate module.
+   *
+   * @public
+   * @memberof Module
+   * @param {*} value
+   * @returns {Module} The instance on which this method was called.
+   */
+  Module.prototype.initiate = function (value) {
+
+    if (this === modules[this.id] && !this.loaded) {
+      this.value = value;
+      this.loaded = true;
+      lib.emit(evInitiate + '-' + this.id, [this]);
+      lib.emit(evInitiate, [this]);
+    }
+
+    return this;
+
+  };
+
+  /**
+   * Private helper functions.
+   */
+
+  /**
+   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
+   *
+   * @private
+   * @param {object} obj
+   * @param {string} [isType]
+   * @returns {string|boolean}
+   */
+  function typeOf(obj, isType) {
+
+    var type = obj === null ? 'null' : // IE 7/8 fix -> null check
+               obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
+               typeof obj;
+
+    type = type !== 'object' ? type : Object.prototype.toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
+
+    // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
+    if (type === 'object') {
+      try {
+        type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
+      } catch (e) {}
+    }
+
+    return isType ? type === isType : type;
+
+  }
+
+  /**
+   * Clone array or arguments object or alternatively copy values from an array to another array. If a non-array value is provided as the 'from' param a new empty array will be returned. If 'to' param is provided it will be emptied and populated with 'from' array's values.
+   *
+   * @private
+   * @param {array} from
+   * @param {array} [to]
+   * @returns {array}
+   */
+  function copyArray(from, to) {
+
+    var
+    fromType = typeOf(from),
+    ret = fromType === 'array' ? from.slice(0) : fromType === 'arguments' ? Array.prototype.slice.call(from) : [];
+
+    if (typeOf(to, 'array')) {
+      to.length = 0;
+      arrayEach(ret, function (fromVal) {
+        to.push(fromVal);
+      });
+      ret = to;
+    }
+
+    return ret;
+
+  }
+
+  /**
+   * Loop array items.
+   *
+   * @private
+   * @param {array} array
+   * @param {function} callback
+   * @returns {array}
+   */
+  function arrayEach(array, callback) {
+
+    if (typeOf(callback, 'function')) {
+      for (var i = 0, len = array.length; i < len; i++) {
+        callback(array[i], i);
+      }
+    }
+
+    return array;
+
+  }
+
+  /**
+   * Define a module. Returns module instance if module registration was successful, otherwise returns false. Validates arguments and makes sure that no bad data is passed on to Module constructor.
+   *
+   * @private
+   * @param {string} id
+   * @param {array|string} [dependencies]
+   * @param {function|object} factory
+   * @returns {boolean|Module}
+   */
+  function defineSingle(id, dependencies, factory) {
+
+    var
+    hasDeps = factory,
+    depIds = hasDeps ? sanitizeDependencies(dependencies) : [],
+    factory = hasDeps ? factory : dependencies,
+    factoryType = typeOf(factory),
+    isValid = id && typeOf(id, 'string') && modules[id] === undefined && (factoryType === 'object' || factoryType === 'function');
+
+    return isValid ? new Module(id, depIds, factory) : false;
+
+  }
+
+  /**
+   * Sanitize dependencies argument of define and require methods.
+   *
+   * @private
+   * @param {array|string} dependencies
+   * @returns {array}
+   */
+  function sanitizeDependencies(dependencies) {
+
+    var type = typeOf(dependencies);
+    return type === 'array' ? dependencies : type === 'string' ? [dependencies] : [];
+
+  }
+
+  /**
+   * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
+   *
+   * @private
+   * @param {array} dependencies
+   * @param {function} callback
+   */
+  function loadDependencies(dependencies, callback) {
+
+    var
+    ret = [],
+    counter = 0,
+    tryResolve = function (module, i) {
+      ++counter;
+      module.locked = true;
+      ret[i] = module.value;
+      if (counter === dependencies.length) {
+        callback(ret);
+      }
+    };
+
+    if (dependencies.length) {
+      arrayEach(dependencies, function (depId, i) {
+        var module = modules[depId];
+        if (module && module.loaded) {
+          tryResolve(module, i);
+        }
+        else {
+          lib.on(evInitiate + '-' + depId, function (ev, module) {
+            lib.off(ev.type, ev.fn);
+            tryResolve(module, i);
+          });
+        }
+      });
+    }
+    else {
+      callback(ret);
+    }
+
+  }
+
+  /**
+   * Public API.
+   */
+
+  /**
+   * Module storage object.
+   *
+   * @protected
+   * @type {object}
+   */
+  lib._modules = modules;
+
+  /**
+   * @public
+   * @see typeOf
+   */
+  lib.typeOf = typeOf;
+
+  /**
+   * @public
+   * @see Eventizer
+   */
+  lib.Eventizer = Eventizer;
+
+  /**
+   * @public
+   * @see Deferred
+   */
+  lib.Deferred = Deferred;
+
+  /**
+   * @public
+   * @see Module
+   */
+  lib.Module = Module;
+
+  /**
+   * Define a single module or multiple modules. Returns an array that contains instances of all modules that were succesfully registered.
+   *
+   * @public
+   * @param {string|array} ids
+   * @param {array|string} [dependencies]
+   * @param {function|object} factory
+   * @returns {array}
+   */
+  lib.define = function (ids, dependencies, factory) {
+
+    ids = typeOf(ids, 'array') ? ids : [ids];
+
+    var ret = [];
+
+    arrayEach(ids, function (id) {
+
+      var module = defineSingle(id, dependencies, factory);
+
+      if (module) {
+        ret.push(module);
+      }
+
+    });
+
+    return ret;
+
+  };
+
+  /**
+   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
+   *
+   * @public
+   * @param {string|array} ids
+   * @returns {array}
+   */
+  lib.undefine = function (ids) {
+
+    ids = typeOf(ids, 'array') ? ids : [ids];
+
+    var ret = [];
+
+    arrayEach(ids, function (id) {
+
+      var
+      module = modules[id],
+      isLocked = module && module.locked;
+
+      if (module && !isLocked) {
+        delete modules[id];
+        ret.push(id);
+      }
+
+    });
+
+    return ret;
+
+  };
+
+  /**
+   * Require a module.
+   *
+   * @public
+   * @param {array|string} dependencies
+   * @param {function} callback
+   */
+  lib.require = function (dependencies, callback) {
+
+    if (typeOf(callback, 'function')) {
+      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
+        callback.apply(null, depModules);
+      });
+    }
+
+  };
+
+  /**
+   * Eventize an object (if provided) or return a new Eventizer instance.
+   *
+   * @public
+   * @param {object} [obj]
+   * @param {object} [listeners]
+   * @returns {object|Eventizer}
+   */
+  lib.eventize = function (obj, listeners) {
+
+    var eventizer = new Eventizer(listeners);
+    if (typeOf(obj, 'object')) {
+      obj._listeners = eventizer._listeners;
+      obj.on = eventizer.on;
+      obj.off = eventizer.off;
+      obj.emit = eventizer.emit;
+      return obj;
+    }
+    else {
+      return eventizer;
+    }
+
+  };
+
+  /**
+   * Return a new Deferred instance.
+   *
+   * @public
+   * @param {function} [callback]
+   * @returns {Deferred}
+   */
+  lib.deferred = function (callback) {
+
+    return new Deferred(callback);
+
+  };
+
+  /**
+   * Return a new Deferred instance which will be resolved/rejected when the provided deferreds are resolved/rejected.
+   *
+   * @public
+   * @param {Deferred|array} [deferreds]
+   * @param {boolean} [resolveOnFirst=false]
+   * @param {boolean} [rejectOnFirst=true]
+   * @returns {Deferred}
+   */
+  lib.when = function () {
+
+    return Deferred.prototype.join.apply(0, arguments);
+
+  };
+
+  /** Eventize the library -> on/off/emit methods. */
   lib.eventize(lib);
 
   /**

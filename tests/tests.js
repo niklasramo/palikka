@@ -34,7 +34,7 @@
 
   function getVal(moduleId) {
 
-    return palikka._modules[moduleId].data;
+    return palikka._modules[moduleId].value;
 
   }
 
@@ -78,15 +78,14 @@
     window.bar = 'bar';
     var obj = {a: 'a', b: 'b'};
 
-    palikka.define(['foo', 'bar'], function() {
-      return window[this.id];
-    });
-
-
     palikka.define(['a', 'b'], ['foo', 'bar'], function (foo, bar) {
       assert.strictEqual(foo, 'foo');
       assert.strictEqual(bar, 'bar');
       return obj[this.id];
+    });
+
+    palikka.define(['foo', 'bar'], function() {
+      return window[this.id];
     });
 
     palikka.require(['foo', 'bar', 'a', 'b'], function (foo, bar, a, b) {
@@ -261,9 +260,9 @@
     assert.strictEqual(success instanceof Array, true);
     assert.strictEqual(successMultiple instanceof Array, true);
     assert.strictEqual(fail instanceof Array, true);
-    assert.strictEqual(success[0], 'a');
-    assert.strictEqual(successMultiple[0], 'b');
-    assert.strictEqual(successMultiple[1], 'c');
+    assert.strictEqual(success[0].id, 'a');
+    assert.strictEqual(successMultiple[0].id, 'b');
+    assert.strictEqual(successMultiple[1].id, 'c');
     assert.strictEqual(fail[0], undefined);
 
   });
@@ -633,15 +632,15 @@
     }, function () {
       assert.strictEqual(1, 0);
     })
-    .whenRejected(function (e) {
+    .onRejected(function (e) {
       assert.strictEqual(1, 0);
     })
-    .whenResolved(function (e, f, g) {
+    .onResolved(function (e, f, g) {
       assert.strictEqual(e, 'e');
       assert.strictEqual(f, 'f');
       assert.strictEqual(g, 'g');
     })
-    .whenSettled(function (e, f, g) {
+    .onSettled(function (e, f, g) {
       assert.strictEqual(e, 'e');
       assert.strictEqual(f, 'f');
       assert.strictEqual(g, 'g');
@@ -660,13 +659,13 @@
       assert.strictEqual(this._chain.length, 4);
       assert.strictEqual(e.message, 'fail');
     })
-    .whenResolved(function (e) {
+    .onResolved(function (e) {
       assert.strictEqual(1, 0);
     })
-    .whenRejected(function (e) {
+    .onRejected(function (e) {
       assert.strictEqual(e.message, 'fail');
     })
-    .whenSettled(function (e) {
+    .onSettled(function (e) {
       assert.strictEqual(e.message, 'fail');
       done();
     });
