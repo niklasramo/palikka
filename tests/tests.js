@@ -603,9 +603,9 @@
     var done = assert.async();
     assert.expect(21);
 
-    var defer = new palikka.Deferred(function (resolve, reject) {
+    var defer = new palikka.Deferred(function (fulfill, reject) {
       window,setTimeout(function () {
-        resolve('a', 'b', 'c');
+        fulfill('a', 'b', 'c');
       }, 500);
     });
 
@@ -626,7 +626,7 @@
       assert.strictEqual(d, 'd');
       var ret = new palikka.Deferred();
       window.setTimeout(function () {
-        ret.resolve('e', 'f', 'g');
+        ret.fulfill('e', 'f', 'g');
       }, 500);
       return ret;
     }, function () {
@@ -635,12 +635,12 @@
     .onRejected(function (e) {
       assert.strictEqual(1, 0);
     })
-    .onResolved(function (e, f, g) {
+    .onFulfilled(function (e, f, g) {
       assert.strictEqual(e, 'e');
       assert.strictEqual(f, 'f');
       assert.strictEqual(g, 'g');
     })
-    .onSettled(function (e, f, g) {
+    .onFulfilled(function (e, f, g) {
       assert.strictEqual(e, 'e');
       assert.strictEqual(f, 'f');
       assert.strictEqual(g, 'g');
@@ -659,13 +659,13 @@
       assert.strictEqual(this._chain.length, 4);
       assert.strictEqual(e.message, 'fail');
     })
-    .onResolved(function (e) {
+    .onFulfilled(function (e) {
       assert.strictEqual(1, 0);
     })
     .onRejected(function (e) {
       assert.strictEqual(e.message, 'fail');
     })
-    .onSettled(function (e) {
+    .onFulfilled(function (e) {
       assert.strictEqual(e.message, 'fail');
       done();
     });

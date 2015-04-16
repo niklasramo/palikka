@@ -8,10 +8,9 @@
 /*
   TODO
   ----
+  - Easier importing of third party libs.
   - Add a minified version to the project repo and improve the build system in general (more automation).
   - Better test coverage (improved tests for return values).
-  - Easier importing of third party libs.
-  - Deferred vs Promise... what's the real difference?
   - Aim for 5k max minified file size + a killer performance.
 */
 
@@ -34,12 +33,12 @@
   evRegister = 'register',
 
   /** Deferred events. */
-  evResolve = 'resolve',
+  evFulfill = 'fulfill',
   evReject = 'reject',
 
   /** Deferred states. */
   statePending = 'pending',
-  stateResolved = 'resolved',
+  stateFulfilled = 'fulfilled',
   stateRejected = 'rejected';
 
   /**
@@ -177,7 +176,7 @@
     this._chain = [];
 
     /**
-     * When the Deferred instance is resolved or rejected the provided arguments are stored here.
+     * When the Deferred instance is fulfilled or rejected the provided arguments are stored here.
      *
      * @protected
      * @type {array}
@@ -185,7 +184,7 @@
     this._args = [];
 
     /**
-     * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'resolved' or 'rejected'.
+     * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
      *
      * @protected
      * @type {string}
@@ -196,7 +195,7 @@
     var instance = this;
     if (typeOf(callback, 'function')) {
       callback.call(instance, function () {
-        instance.resolve.apply(instance, arguments);
+        instance.fulfill.apply(instance, arguments);
       }, function () {
         instance.reject.apply(instance, arguments);
       });
@@ -209,7 +208,7 @@
    *
    * @public
    * @memberof Deferred
-   * @returns {string} 'pending', 'resolved' or 'rejected'.
+   * @returns {string} 'pending', 'fulfilled' or 'rejected'.
    */
   Deferred.prototype.state = function () {
 
@@ -218,18 +217,18 @@
   };
 
   /**
-   * Resolve Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
+   * Fulfill Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
    *
    * @public
    * @memberof Deferred
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.resolve = function () {
+  Deferred.prototype.fulfill = function () {
 
     if (this._state === statePending) {
       copyArray(arguments, this._args);
-      this._state = stateResolved;
-      this._events.emit(evResolve, this._args);
+      this._state = stateFulfilled;
+      this._events.emit(evFulfill, this._args);
     }
 
     return this;
@@ -256,27 +255,27 @@
   };
 
   /**
-   * Execute a callback function when the Deferred instance is resolved.
+   * Execute a callback function when the Deferred instance is fulfilled.
    *
    * @public
    * @memberof Deferred
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.onResolved = function (callback) {
+  Deferred.prototype.onFulfilled = function (callback) {
 
     var that = this;
 
     if (typeOf(callback, 'function')) {
 
-      if (that._state === stateResolved) {
+      if (that._state === stateFulfilled) {
         callback.apply(that, that._args);
       }
 
       if (that._state === statePending) {
-        that._events.on(evResolve, function (e) {
+        that._events.on(evFulfill, function (e) {
           callback.apply(that, that._args);
-          that._events.off(evResolve, e.fn);
+          that._events.off(evFulfill, e.fn);
         });
       }
 
@@ -318,16 +317,16 @@
   };
 
   /**
-   * Execute a callback function when the Deferred instance is resolved or rejected.
+   * Execute a callback function when the Deferred instance is fulfilled or rejected.
    *
    * @public
    * @memberof Deferred
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.onSettled = function (callback) {
+  Deferred.prototype.onResolved = function (callback) {
 
-    return this.onResolved(callback).onRejected(callback);
+    return this.onFulfilled(callback).onRejected(callback);
 
   };
 
@@ -336,11 +335,11 @@
    *
    * @public
    * @memberof Deferred
-   * @param {function} [whenResolved]
+   * @param {function} [whenFulfilled]
    * @param {function} [whenRejected]
    * @returns {Deferred} Creates a new Deferred instance.
    */
-  Deferred.prototype.then = function (whenResolved, whenRejected) {
+  Deferred.prototype.then = function (whenFulfilled, whenRejected) {
 
     var
     that = this,
@@ -350,31 +349,31 @@
     copyArray(that._chain, next._chain);
     next._chain.push(that);
 
-    that.onResolved(function () {
+    that.onFulfilled(function () {
 
       try {
 
-        if (typeOf(whenResolved, 'function')) {
+        if (typeOf(whenFulfilled, 'function')) {
 
-          ret = whenResolved.apply(that, arguments);
+          ret = whenFulfilled.apply(that, arguments);
 
           if (ret instanceof Deferred) {
             ret
-            .onResolved(function () {
-              next.resolve.apply(next, arguments);
+            .onFulfilled(function () {
+              next.fulfill.apply(next, arguments);
             })
             .onRejected(function () {
               next.reject.apply(next, arguments);
             });
           }
           else {
-            next.resolve.call(next, ret);
+            next.fulfill.call(next, ret);
           }
 
         }
         else {
 
-          next.resolve.apply(next, arguments);
+          next.fulfill.apply(next, arguments);
 
         }
 
@@ -406,11 +405,11 @@
    * @public
    * @memberof Deferred
    * @param {Deferred|array} deferreds
-   * @param {boolean} [resolveOnFirst=false]
+   * @param {boolean} [fulfillOnFirst=false]
    * @param {boolean} [rejectOnFirst=true]
    * @returns {Deferred} A new Deferred instance.
    */
-  Deferred.prototype.join = function (deferreds, resolveOnFirst, rejectOnFirst) {
+  Deferred.prototype.join = function (deferreds, fulfillOnFirst, rejectOnFirst) {
 
     deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
 
@@ -423,11 +422,11 @@
     masterArgs = [],
     counter = deferreds.length,
     inc = 0,
-    resolvedHandler = function () {
+    fulfilledHandler = function () {
       --counter;
       masterArgs[inc] = this instanceof Deferred ? copyArray(arguments) : undefined;
-      if (resolveOnFirst === true || counter === 0) {
-        master.resolve.apply(master, masterArgs);
+      if (fulfillOnFirst === true || counter === 0) {
+        master.fulfill.apply(master, masterArgs);
       }
     },
     rejectedHandler = function () {
@@ -443,16 +442,16 @@
         inc = i;
         if (deferred instanceof Deferred) {
           deferred
-          .onResolved(resolvedHandler)
+          .onFulfilled(fulfilledHandler)
           .onRejected(rejectedHandler);
         }
         else {
-          resolvedHandler.call(0);
+          fulfilledHandler.call(0);
         }
       });
     }
     else {
-      master.resolve();
+      master.fulfill();
     }
 
     return master;
@@ -681,7 +680,7 @@
   }
 
   /**
-   * Load dependencies by their ids and return a deferred object that will be resolved when the all dependencies are loaded.
+   * Load dependencies by their ids and return a deferred object that will be fulfilled when the all dependencies are loaded.
    *
    * @private
    * @param {array} dependencies
@@ -871,11 +870,11 @@
   };
 
   /**
-   * Return a new Deferred instance which will be resolved/rejected when the provided deferreds are resolved/rejected.
+   * Return a new Deferred instance which will be fulfilled/rejected when the provided deferreds are fulfilled/rejected.
    *
    * @public
    * @param {Deferred|array} [deferreds]
-   * @param {boolean} [resolveOnFirst=false]
+   * @param {boolean} [fulfillOnFirst=false]
    * @param {boolean} [rejectOnFirst=true]
    * @returns {Deferred}
    */

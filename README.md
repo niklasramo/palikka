@@ -1,36 +1,49 @@
-#Palikka v0.3.0-beta
+#Palikka v0.3.0
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.0-beta)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0-beta)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0-beta)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.0)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A tiny JavaScript module system that allows you to define modules and manage dependencies between them. Palikka makes sure that modules are loaded synchronously, respecting the dependencies, even if your module definitions are included in a mixed order. The API is based on [Asynchronous Module Definition (AMD)](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) with the exception that Palikka is not actually a module *loader* (it does not load JavaScript files for you).
+A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js.
 
 ##Features
 
-* Lightweight, around 2kb minified.
+* Lightweight, around 4.8kb minified.
 * Excellent browser support (IE7+).
-* Well documented codebase (JSDoc syntax).
-* Comprehensive unit tests (Qunit).
+* Well documented codebase.
+* Comprehensive unit tests.
 * No dependencies.
-* Works in browser and Node.js.
+* Works in both the browser and Node.js.
 
-## Usage
+##Basic usage
 
-Include [palikka.js](https://github.com/niklasramo/palikka/blob/v0.2.0/palikka.js) somewhere in your page and start defining and requiring modules.
+Include [palikka.js](https://github.com/niklasramo/palikka/blob/dev/v0.3.0/palikka.js) somewhere on your site (before any code that requires Palikka).
 
 ```javascript
 // Define module "foo" which requires module "bar"
 palikka.define('foo', ['bar'], function (bar) {
+  console.log(bar); // "bar"
   return 'foo';
 });
 
-// Define module "bar" using async initiation
+// Define module "bar"
 palikka.define('bar', function () {
+
+  // Let's use asynchronous initiation
   var init = this.async();
-  window.setTimeout(function () {
-    init('bar');
-  }, 1000);
+
+  // Let's use promises (deferred)
+  var getSomeData = new palikka.Deferred(function (fulfill, reject) {
+    window.setTimeout(function () {
+      fulfill('b', 'a', 'r');
+    }, 1000);
+  });
+
+  // When data is fetched initiate module
+  getSomeData.onFulfilled(function (b, a, r) {
+    init(b + a + r);
+  });
+
 });
 
 // Require modules "foo" and "bar"
@@ -39,41 +52,39 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 });
 ```
 
-##API
+##Module API
+
+All modules are stored in private `palikka._modules` object, which holds all the data about the modules.
 
 * [.define()](#define)
 * [.undefine()](#undefine)
 * [.require()](#require)
 
-**Event system**
-
-* [.on()](#on)
-* [.off()](#off)
-* [.emit()](#emit)
-* [._Eventizer()](#_eventizer)
-
 &nbsp;
 
 ###.define()
 
-Define a module. All modules are stored in `palikka._modules` object, which holds all the data about the modules. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
+Define a module. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
 
 **Syntax**
 
-`palikka.define( id [, dependencies] , factory )`
+`palikka.define( ids [, dependencies] , factory )`
 
 **Parameters**
 
-* **id** &nbsp;&mdash;&nbsp; *array / string*
+* **ids** &nbsp;&mdash;&nbsp; *array / string*
   * Module id(s). Each module must have a unique id.
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
   * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string.
 * **factory** &nbsp;&mdash;&nbsp; *function / object*
-  * If the factory is a plain object it is directly assigned as the module's value. If the argument is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the defined dependency modules as it's function arguments. The factory callback's context object (this keyword) contains the following properties: id (string, module's id), dependencies (object, list of the dependencies), async (function, defers module initiation).
+  * this.id &nbsp;&mdash;&nbsp; *string*
+  * this.dependencies &nbsp;&mdash;&nbsp; *object*
+  * this.async &nbsp;&mdash;&nbsp; *function*
+  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the defined dependency modules as it's function arguments. The context's (this) async property defers the module's initiation when executed and returns a new function that must be exectued in order to finish the module defintion.
 
-**Returns** &nbsp;&mdash;&nbsp; *number*
+**Returns** &nbsp;&mdash;&nbsp; *array*
 
-Returns an integer which represents the number of succesful module registrations.
+Returns an array which contains instances of all modules that were successfully registered.
 
 **Usage**
 
@@ -115,16 +126,16 @@ Undefine a module. Please keep in mind that if any other `define` or `require` i
 
 **Syntax**
 
-`palikka.undefine( id )`
+`palikka.undefine( ids )`
 
 **Parameters**
 
-* **id** &nbsp;&mdash;&nbsp; *string*
-  * Id of the module.
+* **ids** &nbsp;&mdash;&nbsp; *array / string*
+  * Ids of the modules.
 
-**Returns** &nbsp;&mdash;&nbsp; *boolean*
+**Returns** &nbsp;&mdash;&nbsp; *array*
 
-Returns `false` if the module exists and is used as a dependency, otherwise returns `true`. Note that undefining a non-existent module returns `true` also.
+Returns ids of all modules that were successfully undefined.
 
 **Usage**
 
@@ -138,11 +149,11 @@ palikka.define('bar', ['foo'], function () {
 
 // "foo" module can not be undefined since
 // it is required by module "bar" already.
-palikka.undefine('foo'); // Returns false
+palikka.undefine('foo'); // []
 
 // "bar" module can be undefined since it is
 // not required by other modules yet.
-palikka.undefine('bar'); // Return true
+palikka.undefine('bar'); // ['bar']
 ```
 
 &nbsp;
@@ -178,66 +189,42 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 &nbsp;
 
-###Event system API
+##Eventizer API
 
-Palikka has an internal event system that is used to check when a module's dependencies are loaded. The event system is created using a simple constructor class `palikka._Eventizer` which can create `.on()`, `.off()` and `.emit()` methods for any object. This constructor class is useful when you want to create a private event system within your custom module and therefore it is a part of the public API as a "semi-private" class.
-
-Palikka's own `.on()`, `.off()` and `.emit()` methods are intended only for dealing with Palikka specific events ("register" and "initiate"), but they can be used also as a central event hub between all modules if needed. When a module is registered "register-moduleId" and "register" events are emitted. When a module is initiated "initiate-moduleId" and "initiate" events are emitted. All four events provide event data as the first callback function argument and module data as the second argument.
+* [.eventize()](#_eventize)
+* [.Eventizer()](#_eventizer)
+    * [Eventizer.on()](#_eventizer.on)
+    * [Eventizer.off()](#_eventizer.on)
+    * [Eventizer.emit()](#_eventizer.on)
 
 &nbsp;
 
-###.on()
+###.eventize()
 
-Bind a custom even listener. The callback argument always receives an event data object as it's first argument.
+Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
 
 **Syntax**
 
-`palikka.on( type, callback )`
+`palikka.eventize( [obj] [, listeners] )`
 
 **Parameters**
 
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **callback** &nbsp;&mdash;&nbsp; *function*
+* **obj** &nbsp;&mdash;&nbsp; *object*
+* **listeners** &nbsp;&mdash;&nbsp; *object*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
+
+Returns a new Eventizer instance or the object provided as **obj** argument.
 
 &nbsp;
 
-###.off()
+###.Eventizer()
 
-Unbind a custom even listener. If a callback function is not provided all listeners for the specified type will be removed, otherwise only the provided callback instances will be removed.
-
-**Syntax**
-
-`palikka.off( type [, callback] )`
-
-**Parameters**
-
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **callback** &nbsp;&mdash;&nbsp; *function*
-
-&nbsp;
-
-###.emit()
-
-Trigger a custom event. Provided arguments will be applied to the callback functions.
+A constructor class that builds a fully functional event system instance. The instance has ***.on()***, ***.off()*** and ***.emit()*** methods and a private object ***._listeners***  where all event callbacks are stored.
 
 **Syntax**
 
-`palikka.emit( type [, args] )`
-
-**Parameters**
-
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **args** &nbsp;&mdash;&nbsp; *array*
-
-&nbsp;
-
-###._Eventizer()
-
-Creates an event system by adding on, off and emit methods to an object. All event listeners are stored to semi-private "_listeners" property which is also added to the object.
-
-**Syntax**
-
-`palikka._Eventizer( [listeners] )`
+`palikka.Eventizer( [listeners] )`
 
 **Parameters**
 
@@ -247,61 +234,119 @@ Creates an event system by adding on, off and emit methods to an object. All eve
 **Usage**
 
 ```javascript
-// Initiate using new keyword.
-var eventSystem1 = new palikka._Eventizer();
+var eventizer = new palikka.Eventizer();
 
-// Initiate using an existing object.
-var eventSystem2 = {};
-palikka._Eventizer.call(eventSystem2);
+eventizer
+// Bind a "test" event listener.
+.on('test', function (ev, a, b) {
 
-// Create a private event system for a module.
-palikka.define('foo', function () {
-
-  var m = {
-    foo: 'foo'
-  };
-
-  // Initiate event system for m object.
-  palikka._Eventizer.call(m);
-
-  // Emit "tick" event with "a" and "b" arguments every second.
-  window.setInterval(function () {
-    m.emit('tick', ['a', 'b']);
-  }, 1000);
-
-  return m;
-
-});
-palikka.require(['foo'], function (foo) {
-
-  // Bind a listener to foo's "tick" event.
-  foo.on('tick', function (ev, a, b) {
-
-    // Event data
-    console.log(this); // foo module
-    console.log(ev.type); // Event type
-    console.log(ev.fn); // Event listener callback function
+    console.log(this); // eventizer
+    console.log(ev.type); // 'test'
+    console.log(ev.fn); // callback function
     console.log(a); // "a"
     console.log(b); // "b"
 
-    // Let's unbind the event listener after first execution.
-    foo.off('tick', ev.fn);
+    // You can unbind the event listener after first execution.
+    foo.off(ev.type, ev.fn);
 
-  });
-
-});
-
+})
+// Emit "test" event with some arguments,
+// note that on/off/emit methods are chainable.
+.emit('test', ['a', 'b']);
 ```
+
+&nbsp;
+
+###Eventizer.on()
+
+Bind a custom event listener. The callback argument always receives an event data object as it's first argument.
+
+**Syntax**
+
+`Eventizer.on( type, callback )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **callback** &nbsp;&mdash;&nbsp; *function*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+&nbsp;
+
+###Eventizer.off()
+
+Unbind a custom even listener. If a callback function is not provided all listeners for the specified type will be removed, otherwise only the provided callback instances will be removed.
+
+**Syntax**
+
+`Eventizer.off( type [, callback] )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **callback** &nbsp;&mdash;&nbsp; *function*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+&nbsp;
+
+###Eventizer.emit()
+
+Trigger a custom event. Provided context and arguments will be applied to the callback functions.
+
+**Syntax**
+
+`Eventizer.emit( type [, args] [, context] )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **args** &nbsp;&mdash;&nbsp; *array*
+* **context** &nbsp;&mdash;&nbsp; ***
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+&nbsp;
+
+##Deferred API
+
+* [.when()](#_when)
+* [.Deferred()](#_deferred)
+    * [Deferred.state()](#_deferred.state)
+    * [Deferred.fulfill()](#deferred.fulfill)
+    * [Deferred.reject()](#deferred.reject)
+    * [Deferred.onFulfilled()](#deferred.onFulfilled)
+    * [Deferred.onRejected()](#deferred.onRejected)
+    * [Deferred.onResolved()](#deferred.onResolved)
+    * [Deferred.then()](#deferred.then)
+    * [Deferred.join()](#deferred.join)
 
 &nbsp;
 
 ##Alternatives
 
-You should definitely check out these module systems too.
+**Modules**
 
 * [RequireJS](http://requirejs.org/)
 * [Browserify](http://browserify.org/)
 * [modulejs](http://larsjung.de/modulejs/)
+
+**Promises**
+
+* [Q](https://github.com/kriskowal/q)
+* [RSVP.js](https://github.com/tildeio/rsvp.js/)
+* [Bluebird](https://github.com/petkaantonov/bluebird)
+
+**Events**
+
+* [minivents](https://github.com/allouis/minivents)
 
 ##License
 
