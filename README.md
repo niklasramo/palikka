@@ -201,20 +201,20 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ###.eventize()
 
-Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
+Creates a new Eventizer instance and returns it. If target object is provided the Eventizer instance's methods are ported to the object.
 
 **Syntax**
 
-`palikka.eventize( [obj] [, listeners] )`
+`palikka.eventize( [target] [, listeners] )`
 
 **Parameters**
 
-* **obj** &nbsp;&mdash;&nbsp; *object*
+* **target** &nbsp;&mdash;&nbsp; *object*
 * **listeners** &nbsp;&mdash;&nbsp; *object*
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
 
-Returns a new Eventizer instance or the object provided as **obj** argument.
+Returns a new Eventizer instance or the target object if provided.
 
 &nbsp;
 
@@ -350,7 +350,7 @@ Returns a new Deferred instance that will be resolved/rejected when all provided
 
 ###.Deferred()
 
-A constructor function that creates a deferred instance. The deferred is "thenable" and  Promises/A+ compliant. The deferred's API is based on jQuery's Deferred implementation.
+A constructor function that creates a Deferred instance. The instance is "thenable" and Promises/A+ compliant. The API is based on jQuery's Deferred implementation.
 
 **Syntax**
 
@@ -500,27 +500,6 @@ Add a callback that will be called when the Deferred instance is either resolved
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 Returns the instance that called the method.
-
-&nbsp;
-
-###deferred.then()
-
-Chain deferreds. This method will create and return a new Deferred instance that is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the previous Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's like inception for deferreds.
-
-**Syntax**
-
-`deferred.then( [done] [, fail] )`
-
-**Parameters**
-
-* **done** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is resolved.
-* **fail** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is rejected.
-
-**Returns** &nbsp;&mdash;&nbsp; *Deferred*
-
-Returns a new Deferred instance.
 
 &nbsp;
 
