@@ -11,7 +11,7 @@
   - Easier importing of third party libs.
   - Add a minified version to the project repo and improve the build system in general (more automation).
   - Better test coverage (improved tests for return values).
-  - Aim for 5k max minified file size + a killer performance.
+  - Aim for 4k max minified file size + a killer performance.
 */
 
 (function (glob) {
@@ -33,13 +33,20 @@
   evRegister = 'register',
 
   /** Deferred events. */
-  evFulfill = 'fulfill',
+  evResolve = 'resolve',
   evReject = 'reject',
 
   /** Deferred states. */
   statePending = 'pending',
-  stateFulfilled = 'fulfilled',
-  stateRejected = 'rejected';
+  stateResolved = 'resolved',
+  stateRejected = 'rejected',
+
+  /* Cache native toString and slice methods. */
+  toString = ({}).toString,
+  slice = ([]).slice,
+
+  /** Check if strict mode is supported. */
+  isStrict = !this === true;
 
   /**
    * Creates a new Eventizer instance that allows you to bind, unbind and emit events.
@@ -128,8 +135,8 @@
   Eventizer.prototype.emit = function (type, args, ctx) {
 
     var
-    that = this,
-    typeCallbacks = that._listeners[type];
+    instance = this,
+    typeCallbacks = instance._listeners[type];
 
     if (typeCallbacks) {
       arrayEach(typeCallbacks.slice(0), function (callback) {
@@ -137,7 +144,7 @@
 
           var
           cbArgs = copyArray(args),
-          cbCtx = typeOf(ctx, 'undefined') ? that : ctx;
+          cbCtx = typeOf(ctx, 'undefined') ? instance : ctx;
 
           cbArgs.unshift({type: type, fn: callback});
           callback.apply(cbCtx, cbArgs);
@@ -146,7 +153,7 @@
       });
     }
 
-    return that;
+    return instance;
 
   };
 
@@ -159,13 +166,15 @@
    */
   function Deferred(callback) {
 
+    var instance = this;
+
     /**
      * Instance's event emitter.
      *
      * @protected
      * @type {Eventizer}
      */
-    this._events = new Eventizer();
+    instance._events = new Eventizer();
 
     /**
      * When Deferreds are chained with 'then' method this property will contain all the Deferreds in the then' chain before the current instance.
@@ -173,29 +182,28 @@
      * @protected
      * @type {array}
      */
-    this._chain = [];
+    instance._chain = [];
 
     /**
-     * When the Deferred instance is fulfilled or rejected the provided arguments are stored here.
+     * When the Deferred instance is resolved or rejected the provided arguments are stored here.
      *
      * @protected
      * @type {array}
      */
-    this._args = [];
+    instance._args = [];
 
     /**
-     * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
+     * Holds information about the state of the Deferred instance. A Deferred can have three different states: 'pending', 'resolved' or 'rejected'.
      *
      * @protected
      * @type {string}
      */
-    this._state = statePending;
+    instance._state = statePending;
 
     /** Call callback function if provided. */
-    var instance = this;
     if (typeOf(callback, 'function')) {
       callback.call(instance, function () {
-        instance.fulfill.apply(instance, arguments);
+        instance.resolve.apply(instance, arguments);
       }, function () {
         instance.reject.apply(instance, arguments);
       });
@@ -208,7 +216,7 @@
    *
    * @public
    * @memberof Deferred
-   * @returns {string} 'pending', 'fulfilled' or 'rejected'.
+   * @returns {string} 'pending', 'resolved' or 'rejected'.
    */
   Deferred.prototype.state = function () {
 
@@ -217,21 +225,23 @@
   };
 
   /**
-   * Fulfill Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
+   * Resolve Deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
    *
    * @public
    * @memberof Deferred
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.fulfill = function () {
+  Deferred.prototype.resolve = function () {
 
-    if (this._state === statePending) {
-      copyArray(arguments, this._args);
-      this._state = stateFulfilled;
-      this._events.emit(evFulfill, this._args);
+    var instance = this;
+
+    if (instance._state === statePending) {
+      copyArray(arguments, instance._args);
+      instance._state = stateResolved;
+      instance._events.emit(evResolve, instance._args);
     }
 
-    return this;
+    return instance;
 
   };
 
@@ -244,44 +254,46 @@
    */
   Deferred.prototype.reject = function () {
 
-    if (this._state === statePending) {
-      copyArray(arguments, this._args);
-      this._state = stateRejected;
-      this._events.emit(evReject, this._args);
+    var instance = this;
+
+    if (instance._state === statePending) {
+      copyArray(arguments, instance._args);
+      instance._state = stateRejected;
+      this._events.emit(evReject, instance._args);
     }
 
-    return this;
+    return instance;
 
   };
 
   /**
-   * Execute a callback function when the Deferred instance is fulfilled.
+   * Execute a callback function when the Deferred instance is resolved.
    *
    * @public
    * @memberof Deferred
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.onFulfilled = function (callback) {
+  Deferred.prototype.done = function (callback) {
 
-    var that = this;
+    var instance = this;
 
     if (typeOf(callback, 'function')) {
 
-      if (that._state === stateFulfilled) {
-        callback.apply(that, that._args);
+      if (instance._state === stateResolved) {
+        callback.apply(instance, instance._args);
       }
 
-      if (that._state === statePending) {
-        that._events.on(evFulfill, function (e) {
-          callback.apply(that, that._args);
-          that._events.off(evFulfill, e.fn);
+      if (instance._state === statePending) {
+        instance._events.on(evResolve, function (e) {
+          callback.apply(instance, instance._args);
+          instance._events.off(evResolve, e.fn);
         });
       }
 
     }
 
-    return that;
+    return instance;
 
   };
 
@@ -293,40 +305,40 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.onRejected = function (callback) {
+  Deferred.prototype.fail = function (callback) {
 
-    var that = this;
+    var instance = this;
 
     if (typeOf(callback, 'function')) {
 
-      if (that._state === stateRejected) {
-        callback.apply(that, that._args);
+      if (instance._state === stateRejected) {
+        callback.apply(instance, instance._args);
       }
 
-      if (that._state === statePending) {
-        that._events.on(evReject, function (e) {
-          callback.apply(that, that._args);
-          that._events.off(evReject, e.fn);
+      if (instance._state === statePending) {
+        instance._events.on(evReject, function (e) {
+          callback.apply(instance, instance._args);
+          instance._events.off(evReject, e.fn);
         });
       }
 
     }
 
-    return that;
+    return instance;
 
   };
 
   /**
-   * Execute a callback function when the Deferred instance is fulfilled or rejected.
+   * Execute a callback function when the Deferred instance is resolved or rejected.
    *
    * @public
    * @memberof Deferred
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.onResolved = function (callback) {
+  Deferred.prototype.always = function (callback) {
 
-    return this.onFulfilled(callback).onRejected(callback);
+    return this.done(callback).fail(callback);
 
   };
 
@@ -335,45 +347,45 @@
    *
    * @public
    * @memberof Deferred
-   * @param {function} [whenFulfilled]
-   * @param {function} [whenRejected]
+   * @param {function} [done]
+   * @param {function} [fail]
    * @returns {Deferred} Creates a new Deferred instance.
    */
-  Deferred.prototype.then = function (whenFulfilled, whenRejected) {
+  Deferred.prototype.then = function (done, fail) {
 
     var
-    that = this,
+    instance = this,
     next = new Deferred(),
     ret;
 
-    copyArray(that._chain, next._chain);
-    next._chain.push(that);
+    copyArray(instance._chain, next._chain);
+    next._chain.push(instance);
 
-    that.onFulfilled(function () {
+    instance.done(function () {
 
       try {
 
-        if (typeOf(whenFulfilled, 'function')) {
+        if (typeOf(done, 'function')) {
 
-          ret = whenFulfilled.apply(that, arguments);
+          ret = done.apply(instance, arguments);
 
           if (ret instanceof Deferred) {
             ret
-            .onFulfilled(function () {
-              next.fulfill.apply(next, arguments);
+            .done(function () {
+              next.resolve.apply(next, arguments);
             })
-            .onRejected(function () {
+            .fail(function () {
               next.reject.apply(next, arguments);
             });
           }
           else {
-            next.fulfill.call(next, ret);
+            next.resolve.call(next, ret);
           }
 
         }
         else {
 
-          next.fulfill.apply(next, arguments);
+          next.resolve.apply(next, arguments);
 
         }
 
@@ -385,10 +397,10 @@
 
     });
 
-    that.onRejected(function () {
+    instance.fail(function () {
 
-      if (typeOf(whenRejected, 'function')) {
-        whenRejected.apply(that, arguments);
+      if (typeOf(fail, 'function')) {
+        fail.apply(instance, arguments);
       }
 
       next.reject.apply(next, arguments);
@@ -405,56 +417,15 @@
    * @public
    * @memberof Deferred
    * @param {Deferred|array} deferreds
-   * @param {boolean} [fulfillOnFirst=false]
+   * @param {boolean} [resolveOnFirst=false]
    * @param {boolean} [rejectOnFirst=true]
    * @returns {Deferred} A new Deferred instance.
    */
-  Deferred.prototype.join = function (deferreds, fulfillOnFirst, rejectOnFirst) {
+  Deferred.prototype.join = function (deferreds, resolveOnFirst, rejectOnFirst) {
 
     deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
-
-    if (this instanceof Deferred) {
-      deferreds.unshift(this);
-    }
-
-    var
-    master = new Deferred(),
-    masterArgs = [],
-    counter = deferreds.length,
-    inc = 0,
-    fulfilledHandler = function () {
-      --counter;
-      masterArgs[inc] = this instanceof Deferred ? copyArray(arguments) : undefined;
-      if (fulfillOnFirst === true || counter === 0) {
-        master.fulfill.apply(master, masterArgs);
-      }
-    },
-    rejectedHandler = function () {
-      --counter;
-      masterArgs[inc] = this instanceof Deferred ? copyArray(arguments) : undefined;
-      if (rejectOnFirst === undefined || rejectOnFirst === true || counter === 0) {
-        master.reject.apply(master, arguments);
-      }
-    };
-
-    if (counter) {
-      arrayEach(deferreds, function (deferred, i) {
-        inc = i;
-        if (deferred instanceof Deferred) {
-          deferred
-          .onFulfilled(fulfilledHandler)
-          .onRejected(rejectedHandler);
-        }
-        else {
-          fulfilledHandler.call(0);
-        }
-      });
-    }
-    else {
-      master.fulfill();
-    }
-
-    return master;
+    deferreds.unshift(this);
+    return when(deferreds, resolveOnFirst, rejectOnFirst);
 
   };
 
@@ -584,13 +555,11 @@
                obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
                typeof obj;
 
-    type = type !== 'object' ? type : Object.prototype.toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
+    type = type !== 'object' ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
 
     // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
-    if (type === 'object') {
-      try {
-        type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
-      } catch (e) {}
+    if (!isStrict && type === 'object') {
+      type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
     }
 
     return isType ? type === isType : type;
@@ -609,7 +578,7 @@
 
     var
     fromType = typeOf(from),
-    ret = fromType === 'array' ? from.slice(0) : fromType === 'arguments' ? Array.prototype.slice.call(from) : [];
+    ret = fromType === 'array' ? from.slice(0) : fromType === 'arguments' ? slice.call(from) : [];
 
     if (typeOf(to, 'array')) {
       to.length = 0;
@@ -680,7 +649,7 @@
   }
 
   /**
-   * Load dependencies by their ids and return a deferred object that will be fulfilled when the all dependencies are loaded.
+   * Load module dependencies.
    *
    * @private
    * @param {array} dependencies
@@ -721,6 +690,60 @@
   }
 
   /**
+   * Return a new deferred that will be resolved/rejected when a group of deferreds are resolved/rejected.
+   *
+   * @private
+   * @param {*} deferreds
+   * @param {boolean} [resolveOnFirst=false]
+   * @param {boolean} [rejectOnFirst=true]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function when(deferreds, resolveOnFirst, rejectOnFirst) {
+
+    deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
+
+    var
+    master = new Deferred(),
+    masterArgs = [],
+    counter = deferreds.length,
+    inc = 0,
+    resolvedHandler = function () {
+      --counter;
+      masterArgs[inc] = this instanceof Deferred ? copyArray(arguments) : undefined;
+      if (resolveOnFirst === true || counter === 0) {
+        master.resolve.apply(master, masterArgs);
+      }
+    },
+    rejectedHandler = function () {
+      --counter;
+      masterArgs[inc] = this instanceof Deferred ? copyArray(arguments) : undefined;
+      if (rejectOnFirst === undefined || rejectOnFirst === true || counter === 0) {
+        master.reject.apply(master, arguments);
+      }
+    };
+
+    if (counter) {
+      arrayEach(deferreds, function (deferred, i) {
+        inc = i;
+        if (deferred instanceof Deferred) {
+          deferred
+          .done(resolvedHandler)
+          .fail(rejectedHandler);
+        }
+        else {
+          resolvedHandler.call(0);
+        }
+      });
+    }
+    else {
+      master.resolve();
+    }
+
+    return master;
+
+  }
+
+  /**
    * Public API.
    */
 
@@ -737,6 +760,12 @@
    * @see typeOf
    */
   lib.typeOf = typeOf;
+
+  /**
+   * @public
+   * @see when
+   */
+  lib.when = when;
 
   /**
    * @public
@@ -866,21 +895,6 @@
   lib.deferred = function (callback) {
 
     return new Deferred(callback);
-
-  };
-
-  /**
-   * Return a new Deferred instance which will be fulfilled/rejected when the provided deferreds are fulfilled/rejected.
-   *
-   * @public
-   * @param {Deferred|array} [deferreds]
-   * @param {boolean} [fulfillOnFirst=false]
-   * @param {boolean} [rejectOnFirst=true]
-   * @returns {Deferred}
-   */
-  lib.when = function () {
-
-    return Deferred.prototype.join.apply(0, arguments);
 
   };
 
