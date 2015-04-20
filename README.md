@@ -371,10 +371,8 @@ Returns the instance that called the method.
 var d1 = new palikka.Deferred();
 var d2 = new palikka.Deferred();
 console.log(d1.state()); // "pending"
-d1.resolve();
-console.log(d1.state()); // "resolved"
-d2.reject();
-console.log(d2.state()); // "rejected"
+console.log(d1.resolve().state()); // "resolved"
+console.log(d2.reject().state()); // "rejected"
 ```
 
 ###.Deferred.prototype.value()
@@ -389,10 +387,6 @@ Retrieve the current value (the arguments with which the instance was resolved/r
 
 Returns undefined if deferred is pending otherwise returns an array which contains the resolve/reject arguments.
 
-###.Deferred.prototype.resolve()
-
-Resolve a deferred instance.
-
 **Usage**
 
 ```javascript
@@ -401,6 +395,10 @@ var d2 = new palikka.Deferred();
 d1.resolve(1, 2, 3).value(); // [1,2,3]
 d2.reject(1).value(); // [1]
 ```
+
+###.Deferred.prototype.resolve()
+
+Resolve a deferred instance.
 
 **Syntax**
 
