@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js.
+A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Well, both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant.
 
 ##Features
 
@@ -54,13 +54,11 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ##Module API
 
-All modules are stored in private `palikka._modules` object, which holds all the data about the modules.
+All modules are stored in private `palikka._modules` object, which holds the modue instances.
 
 * [.define()](#define)
 * [.undefine()](#undefine)
 * [.require()](#require)
-
-&nbsp;
 
 ###.define()
 
@@ -80,7 +78,7 @@ Define a module. Please avoid defining circular modules (when two modules depend
   * this.id &nbsp;&mdash;&nbsp; *string*
   * this.dependencies &nbsp;&mdash;&nbsp; *object*
   * this.async &nbsp;&mdash;&nbsp; *function*
-  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the defined dependency modules as it's function arguments. The context's (this) async property defers the module's initiation when executed and returns a new function that must be exectued in order to finish the module defintion.
+  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the dependency modules as it's function arguments. The context's (this) async property is a function which defers the module's initiation upon execution and returns a new function that must be exectued in order to finish the module defintion.
 
 **Returns** &nbsp;&mdash;&nbsp; *array*
 
@@ -118,8 +116,6 @@ palikka.define(['a', 'b'], function () {
 });
 ```
 
-&nbsp;
-
 ###.undefine()
 
 Undefine a module. Please keep in mind that if any other `define` or `require` instance depends on the module it cannot be undefined.
@@ -156,8 +152,6 @@ palikka.undefine('foo'); // []
 palikka.undefine('bar'); // ['bar']
 ```
 
-&nbsp;
-
 ###.require()
 
 Require a module.
@@ -187,36 +181,30 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 });
 ```
 
-&nbsp;
-
 ##Eventizer API
 
-* [.eventize()](#_eventize)
 * [.Eventizer()](#_eventizer)
-    * [eventizer.on()](#_eventizer.on)
-    * [eventizer.off()](#_eventizer.on)
-    * [eventizer.emit()](#_eventizer.on)
-
-&nbsp;
+* [.Eventizer.prototype.on()](#_eventizer_prototype_on)
+* [.Eventizer.prototype.off()](#_eventizer_prototype_off)
+* [.Eventizer.prototype.emit()](#_eventizer_prototype_emit)
+* [.eventize()](#_eventize)
 
 ###.eventize()
 
-Creates a new Eventizer instance and returns it. If target object is provided the Eventizer instance's methods are ported to the object.
+Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
 
 **Syntax**
 
-`palikka.eventize( [target] [, listeners] )`
+`palikka.eventize( [obj] [, listeners] )`
 
 **Parameters**
 
-* **target** &nbsp;&mdash;&nbsp; *object*
+* **obj** &nbsp;&mdash;&nbsp; *object*
 * **listeners** &nbsp;&mdash;&nbsp; *object*
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
 
-Returns a new Eventizer instance or the target object if provided.
-
-&nbsp;
+Returns a new Eventizer instance or the object provided as **obj** argument.
 
 ###.Eventizer()
 
@@ -231,7 +219,59 @@ A constructor function that builds a fully functional event system instance. The
 * **listeners** &nbsp;&mdash;&nbsp; *object*
   * Optional. Defaults to `{}`. Provide an object where all the event listeners will be stored.
 
-**Usage**
+###.Eventizer.prototype.on()
+
+Bind a custom event listener to an Eventizer instance. The callback argument always receives an event data object as it's first argument.
+
+**Syntax**
+
+`e.on( type, callback )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **callback** &nbsp;&mdash;&nbsp; *function*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+###.Eventizer.prototype.off()
+
+Unbind a custom event listener from an Eventizer instance. If a callback function is not provided all listeners for the specified type will be removed, otherwise only the provided callback instances will be removed.
+
+**Syntax**
+
+`e.off( type [, cbRef] )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **cbRef** &nbsp;&mdash;&nbsp; *function*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+###.Eventizer.prototype.emit()
+
+Trigger a custom event within an Eventizer instance. Provided context and arguments will be applied to the callback functions.
+
+**Syntax**
+
+`e.emit( type [, args] [, context] )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **args** &nbsp;&mdash;&nbsp; *array*
+* **context** &nbsp;&mdash;&nbsp; ***
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+### Eventizer examples
 
 ```javascript
 var eventizer = new palikka.Eventizer();
@@ -255,102 +295,24 @@ eventizer
 .emit('test', ['a', 'b']);
 ```
 
-&nbsp;
-
-###eventizer.on()
-
-Bind a custom event listener to an Eventizer instance. The callback argument always receives an event data object as it's first argument.
-
-**Syntax**
-
-`eventizer.on( type, callback )`
-
-**Parameters**
-
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **callback** &nbsp;&mdash;&nbsp; *function*
-
-**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
-
-Returns the instance that called the method.
-
-&nbsp;
-
-###eventizer.off()
-
-Unbind a custom event listener from an Eventizer instance. If a callback function is not provided all listeners for the specified type will be removed, otherwise only the provided callback instances will be removed.
-
-**Syntax**
-
-`eventizer.off( type [, cbRef] )`
-
-**Parameters**
-
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **cbRef** &nbsp;&mdash;&nbsp; *function*
-
-**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
-
-Returns the instance that called the method.
-
-&nbsp;
-
-###eventizer.emit()
-
-Trigger a custom event within an Eventizer instance. Provided context and arguments will be applied to the callback functions.
-
-**Syntax**
-
-`eventizer.emit( type [, args] [, context] )`
-
-**Parameters**
-
-* **type** &nbsp;&mdash;&nbsp; *string*
-* **args** &nbsp;&mdash;&nbsp; *array*
-* **context** &nbsp;&mdash;&nbsp; ***
-
-**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
-
-Returns the instance that called the method.
-
-&nbsp;
-
 ##Deferred API
 
-* [.when()](#_when)
 * [.Deferred()](#_deferred)
-    * [deferred.state()](#_deferred.state)
-    * [deferred.resolve()](#deferred.resolve)
-    * [deferred.reject()](#deferred.reject)
-    * [deferred.done()](#deferred.done)
-    * [deferred.fail()](#deferred.fail)
-    * [deferred.always()](#deferred.always)
-    * [deferred.then()](#deferred.then)
-    * [deferred.join()](#deferred.join)
-
-&nbsp;
-
-###.when()
-
-Returns a new Deferred instance that will be resolved/rejected when all provided Deferred instances are resolved or rejected. Any non-Deferred object within the deferreds array will be instantly resolved and assigned with a value of undefined.
-
-**Syntax**
-
-`palikka.when( deferreds [, resolveOnFirst] [, rejectOnFirst])`
-
-**Parameters**
-
-* **deferreds** &nbsp;&mdash;&nbsp; *array*
-* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-
-**Returns** &nbsp;&mdash;&nbsp; *Deferred*
-
-&nbsp;
+* [.Deferred.prototype.value()](#_deferred_prototype_value)
+* [.Deferred.prototype.state()](#_deferred_prototype_state)
+* [.Deferred.prototype.value()](#_deferred_prototype_value)
+* [.Deferred.prototype.resolve()](#_deferred_prototype_resolve)
+* [.Deferred.prototype.reject()](#_deferred_prototype_reject)
+* [.Deferred.prototype.done()](#_deferred_prototype_done)
+* [.Deferred.prototype.fail()](#_deferred_prototype_fail)
+* [.Deferred.prototype.always()](#_deferred_prototype_always)
+* [.Deferred.prototype.then()](#_deferred_prototype_then)
+* [.Deferred.prototype.and()](#_deferred_prototype_and)
+* [.when()](#_when)
 
 ###.Deferred()
 
-A constructor function that creates a Deferred instance. The instance is "thenable" and Promises/A+ compliant. The API is based on jQuery's Deferred implementation.
+A constructor function that creates a deferred instance. The deferred is "thenable" and  Promises/A+ compliant. The deferred's API is based on jQuery's Deferred implementation.
 
 **Syntax**
 
@@ -392,29 +354,37 @@ defer
 });
 ```
 
-&nbsp;
-
-###deferred.state()
+###.Deferred.prototype.state()
 
 Retrieve the current state of the Deferred instance: "pending", "resolved" or "rejected".
 
 **Syntax**
 
-`deferred.state()`
+`d.state()`
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 Returns the instance that called the method.
 
-&nbsp;
+###.Deferred.prototype.value()
 
-###deferred.resolve()
+Retrieve the current value (the arguments with which the instance was resolved/rejected) of the instance.
+
+**Syntax**
+
+`d.value()`
+
+**Returns** &nbsp;&mdash;&nbsp; *undefined / array*
+
+Returns undefined if deferred is pending otherwise returns an array which contains the resolve/reject arguments.
+
+###.Deferred.prototype.resolve()
 
 Resolve a deferred instance.
 
 **Syntax**
 
-`deferred.resolve( [args] )`
+`d.resolve( [args] )`
 
 **Parameters**
 
@@ -425,15 +395,13 @@ Resolve a deferred instance.
 
 Returns the instance that called the method.
 
-&nbsp;
-
-###deferred.reject()
+###.Deferred.prototype.reject()
 
 Reject a deferred instance.
 
 **Syntax**
 
-`deferred.reject( [args] )`
+`d.reject( [args] )`
 
 **Parameters**
 
@@ -444,15 +412,13 @@ Reject a deferred instance.
 
 Returns the instance that called the method.
 
-&nbsp;
-
-###deferred.done()
+###.Deferred.prototype.done()
 
 Add a callback that will be called when the Deferred instance is resolved.
 
 **Syntax**
 
-`deferred.done( callback )`
+`d.done( callback )`
 
 **Parameters**
 
@@ -463,15 +429,13 @@ Add a callback that will be called when the Deferred instance is resolved.
 
 Returns the instance that called the method.
 
-&nbsp;
-
-###deferred.fail()
+###.Deferred.prototype.fail()
 
 Add a callback that will be called when the Deferred instance is rejected.
 
 **Syntax**
 
-`deferred.fail( callback )`
+`d.fail( callback )`
 
 **Parameters**
 
@@ -482,15 +446,13 @@ Add a callback that will be called when the Deferred instance is rejected.
 
 Returns the instance that called the method.
 
-&nbsp;
-
-###deferred.always()
+###.Deferred.prototype.always()
 
 Add a callback that will be called when the Deferred instance is either resolved or rejected.
 
 **Syntax**
 
-`deferred.always( callback )`
+`d.always( callback )`
 
 **Parameters**
 
@@ -501,15 +463,13 @@ Add a callback that will be called when the Deferred instance is either resolved
 
 Returns the instance that called the method.
 
-&nbsp;
-
-###deferred.then()
+###.Deferred.prototype.then()
 
 Chain deferreds. This method will create and return a new Deferred instance that is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the previous Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's like inception for deferreds.
 
 **Syntax**
 
-`deferred.then( [done] [, fail] )`
+`d.then( [done] [, fail] )`
 
 **Parameters**
 
@@ -522,25 +482,54 @@ Chain deferreds. This method will create and return a new Deferred instance that
 
 Returns a new Deferred instance.
 
-&nbsp;
+###.Deferred.prototype.then()
 
-###deferred.join()
+Chain deferreds. This method will create and return a new Deferred instance that is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the previous Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's kind of like inception for deferreds.
 
-This method is basically just a wrapper for *palikka.when()* with the exception that it can be easily chained with other Deferred instance's. The calling instance is added before the provided deferreds and *palikka.when()* is called with the same aguments as provided here. This method is also a combinatoin of ES6 Promise's very useful *.all()* and *.race()* methods.
+**Syntax**
 
-`deferred.join( [deferreds] [, resolveOnFirst] [, rejectOnFirst])`
+`d.then( [done] [, fail] )`
 
 **Parameters**
 
-* **deferreds** &nbsp;&mdash;&nbsp; *array / Deferred*
-* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **done** &nbsp;&mdash;&nbsp; *function*
+  * Optional. A function that is called when the Deferred is resolved.
+* **fail** &nbsp;&mdash;&nbsp; *function*
+  * Optional. A function that is called when the Deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 Returns a new Deferred instance.
 
-&nbsp;
+###.Deferred.prototype.and()
+
+Returns a deferred that resolves when all of the arguments and the instance have resolved. The returned "master" deferred is rejected instantly if one of the arguments is rejected.
+
+`d.and( [deferreds] )`
+
+**Parameters**
+
+* **deferreds** &nbsp;&mdash;&nbsp; *anything*
+
+**Returns** &nbsp;&mdash;&nbsp; *Deferred*
+
+Returns a new Deferred instance.
+
+###.when()
+
+Returns a new Deferred instance that will be resolved/rejected when all provided Deferred instances are resolved or rejected. Any non-Deferred object within the deferreds array will be instantly resolved.
+
+**Syntax**
+
+`palikka.when( deferreds [, resolveOnFirst] [, rejectOnFirst] )`
+
+**Parameters**
+
+* **deferreds** &nbsp;&mdash;&nbsp; *anything*
+* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+
+**Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 ##Alternatives
 

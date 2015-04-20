@@ -4,8 +4,6 @@
    * Configuration.
    */
 
-  var testCounter = 0;
-
   QUnit.config.reorder = false;
 
   Q.testStart(function () {
@@ -32,15 +30,9 @@
    * Helper functions.
    */
 
-  function getVal(moduleId) {
+  function getModuleValue(moduleId) {
 
     return palikka._modules[moduleId].value;
-
-  }
-
-  function testName(name) {
-
-    return '#' + (++testCounter) + ' - ' + name;
 
   }
 
@@ -50,27 +42,27 @@
 
   Q.module('.define()');
 
-  Q.test(testName('Function as factory argument.'), function (assert) {
+  Q.test('Function as factory argument.', function (assert) {
 
     assert.expect(1);
 
     palikka.define('a', function () {
       return 'a';
     });
-    assert.strictEqual(getVal('a'), 'a');
+    assert.strictEqual(getModuleValue('a'), 'a');
 
   });
 
-  Q.test(testName('Object as factory argument.'), function (assert) {
+  Q.test('Object as factory argument.', function (assert) {
 
     assert.expect(1);
 
     palikka.define('a', {text: 'a'});
-    assert.strictEqual(getVal('a').text, 'a');
+    assert.strictEqual(getModuleValue('a').text, 'a');
 
   });
 
-  Q.test(testName('Defining multiple modules.'), function (assert) {
+  Q.test('Defining multiple modules.', function (assert) {
 
     assert.expect(8);
 
@@ -97,7 +89,7 @@
 
   });
 
-  Q.test(testName('Dependencies argument.'), function (assert) {
+  Q.test('Dependencies argument.', function (assert) {
 
     assert.expect(8);
 
@@ -109,7 +101,7 @@
       return 'a';
     });
 
-    assert.strictEqual(getVal('a'), undefined);
+    assert.strictEqual(getModuleValue('a'), undefined);
 
     /** Dependency as a string. */
 
@@ -118,7 +110,7 @@
       return 'b';
     });
 
-    assert.strictEqual(getVal('b'), undefined);
+    assert.strictEqual(getModuleValue('b'), undefined);
 
     /** No dependencies. */
 
@@ -126,13 +118,13 @@
       return 'c';
     });
 
-    assert.strictEqual(getVal('c'), 'c');
-    assert.strictEqual(getVal('b'), 'b');
-    assert.strictEqual(getVal('a'), 'a');
+    assert.strictEqual(getModuleValue('c'), 'c');
+    assert.strictEqual(getModuleValue('b'), 'b');
+    assert.strictEqual(getModuleValue('a'), 'a');
 
   });
 
-  Q.test(testName('Async module initiation.'), function (assert) {
+  Q.test('Async module initiation.', function (assert) {
 
     var done = assert.async();
     assert.expect(12);
@@ -144,13 +136,13 @@
         var init = this.async();
         assert.strictEqual(b, 'b');
         assert.strictEqual(c, 'c');
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('a');
         }, 1000);
       }
     );
 
-    assert.strictEqual(getVal('a'), undefined);
+    assert.strictEqual(getModuleValue('a'), undefined);
 
     palikka.define(
       'b',
@@ -158,45 +150,45 @@
       function (c) {
         var init = this.async();
         assert.strictEqual(c, 'c');
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('b');
         }, 1000);
       }
     );
 
-    assert.strictEqual(getVal('b'), undefined);
+    assert.strictEqual(getModuleValue('b'), undefined);
 
     palikka.define(
       'c',
       function () {
         var init = this.async();
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('c');
         }, 1000);
       }
     );
 
-    assert.strictEqual(getVal('c'), undefined);
+    assert.strictEqual(getModuleValue('c'), undefined);
 
-    window.setTimeout(function () {
-      assert.strictEqual(getVal('a'), undefined);
-      assert.strictEqual(getVal('b'), undefined);
-      assert.strictEqual(getVal('c'), 'c');
+    setTimeout(function () {
+      assert.strictEqual(getModuleValue('a'), undefined);
+      assert.strictEqual(getModuleValue('b'), undefined);
+      assert.strictEqual(getModuleValue('c'), 'c');
     }, 1500);
 
-    window.setTimeout(function () {
-      assert.strictEqual(getVal('a'), undefined);
-      assert.strictEqual(getVal('b'), 'b');
+    setTimeout(function () {
+      assert.strictEqual(getModuleValue('a'), undefined);
+      assert.strictEqual(getModuleValue('b'), 'b');
     }, 2500);
 
-    window.setTimeout(function () {
-      assert.strictEqual(getVal('a'), 'a');
+    setTimeout(function () {
+      assert.strictEqual(getModuleValue('a'), 'a');
       done();
     }, 3500);
 
   });
 
-  Q.test(testName('Define factory context.'), function (assert) {
+  Q.test('Define factory context.', function (assert) {
 
     assert.expect(11);
 
@@ -226,7 +218,7 @@
 
   });
 
-  Q.test(testName('Internal module registration and initiation logic.'), function (assert) {
+  Q.test('Internal module registration and initiation logic.', function (assert) {
 
     var done = assert.async();
     assert.expect(2);
@@ -235,21 +227,21 @@
       'a',
       function () {
         var init = this.async();
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('a');
         }, 500);
       }
     );
 
     assert.strictEqual(palikka._modules.a.loaded, false);
-    window.setTimeout(function () {
+    setTimeout(function () {
       assert.strictEqual(palikka._modules.a.loaded, true);
       done();
     }, 1000);
 
   });
 
-  Q.test(testName('Return values of successful and failed definitions.'), function (assert) {
+  Q.test('Return values of successful and failed definitions.', function (assert) {
 
     assert.expect(7);
 
@@ -267,7 +259,7 @@
 
   });
 
-  Q.test(testName('Overriding modules.'), function (assert) {
+  Q.test('Overriding modules.', function (assert) {
 
     var done = assert.async();
     assert.expect(3);
@@ -275,22 +267,22 @@
     palikka.define('a', function () { return 'a1'; });
     palikka.define('a', function () { return 'a2'; });
 
-    assert.strictEqual(getVal('a'), 'a1');
+    assert.strictEqual(getModuleValue('a'), 'a1');
 
     palikka.define(
       'b',
       function () {
         var init = this.async();
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('b1');
         }, 500);
       }
     );
     palikka.define('b', function () { return 'b2'; });
 
-    assert.strictEqual(getVal('b'), undefined);
-    window.setTimeout(function () {
-      assert.strictEqual(getVal('b'), 'b1');
+    assert.strictEqual(getModuleValue('b'), undefined);
+    setTimeout(function () {
+      assert.strictEqual(getModuleValue('b'), 'b1');
       done();
     }, 1000);
 
@@ -298,7 +290,7 @@
 
   Q.module('.undefine()');
 
-  Q.test(testName('Undefining locked, unlocked and non-existent module.'), function (assert) {
+  Q.test('Undefining locked, unlocked and non-existent module.', function (assert) {
 
     assert.expect(12);
 
@@ -341,7 +333,7 @@
 
   Q.module('.require()');
 
-  Q.test(testName('Requiring with and without dependencies.'), function (assert) {
+  Q.test('Requiring with and without dependencies.', function (assert) {
 
     var done = assert.async();
     assert.expect(8);
@@ -364,7 +356,7 @@
       'd',
       function () {
         var init = this.async();
-        window.setTimeout(function () {
+        setTimeout(function () {
           init('d');
         }, 500);
       }
@@ -404,7 +396,7 @@
 
   Q.module('.on() / .off() / .emit()');
 
-  Q.test(testName('Triggering, binding and unbinding module events.'), function (assert) {
+  Q.test('Triggering, binding and unbinding module events.', function (assert) {
 
     var done = assert.async();
     assert.expect(21);
@@ -459,7 +451,7 @@
 
   Q.module('.typeOf()');
 
-  Q.test(testName('Type checker system.'), function (assert) {
+  Q.test('Type checker system.', function (assert) {
 
     assert.expect(24);
 
@@ -510,7 +502,7 @@
 
   Q.module('.Eventizer()');
 
-  Q.test(testName('Event system.'), function (assert) {
+  Q.test('Event system.', function (assert) {
 
     /* TODO: context param test */
 
@@ -577,7 +569,7 @@
       a.events.on('tock', tockCb);
 
       /** Bind tick event 5 times (to test unbinding all events at once). */
-      window.setTimeout(function () {
+      setTimeout(function () {
         for (var i = 0; i < 5; i++) {
           a.on('tick', function () {});
         }
@@ -598,21 +590,126 @@
 
   Q.module('.Deferred()');
 
-  Q.test(testName('Deferred system.'), function (assert) {
+  Q.test('Base deferred system.', function (assert) {
 
     var done = assert.async();
-    assert.expect(21);
+    assert.expect(50);
 
-    var defer = new palikka.Deferred(function (resolve, reject) {
-      window,setTimeout(function () {
+    var
+    d1 = new palikka.Deferred(function (resolve, reject) {
+      setTimeout(function () {
         resolve('a', 'b', 'c');
       }, 500);
+    }),
+    d2 = new palikka.Deferred(function (resolve, reject) {
+      setTimeout(function () {
+        resolve('d');
+      }, 100);
+    }),
+    d3 = new palikka.Deferred(function (resolve, reject) {
+      setTimeout(function () {
+        reject('fail-1');
+      }, 300);
+    }),
+    d4 = new palikka.Deferred(function (resolve, reject) {
+      setTimeout(function () {
+        reject('fail-2');
+      }, 400);
+    }),
+    m1,
+    m2,
+    m3,
+    m4,
+    m5;
+
+    // Make sure m1 is not resolved before d1.
+    d1.done(function() {
+      assert.strictEqual(d1.state(), 'resolved');
+      assert.strictEqual(m1.state(), 'pending');
     });
 
-    defer
+    // Make sure m1 is not resolved before d2.
+    d2.done(function() {
+      assert.strictEqual(m1.state(), 'pending');
+    });
+
+    // Create master deferreds.
+    m1 = d1.and(d2);
+    m2 = d1.and([d2, d3]);
+    m3 = d1.and([d2, d3, d4]);
+    m4 = d1.and([d2, d3, d4], true, true);
+    m5 = d1.and([d2, d3, d4], false, false);
+
+    // Make sure .and() returns a deferred instance.
+    assert.strictEqual(m1 instanceof palikka.Deferred, true);
+
+    // Test .and()
+    m1.done(function (d1Val, d2Val) {
+      assert.strictEqual(d1.state(), 'resolved');
+      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d1Val[0], 'a');
+      assert.strictEqual(d1Val[1], 'b');
+      assert.strictEqual(d1Val[2], 'c');
+      assert.strictEqual(d2Val, 'd');
+    });
+
+    // Test .and()
+    m2.fail(function (reason) {
+      assert.strictEqual(d1.state(), 'pending');
+      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d3.state(), 'rejected');
+      assert.strictEqual(reason, 'fail-1');
+    });
+
+    // Test .and()
+    m3.fail(function (reason) {
+      assert.strictEqual(d1.state(), 'pending');
+      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d3.state(), 'rejected');
+      assert.strictEqual(d4.state(), 'pending');
+      assert.strictEqual(reason, 'fail-1');
+    });
+
+    // Test .and()
+    m4.done(function (val) {
+      assert.strictEqual(d1.state(), 'pending');
+      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d3.state(), 'pending');
+      assert.strictEqual(d4.state(), 'pending');
+      assert.strictEqual(val, 'd');
+    });
+
+    // Test .and()
+    m5.fail(function (reason) {
+      assert.strictEqual(d1.state(), 'resolved');
+      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d3.state(), 'rejected');
+      assert.strictEqual(d4.state(), 'rejected');
+      assert.strictEqual(reason, 'fail-1');
+    });
+
+    // Test .when() with empty values
+    palikka
+    .when()
+    .done(function (val) {
+      assert.strictEqual(val, undefined);
+    });
+
+    // Test .when() with non-deferred values
+    palikka
+    .when([1, '2', {'a': 'a'}, ['a', 'b']])
+    .done(function (val1, val2, val3, val4) {
+      assert.strictEqual(val1, 1);
+      assert.strictEqual(val2, '2');
+      assert.strictEqual(val3['a'], 'a');
+      assert.strictEqual(val4[0], 'a');
+      assert.strictEqual(val4[1], 'b');
+    });
+
+    // Test deferred chaining.
+    d1
     .then(function (a, b, c) {
-      assert.strictEqual(this, defer);
-      assert.strictEqual(this._chain.length, 0);
+      assert.strictEqual(this, d1);
       assert.strictEqual(a, 'a');
       assert.strictEqual(b, 'b');
       assert.strictEqual(c, 'c');
@@ -621,13 +718,11 @@
       assert.strictEqual(1, 0);
     })
     .then(function (d) {
-      assert.strictEqual(this._chain.length, 1);
-      assert.strictEqual(this._chain[0], defer);
       assert.strictEqual(d, 'd');
       var ret = new palikka.Deferred();
-      window.setTimeout(function () {
+      setTimeout(function () {
         ret.resolve('e', 'f', 'g');
-      }, 500);
+      }, 100);
       return ret;
     }, function () {
       assert.strictEqual(1, 0);
@@ -646,17 +741,14 @@
       assert.strictEqual(g, 'g');
     })
     .then(function () {
-      assert.strictEqual(this._chain.length, 2);
       throw new Error('fail');
     })
     .then(function () {
       assert.strictEqual(1, 0);
     }, function (e) {
-      assert.strictEqual(this._chain.length, 3);
       assert.strictEqual(e.message, 'fail');
     })
     .then(null, function (e) {
-      assert.strictEqual(this._chain.length, 4);
       assert.strictEqual(e.message, 'fail');
     })
     .done(function (e) {
@@ -667,8 +759,11 @@
     })
     .always(function (e) {
       assert.strictEqual(e.message, 'fail');
-      done();
     });
+
+    setTimeout(function () {
+      done();
+    }, 2000);
 
   });
 
