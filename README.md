@@ -298,7 +298,6 @@ eventizer
 ##Deferred API
 
 * [.Deferred()](#_deferred)
-* [.Deferred.prototype.value()](#_deferred_prototype_value)
 * [.Deferred.prototype.state()](#_deferred_prototype_state)
 * [.Deferred.prototype.value()](#_deferred_prototype_value)
 * [.Deferred.prototype.resolve()](#_deferred_prototype_resolve)
