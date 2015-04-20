@@ -5,16 +5,6 @@
  * Released under the MIT license
  */
 
-/*
-  TODO
-  ----
-  - Easier importing of third party libs.
-  - Add a minified version to the project repo and improve the build system in general (more automation).
-  - Better test coverage (improved tests for return values).
-  - Aim for 5k as maximum minified file size + a killer performance.
-  - Sort out & freeze API for Deferreds.
-*/
-
 (function (glob) {
   'use strict';
 
