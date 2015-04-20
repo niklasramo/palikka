@@ -500,25 +500,6 @@ Chain deferreds. This method will create and return a new Deferred instance that
 
 Returns a new Deferred instance.
 
-###.Deferred.prototype.then()
-
-Chain deferreds. This method will create and return a new Deferred instance that is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the previous Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's kind of like inception for deferreds.
-
-**Syntax**
-
-`d.then( [done] [, fail] )`
-
-**Parameters**
-
-* **done** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is resolved.
-* **fail** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is rejected.
-
-**Returns** &nbsp;&mdash;&nbsp; *Deferred*
-
-Returns a new Deferred instance.
-
 ###.Deferred.prototype.and()
 
 Returns a deferred that resolves when all of the arguments and the instance have resolved. The returned "master" deferred is rejected instantly if one of the arguments is rejected.
