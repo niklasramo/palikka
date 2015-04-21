@@ -48,17 +48,43 @@ palikka.define('bar', function () {
 
 // Require modules "foo" and "bar"
 palikka.require(['foo', 'bar'], function (foo, bar) {
-  alert(foo + bar); // "foobar"
+  console.log(foo + bar); // "foobar"
 });
 ```
 
-##Module API
+##Docs
 
-All modules are stored in private `palikka._modules` object, which holds the modue instances.
+**[Modules](#modules)**
 
 * [.define()](#define)
 * [.undefine()](#undefine)
 * [.require()](#require)
+
+**[Events](#events)**
+
+* [.Eventizer()](#eventizer)
+* [.Eventizer.prototype.on()](#eventizerprototypeon)
+* [.Eventizer.prototype.off()](#eventizerprototypeoff)
+* [.Eventizer.prototype.emit()](#eventizerprototypeemit)
+* [.eventize()](#eventize)
+
+**[Deferreds](#deferreds)**
+
+* [.Deferred()](#deferred)
+* [.Deferred.prototype.state()](#deferredprototypestate)
+* [.Deferred.prototype.value()](#deferredprototypevalue)
+* [.Deferred.prototype.resolve()](#deferredprototyperesolve)
+* [.Deferred.prototype.reject()](#deferredprototypereject)
+* [.Deferred.prototype.done()](#deferredprototypedone)
+* [.Deferred.prototype.fail()](#deferredprototypefail)
+* [.Deferred.prototype.always()](#deferredprototypealways)
+* [.Deferred.prototype.then()](#deferredprototypethen)
+* [.Deferred.prototype.and()](#deferredprototypeand)
+* [.when()](#when)
+
+##Modules
+
+All modules are stored in private `palikka._modules` object, which holds the modue instances.
 
 ###.define()
 
@@ -181,30 +207,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 });
 ```
 
-##Eventizer API
-
-* [.Eventizer()](#_eventizer)
-* [.Eventizer.prototype.on()](#_eventizer_prototype_on)
-* [.Eventizer.prototype.off()](#_eventizer_prototype_off)
-* [.Eventizer.prototype.emit()](#_eventizer_prototype_emit)
-* [.eventize()](#_eventize)
-
-###.eventize()
-
-Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
-
-**Syntax**
-
-`palikka.eventize( [obj] [, listeners] )`
-
-**Parameters**
-
-* **obj** &nbsp;&mdash;&nbsp; *object*
-* **listeners** &nbsp;&mdash;&nbsp; *object*
-
-**Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
-
-Returns a new Eventizer instance or the object provided as **obj** argument.
+##Events
 
 ###.Eventizer()
 
@@ -218,6 +221,30 @@ A constructor function that builds a fully functional event system instance. The
 
 * **listeners** &nbsp;&mdash;&nbsp; *object*
   * Optional. Defaults to `{}`. Provide an object where all the event listeners will be stored.
+
+**Usage**
+
+```javascript
+var eventizer = new palikka.Eventizer();
+
+eventizer
+// Bind a "test" event listener.
+.on('test', function (ev, a, b) {
+
+    console.log(this); // eventizer
+    console.log(ev.type); // 'test'
+    console.log(ev.fn); // callback function
+    console.log(a); // "a"
+    console.log(b); // "b"
+
+    // You can unbind the event listener after first execution.
+    foo.off(ev.type, ev.fn);
+
+})
+// Emit "test" event with some arguments,
+// note that on/off/emit methods are chainable.
+.emit('test', ['a', 'b']);
+```
 
 ###.Eventizer.prototype.on()
 
@@ -271,43 +298,24 @@ Trigger a custom event within an Eventizer instance. Provided context and argume
 
 Returns the instance that called the method.
 
-### Eventizer examples
+###.eventize()
 
-```javascript
-var eventizer = new palikka.Eventizer();
+Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
 
-eventizer
-// Bind a "test" event listener.
-.on('test', function (ev, a, b) {
+**Syntax**
 
-    console.log(this); // eventizer
-    console.log(ev.type); // 'test'
-    console.log(ev.fn); // callback function
-    console.log(a); // "a"
-    console.log(b); // "b"
+`palikka.eventize( [obj] [, listeners] )`
 
-    // You can unbind the event listener after first execution.
-    foo.off(ev.type, ev.fn);
+**Parameters**
 
-})
-// Emit "test" event with some arguments,
-// note that on/off/emit methods are chainable.
-.emit('test', ['a', 'b']);
-```
+* **obj** &nbsp;&mdash;&nbsp; *object*
+* **listeners** &nbsp;&mdash;&nbsp; *object*
 
-##Deferred API
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
 
-* [.Deferred()](#_deferred)
-* [.Deferred.prototype.state()](#_deferred_prototype_state)
-* [.Deferred.prototype.value()](#_deferred_prototype_value)
-* [.Deferred.prototype.resolve()](#_deferred_prototype_resolve)
-* [.Deferred.prototype.reject()](#_deferred_prototype_reject)
-* [.Deferred.prototype.done()](#_deferred_prototype_done)
-* [.Deferred.prototype.fail()](#_deferred_prototype_fail)
-* [.Deferred.prototype.always()](#_deferred_prototype_always)
-* [.Deferred.prototype.then()](#_deferred_prototype_then)
-* [.Deferred.prototype.and()](#_deferred_prototype_and)
-* [.when()](#_when)
+Returns a new Eventizer instance or the object provided as **obj** argument.
+
+##Deferreds
 
 ###.Deferred()
 
@@ -483,7 +491,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. This method will create and return a new Deferred instance that is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the previous Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's like inception for deferreds.
+Chain deferreds. This method returns a new Deferred instance which is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the instantiating Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's like inception for deferreds.
 
 **Syntax**
 

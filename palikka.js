@@ -10,7 +10,7 @@
 
   var
 
-  /** Define name of the library. */
+  /** Name of the library. */
   ns = 'palikka',
 
   /** Public API interface. */
@@ -19,18 +19,20 @@
   /** Modules container. */
   modules = {},
 
-  /** Module events. */
+  /** Private event hub + event names. */
+  evHub,
   evInitiate = 'initiate',
   evRegister = 'register',
-
-  /** Deferred events. */
   evResolve = 'resolve',
   evReject = 'reject',
 
   /** Deferred states. */
   statePending = 'pending',
-  stateResolved = 'resolved',
+  stateFulfilled = 'fulfilled',
   stateRejected = 'rejected',
+
+  /** Deferred id counter. */
+  deferredId = 0,
 
   /* Cache native toString and slice methods. */
   toString = ({}).toString,
@@ -119,7 +121,7 @@
    * @public
    * @memberof Eventizer
    * @param {string} type
-   * @param {array|arguments} [args]
+   * @param {array} [args]
    * @param {*} [ctx]
    * @returns {Eventizer} The instance on which this method was called.
    */
@@ -157,15 +159,25 @@
    */
   function Deferred(callback) {
 
-    var instance = this;
+    var
+    instance = this,
+    id = ++deferredId;
 
     /**
-     * Instance's event emitter.
+     * Instance's resolve event name.
      *
      * @protected
-     * @type {Eventizer}
+     * @type {string}
      */
-    instance._events = new Eventizer();
+    instance._eRes = evResolve + '-' + id;
+
+    /**
+     * Instance's reject event name.
+     *
+     * @protected
+     * @type {string}
+     */
+    instance._eRej = evReject + '-' + id;
 
     /**
      * When the deferred is resolved or rejected the provided arguments are stored here wrapped in an array.
@@ -176,7 +188,7 @@
     instance._value = undefined;
 
     /**
-     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'resolved' or 'rejected'.
+     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
      *
      * @protected
      * @type {string}
@@ -199,7 +211,7 @@
    *
    * @public
    * @memberof Deferred.prototype
-   * @returns {string} 'pending', 'resolved' or 'rejected'.
+   * @returns {string} 'pending', 'fulfilled' or 'rejected'.
    */
   Deferred.prototype.state = function () {
 
@@ -233,8 +245,8 @@
 
     if (instance._state === statePending) {
       instance._value = copyArray(arguments);
-      instance._state = stateResolved;
-      instance._events.emit(evResolve, instance._value);
+      instance._state = stateFulfilled;
+      evHub.emit(instance._eRes, instance._value);
     }
 
     return instance;
@@ -255,7 +267,7 @@
     if (instance._state === statePending) {
       instance._value = copyArray(arguments);
       instance._state = stateRejected;
-      this._events.emit(evReject, instance._value);
+      evHub.emit(instance._eRej, instance._value);
     }
 
     return instance;
@@ -276,14 +288,14 @@
 
     if (typeOf(callback, 'function')) {
 
-      if (instance._state === stateResolved) {
+      if (instance._state === stateFulfilled) {
         callback.apply(instance, instance.value());
       }
 
       if (instance._state === statePending) {
-        instance._events.on(evResolve, function (e) {
+        evHub.on(instance._eRes, function (e) {
           callback.apply(instance, instance.value());
-          instance._events.off(evResolve, e.fn);
+          evHub.off(instance._eRes, e.fn);
         });
       }
 
@@ -312,9 +324,9 @@
       }
 
       if (instance._state === statePending) {
-        instance._events.on(evReject, function (e) {
+        evHub.on(instance._eRej, function (e) {
           callback.apply(instance, instance.value());
-          instance._events.off(evReject, e.fn);
+          evHub.off(instance._eRej, e.fn);
         });
       }
 
@@ -405,7 +417,7 @@
   };
 
   /**
-   * Returns a "master" deferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
+   * Returns a "master" de ferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
    *
    * @public
    * @memberof Deferred.prototype
@@ -448,8 +460,8 @@
     modules[id] = instance;
 
     // Emit register events.
-    lib.emit(evRegister + '-' + id, [instance]);
-    lib.emit(evRegister, [instance]);
+    evHub.emit(evRegister + '-' + id, [instance]);
+    evHub.emit(evRegister, [instance]);
 
     // Initiate.
     loadDependencies(dependencies, function (depModules) {
@@ -524,8 +536,8 @@
     if (instance === modules[instance.id] && !instance.loaded) {
       instance.value = value;
       instance.loaded = true;
-      lib.emit(evInitiate + '-' + instance.id, [instance]);
-      lib.emit(evInitiate, [instance]);
+      evHub.emit(evInitiate + '-' + instance.id, [instance]);
+      evHub.emit(evInitiate, [instance]);
     }
 
     return instance;
@@ -537,7 +549,7 @@
    */
 
   /**
-   * Check the type of an object. Returns type of any object in lowercase letters. If comparison type is provided the function will compare the type directly and returns a boolean.
+   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type directly and returns a boolean.
    *
    * @private
    * @param {object} obj
@@ -562,7 +574,7 @@
   }
 
   /**
-   * Clone array or arguments object or alternatively copy values from an array to another array. If a non-array value is provided as the 'from' param a new empty array will be returned. If 'to' param is provided it will be emptied and populated with 'from' array's values.
+   * Clone array or arguments object or alternatively copy values from an array to another array.
    *
    * @private
    * @param {array} from
@@ -608,7 +620,7 @@
   }
 
   /**
-   * Define a module. Returns module instance if module registration was successful, otherwise returns false. Validates arguments and makes sure that no bad data is passed on to Module constructor.
+   * Define a module. Returns module instance if module registration was successful, otherwise returns false.
    *
    * @private
    * @param {string} id
@@ -671,8 +683,8 @@
           tryResolve(module, i);
         }
         else {
-          lib.on(evInitiate + '-' + depId, function (ev, module) {
-            lib.off(ev.type, ev.fn);
+          evHub.on(evInitiate + '-' + depId, function (ev, module) {
+            evHub.off(ev.type, ev.fn);
             tryResolve(module, i);
           });
         }
@@ -685,7 +697,7 @@
   }
 
   /**
-   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
+   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
    *
    * @private
    * @param {*} deferreds
@@ -804,7 +816,7 @@
   };
 
   /**
-   * Undefine a module. If any other define or require instance depends on the module it cannot be undefined. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
+   * Undefine a module. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
    *
    * @public
    * @param {string|array} ids
@@ -874,8 +886,8 @@
 
   };
 
-  /** Eventize the library -> on/off/emit methods. */
-  lib.eventize(lib);
+  /** Initialize private event hub. */
+  evHub = new Eventizer();
 
   /**
    * Publish library using an adapted UMD pattern.

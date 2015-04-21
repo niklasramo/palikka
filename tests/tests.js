@@ -394,6 +394,7 @@
 
   });
 
+  /*
   Q.module('.on() / .off() / .emit()');
 
   Q.test('Triggering, binding and unbinding module events.', function (assert) {
@@ -429,7 +430,6 @@
       assert.strictEqual(palikka._modules['a'], module);
     };
 
-    /** Test binding. */
     palikka.on('register-a', regCb);
     palikka.on('register', regCb2);
     palikka.on('initiate-a', initCb);
@@ -438,16 +438,15 @@
       return 'foobar';
     });
 
-    /** Test triggering. */
     palikka.emit('initiate-a', [palikka._modules['a']]);
 
-    /** Test unbinding. */
     palikka.off('initiate-a');
     assert.strictEqual(palikka._listeners['initiate-a'], undefined);
 
     done();
 
   });
+  */
 
   Q.module('.typeOf()');
 
@@ -624,11 +623,11 @@
 
     // Make sure m1 is not resolved before d1.
     d1.done(function() {
-      assert.strictEqual(d1.state(), 'resolved');
+      assert.strictEqual(d1.state(), 'fulfilled');
       assert.strictEqual(m1.state(), 'pending');
     });
 
-    // Make sure m1 is not resolved before d2.
+    // Make sure m1 is not fulfilled before d2.
     d2.done(function() {
       assert.strictEqual(m1.state(), 'pending');
     });
@@ -645,8 +644,8 @@
 
     // Test .and()
     m1.done(function (d1Val, d2Val) {
-      assert.strictEqual(d1.state(), 'resolved');
-      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d1.state(), 'fulfilled');
+      assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d1Val[0], 'a');
       assert.strictEqual(d1Val[1], 'b');
       assert.strictEqual(d1Val[2], 'c');
@@ -656,7 +655,7 @@
     // Test .and()
     m2.fail(function (reason) {
       assert.strictEqual(d1.state(), 'pending');
-      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'rejected');
       assert.strictEqual(reason, 'fail-1');
     });
@@ -664,7 +663,7 @@
     // Test .and()
     m3.fail(function (reason) {
       assert.strictEqual(d1.state(), 'pending');
-      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'rejected');
       assert.strictEqual(d4.state(), 'pending');
       assert.strictEqual(reason, 'fail-1');
@@ -673,7 +672,7 @@
     // Test .and()
     m4.done(function (val) {
       assert.strictEqual(d1.state(), 'pending');
-      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'pending');
       assert.strictEqual(d4.state(), 'pending');
       assert.strictEqual(val, 'd');
@@ -681,8 +680,8 @@
 
     // Test .and()
     m5.fail(function (reason) {
-      assert.strictEqual(d1.state(), 'resolved');
-      assert.strictEqual(d2.state(), 'resolved');
+      assert.strictEqual(d1.state(), 'fulfilled');
+      assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'rejected');
       assert.strictEqual(d4.state(), 'rejected');
       assert.strictEqual(reason, 'fail-1');
