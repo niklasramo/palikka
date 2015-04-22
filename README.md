@@ -319,7 +319,7 @@ Returns a new Eventizer instance or the object provided as **obj** argument.
 
 ###.Deferred()
 
-A constructor function that creates a deferred instance. The deferred is "thenable" and  Promises/A+ compliant. The deferred's API is based on jQuery's Deferred implementation.
+A constructor function that creates a deferred instance. The deferred is "thenable" and  Promises/A+ compliant. The API is based on jQuery's Deferred implementation and is Promises/A+ compatible.
 
 **Syntax**
 
@@ -328,7 +328,7 @@ A constructor function that creates a deferred instance. The deferred is "thenab
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * Optional. The callback function has two arguments, *resolve* and *reject*, which can be used to resolve or reject the Deferred instance.
+  * Optional. The callback function has two arguments, *resolve* and *reject*, which can be used to resolve or reject the deferred.
 
 **Usage**
 
@@ -363,7 +363,7 @@ defer
 
 ###.Deferred.prototype.state()
 
-Retrieve the current state of the Deferred instance: "pending", "resolved" or "rejected".
+Retrieve the current state of the deferred: "pending", "resolved" or "rejected".
 
 **Syntax**
 
@@ -440,7 +440,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.done()
 
-Add a callback that will be called when the Deferred instance is resolved.
+Add a callback that will be called when the deferred is resolved.
 
 **Syntax**
 
@@ -449,7 +449,7 @@ Add a callback that will be called when the Deferred instance is resolved.
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the Deferred is resolved.
+  * A function that is called when the deferred is resolved.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -457,7 +457,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.fail()
 
-Add a callback that will be called when the Deferred instance is rejected.
+Add a callback that will be called when the deferred is rejected.
 
 **Syntax**
 
@@ -466,7 +466,7 @@ Add a callback that will be called when the Deferred instance is rejected.
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the Deferred is rejected.
+  * A function that is called when the deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -474,7 +474,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.always()
 
-Add a callback that will be called when the Deferred instance is either resolved or rejected.
+Add a callback that will be called when the deferred is either resolved or rejected.
 
 **Syntax**
 
@@ -483,7 +483,7 @@ Add a callback that will be called when the Deferred instance is either resolved
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the Deferred is either resolved or rejected.
+  * A function that is called when the deferred is either resolved or rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -491,7 +491,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. This method returns a new Deferred instance which is contigent on the instantiating Deferred instance. The new Deferred instance has two optional callback functions as it's arguments: *done* and *fail*. The fate of the instantiating Deferred instance will determine which callback will be executed. When either of the callbacks is excecuted the new Deferred instance is resolved/rejected with the callback function's return value. If the return value is also a Deferred instance the new Deferred instance is resolved/rejected based on the fate of that Deferred. Rejection will bubble all the way down to the last link of the chain. Yep, it's like inception for deferreds.
+Chain deferreds. Returns a new deferred.
 
 **Syntax**
 
@@ -500,13 +500,13 @@ Chain deferreds. This method returns a new Deferred instance which is contigent 
 **Parameters**
 
 * **done** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is resolved.
+  * Optional. A function that is called when the deferred is resolved.
 * **fail** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the Deferred is rejected.
+  * Optional. A function that is called when the deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
-Returns a new Deferred instance.
+Returns a new deferred.
 
 ###.Deferred.prototype.and()
 
@@ -520,11 +520,11 @@ Returns a deferred that resolves when all of the arguments and the instance have
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
-Returns a new Deferred instance.
+Returns a new deferred.
 
 ###.when()
 
-Returns a new Deferred instance that will be resolved/rejected when all provided Deferred instances are resolved or rejected. Any non-Deferred object within the deferreds array will be instantly resolved.
+Returns a new deferred that will be resolved/rejected when all provided deferreds are resolved or rejected. Any non-deferred object within the deferreds array will be instantly resolved.
 
 **Syntax**
 

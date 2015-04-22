@@ -506,7 +506,7 @@
     /* TODO: context param test */
 
     var done = assert.async();
-    assert.expect(12);
+    assert.expect(13);
 
     palikka.define('a', function () {
 
@@ -517,6 +517,10 @@
 
       /** Initiate another Eventizer using new keyword. */
       m.events = new palikka.Eventizer();
+
+      /** Make sure that eventize method returns a new Eventizer instance when called with no args. */
+      var test = palikka.eventize();
+      assert.strictEqual(test instanceof palikka.Eventizer, true);
 
       /** Emit "tick" event with "foo" and "bar" arguments. */
       m.ticker = window.setInterval(function () {
@@ -714,15 +718,16 @@
       assert.strictEqual(c, 'c');
       return 'd';
     }, function () {
+      console.log('moro')
       assert.strictEqual(1, 0);
     })
     .then(function (d) {
       assert.strictEqual(d, 'd');
-      var ret = new palikka.Deferred();
-      setTimeout(function () {
-        ret.resolve('e', 'f', 'g');
-      }, 100);
-      return ret;
+      return new palikka.Deferred(function (resolve) {
+        setTimeout(function () {
+          resolve('e', 'f', 'g');
+        }, 100);
+      });
     }, function () {
       assert.strictEqual(1, 0);
     })
@@ -746,18 +751,21 @@
       assert.strictEqual(1, 0);
     }, function (e) {
       assert.strictEqual(e.message, 'fail');
+      return 'test';
     })
-    .then(null, function (e) {
-      assert.strictEqual(e.message, 'fail');
-    })
-    .done(function (e) {
+    .then(function (val) {
+      assert.strictEqual(val, 'test');
+    }, function (e) {
       assert.strictEqual(1, 0);
     })
+    .done(function (val) {
+      assert.strictEqual(arguments.length, 0);
+    })
     .fail(function (e) {
-      assert.strictEqual(e.message, 'fail');
+      assert.strictEqual(1, 0);
     })
     .always(function (e) {
-      assert.strictEqual(e.message, 'fail');
+      assert.strictEqual(arguments.length, 0);
     });
 
     setTimeout(function () {

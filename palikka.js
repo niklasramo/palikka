@@ -364,17 +364,25 @@
     var
     instance = this,
     next = new Deferred(),
+    isFulfilled,
+    fateCallback,
     ret;
 
-    instance.done(function () {
+    instance.always(function () {
 
       try {
 
-        if (typeOf(done, 'function')) {
+        isFulfilled = this.state() === stateFulfilled;
+        done = isFulfilled && typeOf(done, 'function') ? done : 0;
+        fail = !isFulfilled && typeOf(fail, 'function') ? fail : 0;
+        fateCallback = done || fail || 0;
 
-          ret = done.apply(instance, arguments);
+        if (fateCallback) {
+
+          ret = fateCallback.apply(instance, arguments);
 
           if (ret instanceof Deferred) {
+
             ret
             .done(function () {
               next.resolve.apply(next, arguments);
@@ -382,9 +390,17 @@
             .fail(function () {
               next.reject.apply(next, arguments);
             });
+
+          }
+          else if (ret === undefined) {
+
+            next.resolve();
+
           }
           else {
-            next.resolve.call(next, ret);
+
+            next.resolve(ret);
+
           }
 
         }
@@ -396,19 +412,9 @@
 
       } catch (e) {
 
-        next.reject.call(next, e);
+        next.reject(e);
 
       }
-
-    });
-
-    instance.fail(function () {
-
-      if (typeOf(fail, 'function')) {
-        fail.apply(instance, arguments);
-      }
-
-      next.reject.apply(next, arguments);
 
     });
 
@@ -417,7 +423,7 @@
   };
 
   /**
-   * Returns a "master" de ferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
+   * Returns a "master" deferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
    *
    * @public
    * @memberof Deferred.prototype
@@ -574,26 +580,17 @@
   }
 
   /**
-   * Clone array or arguments object or alternatively copy values from an array to another array.
+   * Clone array or arguments object.
    *
    * @private
-   * @param {array} from
-   * @param {array} [to]
+   * @param {array} array
    * @returns {array}
    */
-  function copyArray(from, to) {
+  function copyArray(array) {
 
     var
-    fromType = typeOf(from),
-    ret = fromType === 'array' ? from.slice(0) : fromType === 'arguments' ? slice.call(from) : [];
-
-    if (typeOf(to, 'array')) {
-      to.length = 0;
-      arrayEach(ret, function (fromVal) {
-        to.push(fromVal);
-      });
-      ret = to;
-    }
+    arrayType = typeOf(array),
+    ret = arrayType === 'array' ? array.slice(0) : arrayType === 'arguments' ? slice.call(array) : [];
 
     return ret;
 
@@ -717,28 +714,23 @@
     counter = deferreds.length,
     firstRejection;
 
-    if (counter) {
-      arrayEach(deferreds, function (deferred, i) {
-        deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
-        deferred.always(function () {
-          if (master.state() === 'pending') {
-            --counter;
-            var val = deferred.value();
-            firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
-            masterArgs[i] = val.length < 2 ? val[0] : val;
-            if (firstRejection && (rejectOnFirst || !counter)) {
-              master.reject.apply(master, firstRejection.value());
-            }
-            if (!firstRejection && (resolveOnFirst || !counter)) {
-              master.resolve.apply(master, resolveOnFirst ? [masterArgs[i]] : masterArgs);
-            }
+    arrayEach(deferreds, function (deferred, i) {
+      deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
+      deferred.always(function () {
+        if (master.state() === 'pending') {
+          --counter;
+          var val = deferred.value();
+          firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
+          masterArgs[i] = val.length < 2 ? val[0] : val;
+          if (firstRejection && (rejectOnFirst || !counter)) {
+            master.reject.apply(master, firstRejection.value());
           }
-        });
+          if (!firstRejection && (resolveOnFirst || !counter)) {
+            master.resolve.apply(master, resolveOnFirst ? [masterArgs[i]] : masterArgs);
+          }
+        }
       });
-    }
-    else {
-      master.resolve();
-    }
+    });
 
     return master;
 
