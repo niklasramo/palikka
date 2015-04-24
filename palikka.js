@@ -6,6 +6,7 @@
  */
 
 (function (glob) {
+
   'use strict';
 
   var
@@ -41,6 +42,11 @@
   /** Check if strict mode is supported. */
   isStrict = !this === true;
 
+  /*
+   * Eventizer - Constructor
+   * ***********************
+   */
+
   /**
    * Creates a new Eventizer instance that allows you to bind, unbind and emit events.
    *
@@ -71,7 +77,9 @@
    */
   Eventizer.prototype.on = function (type, callback) {
 
-    var listeners = this._listeners;
+    var
+    listeners = this._listeners;
+
     listeners[type] = listeners[type] || [];
     listeners[type].push(callback);
 
@@ -100,13 +108,19 @@
       i = typeCallbacks.length;
 
       while (i--) {
+
         if (!callback || (callback && typeCallbacks[i] === callback)) {
+
           typeCallbacks.splice(i, 1);
+
         }
+
       }
 
       if (!typeCallbacks.length) {
+
         delete listeners[type];
+
       }
 
     }
@@ -132,7 +146,9 @@
     typeCallbacks = instance._listeners[type];
 
     if (typeCallbacks) {
-      arrayEach(typeCallbacks.slice(0), function (callback) {
+
+      arrayEach(copyArray(typeCallbacks), function (callback) {
+
         if (typeOf(callback, 'function')) {
 
           var
@@ -143,12 +159,19 @@
           callback.apply(cbCtx, cbArgs);
 
         }
+
       });
+
     }
 
     return instance;
 
   };
+
+  /*
+   * Deferred - Constructor
+   * **********************
+   */
 
   /**
    * Create a deferred object.
@@ -180,12 +203,20 @@
     instance._eRej = evReject + '-' + id;
 
     /**
-     * When the deferred is resolved or rejected the provided arguments are stored here wrapped in an array.
+     * Indicates if the instance can be resolved/rejected while in pending state. This property will be set to true on the first resolve/reject call.
+     *
+     * @protected
+     * @type {boolean}
+     */
+    instance._locked = false;
+
+    /**
+     * The instance's result value is stored here.
      *
      * @protected
      * @type {undefined|array}
      */
-    instance._value = undefined;
+    instance._result = undefined;
 
     /**
      * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
@@ -197,11 +228,20 @@
 
     /** Call callback function if provided. */
     if (typeOf(callback, 'function')) {
-      callback.call(instance, function () {
-        instance.resolve.apply(instance, arguments);
-      }, function () {
-        instance.reject.apply(instance, arguments);
-      });
+
+      callback(
+        function (val) {
+
+          instance.resolve(val);
+
+        },
+        function (val) {
+
+          instance.reject(val);
+
+        }
+      );
+
     }
 
   }
@@ -215,38 +255,67 @@
    */
   Deferred.prototype.state = function () {
 
+    isDeferred(this);
+
     return this._state;
 
   };
 
   /**
-   * Get current value (the arguments with which the instance was resolved/rejected) of the instance.
+   * Get instance's result value.
    *
    * @public
    * @memberof Deferred.prototype
-   * @returns {undefined|array}
+   * @returns {*}
    */
-  Deferred.prototype.value = function () {
+  Deferred.prototype.result = function () {
 
-    return this._value ? copyArray(this._value) : this._value;
+    isDeferred(this);
+
+    return this._result;
 
   };
 
   /**
-   * Resolve deferred. All provided arguments will be passed directly to 'done' and 'always' callback functions.
+   * Resolve deferred. All provided arguments will be passed directly to 'onFulfilled' and 'onSettled' callback functions.
    *
    * @public
    * @memberof Deferred.prototype
+   * @param {*} [val=undefined]
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.resolve = function () {
+  Deferred.prototype.resolve = function (val) {
 
-    var instance = this;
+    var
+    instance = this;
 
-    if (instance._state === statePending) {
-      instance._value = copyArray(arguments);
-      instance._state = stateFulfilled;
-      evHub.emit(instance._eRes, instance._value);
+    isDeferred(instance);
+
+    if (instance._state === statePending && !instance._locked) {
+
+      instance._locked = true;
+
+      if (val instanceof Deferred) {
+
+        val
+        .onFulfilled(function (val) {
+
+          resolveHandler(instance, val);
+
+        })
+        .onRejected(function (reason) {
+
+          rejectHandler(instance, reason);
+
+        });
+
+      }
+      else {
+
+        resolveHandler(instance, val);
+
+      }
+
     }
 
     return instance;
@@ -254,20 +323,24 @@
   };
 
   /**
-   * Reject deferred. All provided arguments will be passed directly to 'fail' and 'always' callback functions.
+   * Reject deferred. All provided arguments will be passed directly to 'onRejected' and 'onSettled' callback functions.
    *
    * @public
    * @memberof Deferred.prototype
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.reject = function () {
+  Deferred.prototype.reject = function (reason) {
 
-    var instance = this;
+    var
+    instance = this;
 
-    if (instance._state === statePending) {
-      instance._value = copyArray(arguments);
-      instance._state = stateRejected;
-      evHub.emit(instance._eRej, instance._value);
+    isDeferred(instance);
+
+    if (instance._state === statePending && !instance._locked) {
+
+      instance._locked = true;
+      rejectHandler(instance, reason);
+
     }
 
     return instance;
@@ -282,21 +355,30 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.done = function (callback) {
+  Deferred.prototype.onFulfilled = function (callback) {
 
-    var instance = this;
+    var
+    instance = this;
+
+    isDeferred(instance);
 
     if (typeOf(callback, 'function')) {
 
       if (instance._state === stateFulfilled) {
-        callback.apply(instance, instance.value());
+
+        callback(instance.result());
+
       }
 
       if (instance._state === statePending) {
+
         evHub.on(instance._eRes, function (e) {
-          callback.apply(instance, instance.value());
-          evHub.off(instance._eRes, e.fn);
+
+          callback(instance.result());
+          evHub.off(e.type, e.fn);
+
         });
+
       }
 
     }
@@ -313,21 +395,30 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.fail = function (callback) {
+  Deferred.prototype.onRejected = function (callback) {
 
-    var instance = this;
+    var
+    instance = this;
+
+    isDeferred(instance);
 
     if (typeOf(callback, 'function')) {
 
       if (instance._state === stateRejected) {
-        callback.apply(instance, instance.value());
+
+        callback(instance.result());
+
       }
 
       if (instance._state === statePending) {
+
         evHub.on(instance._eRej, function (e) {
-          callback.apply(instance, instance.value());
-          evHub.off(instance._eRej, e.fn);
+
+          callback(instance.result());
+          evHub.off(e.type, e.fn);
+
         });
+
       }
 
     }
@@ -344,9 +435,11 @@
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
    */
-  Deferred.prototype.always = function (callback) {
+  Deferred.prototype.onSettled = function (callback) {
 
-    return this.done(callback).fail(callback);
+    isDeferred(this);
+
+    return this.onFulfilled(callback).onRejected(callback);
 
   };
 
@@ -355,64 +448,51 @@
    *
    * @public
    * @memberof Deferred.prototype
-   * @param {function} [done]
-   * @param {function} [fail]
+   * @param {function} [onFulfilled]
+   * @param {function} [onRejected]
    * @returns {Deferred} Creates a new deferred.
    */
-  Deferred.prototype.then = function (done, fail) {
+  Deferred.prototype.then = function (onFulfilled, onRejected) {
+
+    isDeferred(this);
 
     var
     instance = this,
     next = new Deferred(),
     isFulfilled,
-    fateCallback,
-    ret;
+    fateCallback;
 
-    instance.always(function () {
+    // TODO: this callback should be bound after next is returned.
+    // https://promisesaplus.com/
+    // Rule: 2.2.4
+    instance.onSettled(function (instanceVal) {
 
-      try {
+      isFulfilled = instance.state() === stateFulfilled;
+      onFulfilled = isFulfilled && typeOf(onFulfilled, 'function') ? onFulfilled : 0;
+      onRejected = !isFulfilled && typeOf(onRejected, 'function') ? onRejected : 0;
+      fateCallback = onFulfilled || onRejected || 0;
 
-        isFulfilled = this.state() === stateFulfilled;
-        done = isFulfilled && typeOf(done, 'function') ? done : 0;
-        fail = !isFulfilled && typeOf(fail, 'function') ? fail : 0;
-        fateCallback = done || fail || 0;
+      /**
+       * If we have a callback that matches the instance's fate (fulfilled -> onFulfilled, rejected -> onRejected)
+       * or if the instance was fulfilled, let's do the default try catch procedure.
+       */
+      if (fateCallback || isFulfilled) {
 
-        if (fateCallback) {
+        try {
 
-          ret = fateCallback.apply(instance, arguments);
+          next.resolve(fateCallback ? fateCallback(instanceVal) : instanceVal);
 
-          if (ret instanceof Deferred) {
+        } catch (e) {
 
-            ret
-            .done(function () {
-              next.resolve.apply(next, arguments);
-            })
-            .fail(function () {
-              next.reject.apply(next, arguments);
-            });
-
-          }
-          else if (ret === undefined) {
-
-            next.resolve();
-
-          }
-          else {
-
-            next.resolve(ret);
-
-          }
-
-        }
-        else {
-
-          next.resolve.apply(next, arguments);
+          next.reject(e);
 
         }
 
-      } catch (e) {
+      }
+      /** In other cases, let's sink the error down the then chain until it's caught. */
+      else {
 
-        next.reject(e);
+        next.reject(instanceVal);
 
       }
 
@@ -434,11 +514,131 @@
    */
   Deferred.prototype.and = function (deferreds, resolveOnFirst, rejectOnFirst) {
 
+    isDeferred(this);
     deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
     deferreds.unshift(this);
+
     return when(deferreds, resolveOnFirst, rejectOnFirst);
 
   };
+
+  /*
+   * Deferred - Helpers
+   * ******************
+   */
+
+  /**
+   * Resolve handler.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} val
+   */
+  function resolveHandler(instance, val) {
+
+    instance._result = val;
+    instance._state = stateFulfilled;
+    evHub.emit(instance._eRes, [val]);
+
+  }
+
+  /**
+   * Reject handler.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} reason
+   */
+  function rejectHandler(instance, reason) {
+
+    instance._result = reason;
+    instance._state = stateRejected;
+    evHub.emit(instance._eRej, [reason]);
+
+  }
+
+  /**
+   * Check if a value is a deferred instance. By default throws a type error if test fails, but can be configured not to throw error.
+   *
+   * @private
+   * @param {*} val
+   * @param {boolean} [noError=false]
+   * @returns {boolean}
+   */
+  function isDeferred(val, noError) {
+
+    var
+    ret = val instanceof Deferred;
+
+    if (!noError && !ret) {
+
+      throw TypeError(this + ' is not a promise');
+
+    }
+
+    return ret;
+
+  }
+
+  /**
+   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
+   *
+   * @private
+   * @param {*} deferreds
+   * @param {boolean} [resolveOnFirst=false]
+   * @param {boolean} [rejectOnFirst=true]
+   * @returns {Deferred} A new deferred.
+   */
+  function when(deferreds, resolveOnFirst, rejectOnFirst) {
+
+    deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
+    resolveOnFirst = resolveOnFirst === true;
+    rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
+
+    var
+    master = new Deferred(),
+    masterArgs = [],
+    counter = deferreds.length,
+    firstRejection;
+
+    arrayEach(deferreds, function (deferred, i) {
+
+      deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
+
+      deferred.onSettled(function () {
+
+        if (master.state() === 'pending' && !master._locked) {
+
+          --counter;
+          firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
+          masterArgs[i] = deferred.result();
+
+          if (firstRejection && (rejectOnFirst || !counter)) {
+
+            master.reject(firstRejection.result());
+
+          }
+
+          if (!firstRejection && (resolveOnFirst || !counter)) {
+
+            master.resolve(resolveOnFirst ? masterArgs[i] : masterArgs);
+
+          }
+
+        }
+
+      });
+
+    });
+
+    return master;
+
+  }
+
+  /*
+   * Module - Constructor
+   * ********************
+   */
 
   /**
    * Create a module object.
@@ -471,7 +671,9 @@
 
     // Initiate.
     loadDependencies(dependencies, function (depModules) {
+
       instance.process(depModules);
+
     });
 
   }
@@ -492,7 +694,9 @@
     factoryValue,
     factoryAsync,
     factoryInit = function (val) {
+
       instance.initiate(arguments.length ? val : factoryValue);
+
     };
 
     if (typeOf(instance.factory, 'function')) {
@@ -501,19 +705,26 @@
         id: instance.id,
         dependencies: {},
         async: function () {
+
           factoryAsync = true;
+
           return factoryInit;
+
         }
       };
 
       arrayEach(instance.dependencies, function (depId) {
+
         factoryCtx.dependencies[depId] = modules[depId].value;
+
       });
 
       factoryValue = instance.factory.apply(factoryCtx, depModules);
 
       if (!factoryAsync) {
+
         factoryInit(factoryValue);
+
       }
 
     }
@@ -537,84 +748,26 @@
    */
   Module.prototype.initiate = function (value) {
 
-    var instance = this;
+    var
+    instance = this;
 
     if (instance === modules[instance.id] && !instance.loaded) {
+
       instance.value = value;
       instance.loaded = true;
       evHub.emit(evInitiate + '-' + instance.id, [instance]);
       evHub.emit(evInitiate, [instance]);
+
     }
 
     return instance;
 
   };
 
-  /**
-   * Private helper functions.
+  /*
+   * Module - Helpers
+   * ****************
    */
-
-  /**
-   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type directly and returns a boolean.
-   *
-   * @private
-   * @param {object} obj
-   * @param {string} [isType]
-   * @returns {string|boolean}
-   */
-  function typeOf(obj, isType) {
-
-    var type = obj === null ? 'null' : // IE 7/8 fix -> null check
-               obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
-               typeof obj;
-
-    type = type !== 'object' ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
-
-    // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
-    if (!isStrict && type === 'object') {
-      type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
-    }
-
-    return isType ? type === isType : type;
-
-  }
-
-  /**
-   * Clone array or arguments object.
-   *
-   * @private
-   * @param {array} array
-   * @returns {array}
-   */
-  function copyArray(array) {
-
-    var
-    arrayType = typeOf(array),
-    ret = arrayType === 'array' ? array.slice(0) : arrayType === 'arguments' ? slice.call(array) : [];
-
-    return ret;
-
-  }
-
-  /**
-   * Loop array items.
-   *
-   * @private
-   * @param {array} array
-   * @param {function} callback
-   * @returns {array}
-   */
-  function arrayEach(array, callback) {
-
-    if (typeOf(callback, 'function')) {
-      for (var i = 0, len = array.length; i < len; i++) {
-        callback(array[i], i);
-      }
-    }
-
-    return array;
-
-  }
 
   /**
    * Define a module. Returns module instance if module registration was successful, otherwise returns false.
@@ -647,7 +800,9 @@
    */
   function sanitizeDependencies(dependencies) {
 
-    var type = typeOf(dependencies);
+    var
+    type = typeOf(dependencies);
+
     return type === 'array' ? dependencies : type === 'string' ? [dependencies] : [];
 
   }
@@ -665,79 +820,133 @@
     ret = [],
     counter = 0,
     tryResolve = function (module, i) {
+
       ++counter;
       module.locked = true;
       ret[i] = module.value;
       if (counter === dependencies.length) {
+
         callback(ret);
+
       }
+
     };
 
     if (dependencies.length) {
+
       arrayEach(dependencies, function (depId, i) {
-        var module = modules[depId];
+
+        var
+        module = modules[depId];
+
         if (module && module.loaded) {
+
           tryResolve(module, i);
+
         }
         else {
+
           evHub.on(evInitiate + '-' + depId, function (ev, module) {
+
             evHub.off(ev.type, ev.fn);
             tryResolve(module, i);
+
           });
+
         }
+
       });
     }
     else {
+
       callback(ret);
+
     }
 
   }
 
   /**
-   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
+   * Generic helpers
+   * ***************
+   */
+
+  /**
+   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type directly and returns a boolean.
    *
    * @private
-   * @param {*} deferreds
-   * @param {boolean} [resolveOnFirst=false]
-   * @param {boolean} [rejectOnFirst=true]
-   * @returns {Deferred} A new deferred.
+   * @param {object} obj
+   * @param {string} [isType]
+   * @returns {string|boolean}
    */
-  function when(deferreds, resolveOnFirst, rejectOnFirst) {
-
-    deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
-    resolveOnFirst = resolveOnFirst === true;
-    rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
+  function typeOf(obj, isType) {
 
     var
-    master = new Deferred(),
-    masterArgs = [],
-    counter = deferreds.length,
-    firstRejection;
+    type = (
+      obj === null ? 'null' : // IE 7/8 fix -> null check
+      obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
+      typeof obj
+    );
 
-    arrayEach(deferreds, function (deferred, i) {
-      deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
-      deferred.always(function () {
-        if (master.state() === 'pending') {
-          --counter;
-          var val = deferred.value();
-          firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
-          masterArgs[i] = val.length < 2 ? val[0] : val;
-          if (firstRejection && (rejectOnFirst || !counter)) {
-            master.reject.apply(master, firstRejection.value());
-          }
-          if (!firstRejection && (resolveOnFirst || !counter)) {
-            master.resolve.apply(master, resolveOnFirst ? [masterArgs[i]] : masterArgs);
-          }
-        }
-      });
-    });
+    type = type !== 'object' ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
 
-    return master;
+    // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
+    if (!isStrict && type === 'object') {
+
+      type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
+
+    }
+
+    return isType ? type === isType : type;
 
   }
 
   /**
-   * Public API.
+   * Clone array or arguments object.
+   *
+   * @private
+   * @param {array} array
+   * @returns {array}
+   */
+  function copyArray(array) {
+
+    var
+    arrayType = typeOf(array);
+
+    return (
+      arrayType === 'array' ? array.slice(0) :
+      arrayType === 'arguments' ? slice.call(array) :
+      []
+    );
+
+  }
+
+  /**
+   * Loop array items.
+   *
+   * @private
+   * @param {array} array
+   * @param {function} callback
+   * @returns {array}
+   */
+  function arrayEach(array, callback) {
+
+    if (typeOf(callback, 'function')) {
+
+      for (var i = 0, len = array.length; i < len; i++) {
+
+        callback(array[i], i);
+
+      }
+
+    }
+
+    return array;
+
+  }
+
+  /**
+   * Public API
+   * **********
    */
 
   /**
@@ -789,16 +998,20 @@
    */
   lib.define = function (ids, dependencies, factory) {
 
-    ids = typeOf(ids, 'array') ? ids : [ids];
+    var
+    ret = [];
 
-    var ret = [];
+    ids = typeOf(ids, 'array') ? ids : [ids];
 
     arrayEach(ids, function (id) {
 
-      var module = defineSingle(id, dependencies, factory);
+      var
+      module = defineSingle(id, dependencies, factory);
 
       if (module) {
+
         ret.push(module);
+
       }
 
     });
@@ -816,9 +1029,10 @@
    */
   lib.undefine = function (ids) {
 
-    ids = typeOf(ids, 'array') ? ids : [ids];
+    var
+    ret = [];
 
-    var ret = [];
+    ids = typeOf(ids, 'array') ? ids : [ids];
 
     arrayEach(ids, function (id) {
 
@@ -827,8 +1041,10 @@
       isLocked = module && module.locked;
 
       if (module && !isLocked) {
+
         delete modules[id];
         ret.push(id);
+
       }
 
     });
@@ -847,9 +1063,13 @@
   lib.require = function (dependencies, callback) {
 
     if (typeOf(callback, 'function')) {
+
       loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
+
         callback.apply(null, depModules);
+
       });
+
     }
 
   };
@@ -864,19 +1084,31 @@
    */
   lib.eventize = function (obj, listeners) {
 
-    var eventizer = new Eventizer(listeners);
+    var
+    eventizer = new Eventizer(listeners);
+
     if (typeOf(obj, 'object')) {
+
       obj._listeners = eventizer._listeners;
       obj.on = eventizer.on;
       obj.off = eventizer.off;
       obj.emit = eventizer.emit;
+
       return obj;
+
     }
     else {
+
       return eventizer;
+
     }
 
   };
+
+  /**
+   * Initiate
+   * ********
+   */
 
   /** Initialize private event hub. */
   evHub = new Eventizer();
@@ -886,13 +1118,19 @@
    * https://github.com/umdjs/umd
    */
   if (typeOf(glob.define, 'function') && define.amd) {
+
     define([], lib);
+
   }
   else if (typeOf(glob.exports, 'object')) {
+
     module.exports = lib;
+
   }
   else {
+
     glob[ns] = lib;
+
   }
 
 })(this);
