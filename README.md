@@ -22,7 +22,6 @@ Include [palikka.js](https://github.com/niklasramo/palikka/blob/dev/v0.3.0/palik
 ```javascript
 // Define module "foo" which requires module "bar"
 palikka.define('foo', ['bar'], function (bar) {
-  console.log(bar); // "bar"
   return 'foo';
 });
 
@@ -35,13 +34,13 @@ palikka.define('bar', function () {
   // Let's use promises (deferred)
   var getSomeData = new palikka.Deferred(function (resolve, reject) {
     window.setTimeout(function () {
-      resolve('b', 'a', 'r');
+      resolve('bar');
     }, 1000);
   });
 
   // When data is fetched initiate module
-  getSomeData.done(function (b, a, r) {
-    init(b + a + r);
+  getSomeData.onFulfilled(function (val) {
+    init(val);
   });
 
 });
@@ -72,12 +71,12 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 * [.Deferred()](#deferred)
 * [.Deferred.prototype.state()](#deferredprototypestate)
-* [.Deferred.prototype.value()](#deferredprototypevalue)
+* [.Deferred.prototype.result()](#deferredprototyperesult)
 * [.Deferred.prototype.resolve()](#deferredprototyperesolve)
 * [.Deferred.prototype.reject()](#deferredprototypereject)
-* [.Deferred.prototype.done()](#deferredprototypedone)
-* [.Deferred.prototype.fail()](#deferredprototypefail)
-* [.Deferred.prototype.always()](#deferredprototypealways)
+* [.Deferred.prototype.onFulfilled()](#deferredprototypeonFulfilled)
+* [.Deferred.prototype.onRejected()](#deferredprototypeonRejected)
+* [.Deferred.prototype.onSettled()](#deferredprototypeonSettled)
 * [.Deferred.prototype.then()](#deferredprototypethen)
 * [.Deferred.prototype.and()](#deferredprototypeand)
 * [.when()](#when)
@@ -248,7 +247,7 @@ eventizer
 
 ###.Eventizer.prototype.on()
 
-Bind a custom event listener to an Eventizer instance. The callback argument always receives an event data object as it's first argument.
+Bind a custom event listener to an Eventizer instance. The callback argument onSettled receives an event data object as it's first argument.
 
 **Syntax**
 
@@ -336,28 +335,24 @@ A constructor function that creates a deferred instance. The deferred is "thenab
 var defer = new palikka.Deferred(function (resolve, reject) {
 
   window.setTimeout(function () {
-    resolve('wuu', 'huu');
+    resolve('done');
   }, Math.floor(Math.random() * 1000));
 
   window.setTimeout(function () {
-    reject('bummer');
+    reject('fail');
   }, Math.floor(Math.random() * 1000));
 
 });
 
 defer
-.done(function (wuu, huu) {
-  console.log(wuu + huu); // "wuuhuu"
+.onFulfilled(function (val) {
+  console.log(val); // "done"
 })
-.fail(function (reason) {
-  console.log(reason); // "bummer"
+.onRejected(function (reason) {
+  console.log(reason); // "fail"
 })
-.always(function () {
-  if (this.state() === 'resolved') {
-    console.log(arguments[0] + arguments[1]); // "wuuhuu"
-  } else {
-    console.log(arguments[0]); // "bummer"
-  }
+.onSettled(function (val) {
+  console.log(val); // "done" or "fail"
 });
 ```
 
@@ -383,13 +378,13 @@ console.log(d1.resolve().state()); // "resolved"
 console.log(d2.reject().state()); // "rejected"
 ```
 
-###.Deferred.prototype.value()
+###.Deferred.prototype.result()
 
-Retrieve the current value (the arguments with which the instance was resolved/rejected) of the instance.
+Retrieve the result value (the arguments with which the instance was resolved/rejected) of the instance.
 
 **Syntax**
 
-`d.value()`
+`d.result()`
 
 **Returns** &nbsp;&mdash;&nbsp; *undefined / array*
 
@@ -400,8 +395,8 @@ Returns undefined if deferred is pending otherwise returns an array which contai
 ```javascript
 var d1 = new palikka.Deferred();
 var d2 = new palikka.Deferred();
-d1.resolve(1, 2, 3).value(); // [1,2,3]
-d2.reject(1).value(); // [1]
+d1.resolve(1).result(); // 1
+d2.reject(2).result(); // 2
 ```
 
 ###.Deferred.prototype.resolve()
@@ -410,12 +405,12 @@ Resolve a deferred instance.
 
 **Syntax**
 
-`d.resolve( [args] )`
+`d.resolve( [result] )`
 
 **Parameters**
 
-* **args** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Arguments that are passed to the *done* and *always* callbacks.
+* **result** &nbsp;&mdash;&nbsp; *anything*
+  * Optional. Defaults to undefined. A value that is passed on to the *onFulfilled* and *onSettled* callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -427,24 +422,24 @@ Reject a deferred instance.
 
 **Syntax**
 
-`d.reject( [args] )`
+`d.reject( [reason] )`
 
 **Parameters**
 
-* **args** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Arguments that are passed to the *fail* and *always* callbacks.
+* **reason** &nbsp;&mdash;&nbsp; *anything*
+  * Optional. Defaults to undefined. A value (reason) that is passed on to the *onRejected* and *onSettled* callbacks.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 Returns the instance that called the method.
 
-###.Deferred.prototype.done()
+###.Deferred.prototype.onFulfilled()
 
 Add a callback that will be called when the deferred is resolved.
 
 **Syntax**
 
-`d.done( callback )`
+`d.onFulfilled( callback )`
 
 **Parameters**
 
@@ -455,13 +450,13 @@ Add a callback that will be called when the deferred is resolved.
 
 Returns the instance that called the method.
 
-###.Deferred.prototype.fail()
+###.Deferred.prototype.onRejected()
 
 Add a callback that will be called when the deferred is rejected.
 
 **Syntax**
 
-`d.fail( callback )`
+`d.onRejected( callback )`
 
 **Parameters**
 
@@ -472,13 +467,13 @@ Add a callback that will be called when the deferred is rejected.
 
 Returns the instance that called the method.
 
-###.Deferred.prototype.always()
+###.Deferred.prototype.onSettled()
 
 Add a callback that will be called when the deferred is either resolved or rejected.
 
 **Syntax**
 
-`d.always( callback )`
+`d.onSettled( callback )`
 
 **Parameters**
 
@@ -491,17 +486,17 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. Returns a new deferred.
+Chain deferreds. Returns a new deferred. Errors will fall through until they are "caught" with another ".then()" (with onRejected callback defined) in the same chain.
 
 **Syntax**
 
-`d.then( [done] [, fail] )`
+`d.then( [onFulfilled] [, onRejected] )`
 
 **Parameters**
 
-* **done** &nbsp;&mdash;&nbsp; *function*
+* **onFulfilled** &nbsp;&mdash;&nbsp; *function*
   * Optional. A function that is called when the deferred is resolved.
-* **fail** &nbsp;&mdash;&nbsp; *function*
+* **onRejected** &nbsp;&mdash;&nbsp; *function*
   * Optional. A function that is called when the deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*

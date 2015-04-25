@@ -32,7 +32,7 @@
 
   function getModuleValue(moduleId) {
 
-    return palikka._modules[moduleId].value;
+    return palikka._modules[moduleId]._value;
 
   }
 
@@ -233,9 +233,9 @@
       }
     );
 
-    assert.strictEqual(palikka._modules.a.loaded, false);
+    assert.strictEqual(palikka._modules.a._loaded, false);
     setTimeout(function () {
-      assert.strictEqual(palikka._modules.a.loaded, true);
+      assert.strictEqual(palikka._modules.a._loaded, true);
       done();
     }, 1000);
 
@@ -252,9 +252,9 @@
     assert.strictEqual(success instanceof Array, true);
     assert.strictEqual(successMultiple instanceof Array, true);
     assert.strictEqual(fail instanceof Array, true);
-    assert.strictEqual(success[0].id, 'a');
-    assert.strictEqual(successMultiple[0].id, 'b');
-    assert.strictEqual(successMultiple[1].id, 'c');
+    assert.strictEqual(success[0]._id, 'a');
+    assert.strictEqual(successMultiple[0]._id, 'b');
+    assert.strictEqual(successMultiple[1]._id, 'c');
     assert.strictEqual(fail[0], undefined);
 
   });

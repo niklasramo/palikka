@@ -1,8 +1,15 @@
 /*!
+ * @license
  * Palikka v0.3.0-beta
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
+ */
+
+/**
+ * @todo Update tests.
+ * @todo Update docs.
+ * @todo Better error throwing.
  */
 
 (function (glob) {
@@ -23,7 +30,6 @@
   /** Private event hub + event names. */
   evHub,
   evInitiate = 'initiate',
-  evRegister = 'register',
   evResolve = 'resolve',
   evReject = 'reject',
 
@@ -40,7 +46,13 @@
   slice = ([]).slice,
 
   /** Check if strict mode is supported. */
-  isStrict = !this === true;
+  isStrict = !this === true,
+
+  /** Get reference to native Promise. */
+  nativePromise = isNative(glob.Promise),
+
+  /** Get reference to native setImmediate. */
+  nativeSetImmediate = isNative(glob.setImmediate);
 
   /*
    * Eventizer - Constructor
@@ -168,6 +180,67 @@
 
   };
 
+  /**
+   * Emit event asynchronously. Optionally one can provide context and additional arguments for the callback functions.
+   *
+   * @public
+   * @memberof Eventizer
+   * @param {string} type
+   * @param {array} [args]
+   * @param {*} [ctx]
+   * @returns {Eventizer} The instance on which this method was called.
+   */
+  Eventizer.prototype.emitAsync = function (type, args, ctx) {
+
+    var
+    instance = this;
+
+    execAsync(function () {
+
+      instance.emit(type, args, ctx);
+
+    });
+
+    return instance;
+
+  };
+
+  /*
+   * Eventizer - Helpers
+   * *******************
+   */
+
+  /**
+   * Eventize an object (if provided) or return a new Eventizer instance.
+   *
+   * @public
+   * @param {object} [obj]
+   * @param {object} [listeners]
+   * @returns {object|Eventizer}
+   */
+  function eventize(obj, listeners) {
+
+    var
+    eventizer = new Eventizer(listeners);
+
+    if (typeOf(obj, 'object')) {
+
+      obj._listeners = eventizer._listeners;
+      obj.on = eventizer.on;
+      obj.off = eventizer.off;
+      obj.emit = eventizer.emit;
+
+      return obj;
+
+    }
+    else {
+
+      return eventizer;
+
+    }
+
+  }
+
   /*
    * Deferred - Constructor
    * **********************
@@ -192,15 +265,7 @@
      * @protected
      * @type {string}
      */
-    instance._eRes = evResolve + '-' + id;
-
-    /**
-     * Instance's reject event name.
-     *
-     * @protected
-     * @type {string}
-     */
-    instance._eRej = evReject + '-' + id;
+    instance._id = ++deferredId;
 
     /**
      * Indicates if the instance can be resolved/rejected while in pending state. This property will be set to true on the first resolve/reject call.
@@ -235,9 +300,9 @@
           instance.resolve(val);
 
         },
-        function (val) {
+        function (reason) {
 
-          instance.reject(val);
+          instance.reject(reason);
 
         }
       );
@@ -348,7 +413,7 @@
   };
 
   /**
-   * Execute a callback function when the deferred is resolved.
+   * Execute a callback function asynchronously when the deferred is resolved.
    *
    * @public
    * @memberof Deferred.prototype
@@ -362,33 +427,37 @@
 
     isDeferred(instance);
 
-    if (typeOf(callback, 'function')) {
+    execAsync(function () {
 
-      if (instance._state === stateFulfilled) {
+      if (typeOf(callback, 'function')) {
 
-        callback(instance.result());
-
-      }
-
-      if (instance._state === statePending) {
-
-        evHub.on(instance._eRes, function (e) {
+        if (instance._state === stateFulfilled) {
 
           callback(instance.result());
-          evHub.off(e.type, e.fn);
 
-        });
+        }
+
+        if (instance._state === statePending) {
+
+          evHub.on(evResolve + instance._id, function (e) {
+
+            callback(instance.result());
+            evHub.off(e.type, e.fn);
+
+          });
+
+        }
 
       }
 
-    }
+    });
 
     return instance;
 
   };
 
   /**
-   * Execute a callback function when the deferred is rejected.
+   * Execute a callback function asynchronously when the deferred is rejected.
    *
    * @public
    * @memberof Deferred.prototype
@@ -402,33 +471,37 @@
 
     isDeferred(instance);
 
-    if (typeOf(callback, 'function')) {
+    execAsync(function () {
 
-      if (instance._state === stateRejected) {
+      if (typeOf(callback, 'function')) {
 
-        callback(instance.result());
-
-      }
-
-      if (instance._state === statePending) {
-
-        evHub.on(instance._eRej, function (e) {
+        if (instance._state === stateRejected) {
 
           callback(instance.result());
-          evHub.off(e.type, e.fn);
 
-        });
+        }
+
+        if (instance._state === statePending) {
+
+          evHub.on(evReject + instance._id, function (e) {
+
+            callback(instance.result());
+            evHub.off(e.type, e.fn);
+
+          });
+
+        }
 
       }
 
-    }
+    });
 
     return instance;
 
   };
 
   /**
-   * Execute a callback function when the deferred is resolved or rejected.
+   * Execute a callback function asynchronously when the deferred is resolved or rejected.
    *
    * @public
    * @memberof Deferred.prototype
@@ -462,9 +535,6 @@
     isFulfilled,
     fateCallback;
 
-    // TODO: this callback should be bound after next is returned.
-    // https://promisesaplus.com/
-    // Rule: 2.2.4
     instance.onSettled(function (instanceVal) {
 
       isFulfilled = instance.state() === stateFulfilled;
@@ -538,7 +608,7 @@
 
     instance._result = val;
     instance._state = stateFulfilled;
-    evHub.emit(instance._eRes, [val]);
+    evHub.emit(evResolve + instance._id, [val]);
 
   }
 
@@ -553,7 +623,7 @@
 
     instance._result = reason;
     instance._state = stateRejected;
-    evHub.emit(instance._eRej, [reason]);
+    evHub.emit(evReject + instance._id, [reason]);
 
   }
 
@@ -655,22 +725,18 @@
     instance = this;
 
     // Module data.
-    instance.id = id;
-    instance.value = undefined;
-    instance.loaded = false;
-    instance.locked = false;
-    instance.dependencies = dependencies;
-    instance.factory = factory;
+    instance._id = id;
+    instance._value = undefined;
+    instance._loaded = false;
+    instance._locked = false;
+    instance._dependencies = dependencies;
+    instance._factory = factory;
 
     // Add module to modules object.
     modules[id] = instance;
 
-    // Emit register events.
-    evHub.emit(evRegister + '-' + id, [instance]);
-    evHub.emit(evRegister, [instance]);
-
-    // Initiate.
-    loadDependencies(dependencies, function (depModules) {
+    // Load dependencies and initiate module.
+    loadDependenciesAsync(dependencies, function (depModules) {
 
       instance.process(depModules);
 
@@ -699,10 +765,10 @@
 
     };
 
-    if (typeOf(instance.factory, 'function')) {
+    if (typeOf(instance._factory, 'function')) {
 
       factoryCtx = {
-        id: instance.id,
+        id: instance._id,
         dependencies: {},
         async: function () {
 
@@ -713,13 +779,13 @@
         }
       };
 
-      arrayEach(instance.dependencies, function (depId) {
+      arrayEach(instance._dependencies, function (depId) {
 
-        factoryCtx.dependencies[depId] = modules[depId].value;
+        factoryCtx.dependencies[depId] = modules[depId]._value;
 
       });
 
-      factoryValue = instance.factory.apply(factoryCtx, depModules);
+      factoryValue = instance._factory.apply(factoryCtx, depModules);
 
       if (!factoryAsync) {
 
@@ -730,7 +796,7 @@
     }
     else {
 
-      factoryInit(instance.factory);
+      factoryInit(instance._factory);
 
     }
 
@@ -751,11 +817,11 @@
     var
     instance = this;
 
-    if (instance === modules[instance.id] && !instance.loaded) {
+    if (instance === modules[instance._id] && !instance._loaded) {
 
-      instance.value = value;
-      instance.loaded = true;
-      evHub.emit(evInitiate + '-' + instance.id, [instance]);
+      instance._value = value;
+      instance._loaded = true;
+      evHub.emit(evInitiate + '-' + instance._id, [instance]);
       evHub.emit(evInitiate, [instance]);
 
     }
@@ -768,6 +834,39 @@
    * Module - Helpers
    * ****************
    */
+
+  /**
+   * Define a single module or multiple modules. Returns an array that contains instances of all modules that were succesfully registered.
+   *
+   * @public
+   * @param {string|array} ids
+   * @param {array|string} [dependencies]
+   * @param {function|object} factory
+   * @returns {array}
+   */
+  function defineMultiple(ids, dependencies, factory) {
+
+    var
+    ret = [];
+
+    ids = typeOf(ids, 'array') ? ids : [ids];
+
+    arrayEach(ids, function (id) {
+
+      var
+      module = defineSingle(id, dependencies, factory);
+
+      if (module) {
+
+        ret.push(module);
+
+      }
+
+    });
+
+    return ret;
+
+  }
 
   /**
    * Define a module. Returns module instance if module registration was successful, otherwise returns false.
@@ -792,6 +891,27 @@
   }
 
   /**
+   * Require a module.
+   *
+   * @public
+   * @param {array|string} dependencies
+   * @param {function} callback
+   */
+  function require(dependencies, callback) {
+
+    if (typeOf(callback, 'function')) {
+
+      loadDependenciesAsync(sanitizeDependencies(dependencies), function (depModules) {
+
+        callback.apply(null, depModules);
+
+      });
+
+    }
+
+  }
+
+  /**
    * Sanitize dependencies argument of define and require methods.
    *
    * @private
@@ -808,7 +928,7 @@
   }
 
   /**
-   * Load module dependencies.
+   * Load module dependencies synchronously.
    *
    * @private
    * @param {array} dependencies
@@ -822,8 +942,9 @@
     tryResolve = function (module, i) {
 
       ++counter;
-      module.locked = true;
-      ret[i] = module.value;
+      module._locked = true;
+      ret[i] = module._value;
+
       if (counter === dependencies.length) {
 
         callback(ret);
@@ -839,7 +960,7 @@
         var
         module = modules[depId];
 
-        if (module && module.loaded) {
+        if (module && module._loaded) {
 
           tryResolve(module, i);
 
@@ -862,6 +983,50 @@
       callback(ret);
 
     }
+
+  }
+
+  /**
+   * Load module dependencies asynchronously.
+   *
+   * @private
+   * @param {array} dependencies
+   * @param {function} callback
+   */
+  function loadDependenciesAsync(dependencies, callback) {
+
+    execAsync(function () {
+
+      loadDependencies(dependencies, callback);
+
+    });
+
+  }
+
+  /**
+   * Returns a list of modules.
+   *
+   * @private
+   * @returns {object}
+   */
+  function listModules() {
+
+    var
+    ret = {},
+    module;
+
+    for (var prop in modules) {
+
+      module = modules[prop];
+      ret[module._id] = {
+        id: module._id,
+        loaded: module._loaded,
+        value: module._value
+      };
+
+    }
+
+    return ret;
 
   }
 
@@ -945,17 +1110,48 @@
   }
 
   /**
-   * Public API
-   * **********
+   * Execute function asynchronously in the next event loop.
+   *
+   * @private
+   * @param {function} fn
    */
+  function execAsync(fn) {
+
+    if (nativePromise) {
+
+      nativePromise.resolve().then(fn);
+
+    }
+    else if (nativeSetImmediate) {
+
+      nativeSetImmediate(fn);
+
+    }
+    else {
+
+      glob.setTimeout(fn, 0);
+
+    }
+
+  }
 
   /**
-   * Module storage object.
+   * Check if a function is native code. Returns the passed function if it is native code and otherwise returns false.
    *
-   * @protected
-   * @type {object}
+   * @private
+   * @param {function} fn
+   * @returns {function|false}
    */
-  lib._modules = modules;
+  function isNative(fn) {
+
+    return typeOf(fn, 'function') && fn.toString().indexOf('[native') > -1 && fn;
+
+  }
+
+  /**
+   * Public API - Eventizer
+   * **********************
+   */
 
   /**
    * @public
@@ -965,15 +1161,43 @@
 
   /**
    * @public
-   * @see Deferred
+   * @see eventize
    */
-  lib.Deferred = Deferred;
+  lib.eventize = eventize;
+
+  /**
+   * Public API - Modules
+   * ********************
+   */
 
   /**
    * @public
-   * @see Module
+   * @see defineMultiple
    */
-  lib.Module = Module;
+  lib.define = defineMultiple;
+
+  /**
+   * @public
+   * @see require
+   */
+  lib.require = require;
+
+  /**
+   * @public
+   * @see listModules
+   */
+  lib.list = listModules;
+
+  /**
+   * Public API - Deferred
+   * *********************
+   */
+
+  /**
+   * @public
+   * @see Deferred
+   */
+  lib.Deferred = Deferred;
 
   /**
    * @public
@@ -982,128 +1206,21 @@
   lib.when = when;
 
   /**
+   * Public API - Utils
+   * ******************
+   */
+
+  /**
    * @public
    * @see typeOf
    */
   lib.typeOf = typeOf;
 
   /**
-   * Define a single module or multiple modules. Returns an array that contains instances of all modules that were succesfully registered.
-   *
    * @public
-   * @param {string|array} ids
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
-   * @returns {array}
+   * @see execAsync
    */
-  lib.define = function (ids, dependencies, factory) {
-
-    var
-    ret = [];
-
-    ids = typeOf(ids, 'array') ? ids : [ids];
-
-    arrayEach(ids, function (id) {
-
-      var
-      module = defineSingle(id, dependencies, factory);
-
-      if (module) {
-
-        ret.push(module);
-
-      }
-
-    });
-
-    return ret;
-
-  };
-
-  /**
-   * Undefine a module. Returns an array tha contains id's of all modules that were undefined successfully, otherwise returns false.
-   *
-   * @public
-   * @param {string|array} ids
-   * @returns {array}
-   */
-  lib.undefine = function (ids) {
-
-    var
-    ret = [];
-
-    ids = typeOf(ids, 'array') ? ids : [ids];
-
-    arrayEach(ids, function (id) {
-
-      var
-      module = modules[id],
-      isLocked = module && module.locked;
-
-      if (module && !isLocked) {
-
-        delete modules[id];
-        ret.push(id);
-
-      }
-
-    });
-
-    return ret;
-
-  };
-
-  /**
-   * Require a module.
-   *
-   * @public
-   * @param {array|string} dependencies
-   * @param {function} callback
-   */
-  lib.require = function (dependencies, callback) {
-
-    if (typeOf(callback, 'function')) {
-
-      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
-
-        callback.apply(null, depModules);
-
-      });
-
-    }
-
-  };
-
-  /**
-   * Eventize an object (if provided) or return a new Eventizer instance.
-   *
-   * @public
-   * @param {object} [obj]
-   * @param {object} [listeners]
-   * @returns {object|Eventizer}
-   */
-  lib.eventize = function (obj, listeners) {
-
-    var
-    eventizer = new Eventizer(listeners);
-
-    if (typeOf(obj, 'object')) {
-
-      obj._listeners = eventizer._listeners;
-      obj.on = eventizer.on;
-      obj.off = eventizer.off;
-      obj.emit = eventizer.emit;
-
-      return obj;
-
-    }
-    else {
-
-      return eventizer;
-
-    }
-
-  };
+  lib.execAsync = execAsync;
 
   /**
    * Initiate
@@ -1117,14 +1234,14 @@
    * Publish library using an adapted UMD pattern.
    * https://github.com/umdjs/umd
    */
-  if (typeOf(glob.define, 'function') && define.amd) {
+  if (typeOf(glob.define, 'function') && glob.define.amd) {
 
-    define([], lib);
+    glob.define([], lib);
 
   }
   else if (typeOf(glob.exports, 'object')) {
 
-    module.exports = lib;
+    glob.module.exports = lib;
 
   }
   else {
