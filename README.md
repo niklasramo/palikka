@@ -8,7 +8,7 @@ A compact and well-tested JavaScript module/event/promise system that works in t
 
 ##Features
 
-* Lightweight, around 4.6kb minified.
+* Lightweight, around 5kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase.
 * Comprehensive unit tests.

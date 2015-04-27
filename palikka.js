@@ -6,10 +6,11 @@
  * Released under the MIT license
  */
 
-/**
- * @todo Update tests.
- * @todo Update docs.
- * @todo Better error throwing.
+/*
+ * @todo The API should be designed in a way where Modules are the main thing and Eventizer/Deferred are just utilities.
+ * @todo An easy way to import third party libraries as modules.
+ * @todo Use different eventizer instances for deferreds and modules.
+ * @todo Update tests and docs.
  */
 
 (function (glob) {
@@ -229,6 +230,7 @@
       obj.on = eventizer.on;
       obj.off = eventizer.off;
       obj.emit = eventizer.emit;
+      obj.emitAsync = eventizer.emitAsync;
 
       return obj;
 
@@ -256,8 +258,7 @@
   function Deferred(callback) {
 
     var
-    instance = this,
-    id = ++deferredId;
+    instance = this;
 
     /**
      * Instance's resolve event name.
@@ -320,8 +321,6 @@
    */
   Deferred.prototype.state = function () {
 
-    isDeferred(this);
-
     return this._state;
 
   };
@@ -334,8 +333,6 @@
    * @returns {*}
    */
   Deferred.prototype.result = function () {
-
-    isDeferred(this);
 
     return this._result;
 
@@ -353,8 +350,6 @@
 
     var
     instance = this;
-
-    isDeferred(instance);
 
     if (instance._state === statePending && !instance._locked) {
 
@@ -399,8 +394,6 @@
     var
     instance = this;
 
-    isDeferred(instance);
-
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
@@ -424,8 +417,6 @@
 
     var
     instance = this;
-
-    isDeferred(instance);
 
     execAsync(function () {
 
@@ -469,8 +460,6 @@
     var
     instance = this;
 
-    isDeferred(instance);
-
     execAsync(function () {
 
       if (typeOf(callback, 'function')) {
@@ -510,8 +499,6 @@
    */
   Deferred.prototype.onSettled = function (callback) {
 
-    isDeferred(this);
-
     return this.onFulfilled(callback).onRejected(callback);
 
   };
@@ -526,8 +513,6 @@
    * @returns {Deferred} Creates a new deferred.
    */
   Deferred.prototype.then = function (onFulfilled, onRejected) {
-
-    isDeferred(this);
 
     var
     instance = this,
@@ -577,15 +562,13 @@
    *
    * @public
    * @memberof Deferred.prototype
-   * @param {*} deferreds
+   * @param {array} deferreds
    * @param {boolean} [resolveOnFirst=false]
    * @param {boolean} [rejectOnFirst=true]
    * @returns {Deferred} A new deferred.
    */
   Deferred.prototype.and = function (deferreds, resolveOnFirst, rejectOnFirst) {
 
-    isDeferred(this);
-    deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
     deferreds.unshift(this);
 
     return when(deferreds, resolveOnFirst, rejectOnFirst);
@@ -628,40 +611,18 @@
   }
 
   /**
-   * Check if a value is a deferred instance. By default throws a type error if test fails, but can be configured not to throw error.
-   *
-   * @private
-   * @param {*} val
-   * @param {boolean} [noError=false]
-   * @returns {boolean}
-   */
-  function isDeferred(val, noError) {
-
-    var
-    ret = val instanceof Deferred;
-
-    if (!noError && !ret) {
-
-      throw TypeError(this + ' is not a promise');
-
-    }
-
-    return ret;
-
-  }
-
-  /**
    * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
    *
    * @private
-   * @param {*} deferreds
+   * @param {array} deferreds
    * @param {boolean} [resolveOnFirst=false]
    * @param {boolean} [rejectOnFirst=true]
    * @returns {Deferred} A new deferred.
    */
   function when(deferreds, resolveOnFirst, rejectOnFirst) {
 
-    deferreds = typeOf(deferreds, 'array') ? deferreds : [deferreds];
+    /** @todo Throw error if deferreds is not array. */
+
     resolveOnFirst = resolveOnFirst === true;
     rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
 
@@ -671,35 +632,44 @@
     counter = deferreds.length,
     firstRejection;
 
-    arrayEach(deferreds, function (deferred, i) {
+    if (counter) {
 
-      deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
+      arrayEach(deferreds, function (deferred, i) {
 
-      deferred.onSettled(function () {
+        deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
 
-        if (master.state() === 'pending' && !master._locked) {
+        deferred.onSettled(function () {
 
-          --counter;
-          firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
-          masterArgs[i] = deferred.result();
+          if (master.state() === 'pending' && !master._locked) {
 
-          if (firstRejection && (rejectOnFirst || !counter)) {
+            --counter;
+            firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
+            masterArgs[i] = deferred.result();
 
-            master.reject(firstRejection.result());
+            if (firstRejection && (rejectOnFirst || !counter)) {
+
+              master.reject(firstRejection.result());
+
+            }
+
+            if (!firstRejection && (resolveOnFirst || !counter)) {
+
+              master.resolve(resolveOnFirst ? masterArgs[i] : masterArgs);
+
+            }
 
           }
 
-          if (!firstRejection && (resolveOnFirst || !counter)) {
-
-            master.resolve(resolveOnFirst ? masterArgs[i] : masterArgs);
-
-          }
-
-        }
+        });
 
       });
 
-    });
+    }
+    else {
+
+      master.resolve(masterArgs);
+
+    }
 
     return master;
 
@@ -722,111 +692,78 @@
   function Module(id, dependencies, factory) {
 
     var
-    instance = this;
+    instance = this,
+    deferred = new Deferred(),
+    factoryCtx,
+    factoryValue;
 
     // Module data.
     instance._id = id;
-    instance._value = undefined;
-    instance._loaded = false;
-    instance._locked = false;
     instance._dependencies = dependencies;
     instance._factory = factory;
+    instance._deferred = deferred;
 
     // Add module to modules object.
     modules[id] = instance;
 
-    // Load dependencies and initiate module.
-    loadDependenciesAsync(dependencies, function (depModules) {
+    // Emit initiation event when module is loaded.
+    deferred.onFulfilled(function () {
 
-      instance.process(depModules);
+      evHub.emit(evInitiate + '-' + id, [instance]);
+
+    });
+
+    // Load dependencies and resolve factory value.
+    loadDependencies(dependencies, function (depModules) {
+
+      console.log('moro');
+
+      if (typeOf(factory, 'function')) {
+
+        factoryCtx = {
+          id: id,
+          dependencies: {}
+        };
+
+        arrayEach(dependencies, function (depId, i) {
+
+          factoryCtx.dependencies[depId] = depModules[i];
+
+        });
+
+        factoryValue = factory.apply(factoryCtx, depModules);
+
+      }
+      else {
+
+        factoryValue = factory;
+
+      }
+
+      deferred.resolve(factoryValue);
 
     });
 
   }
 
   /**
-   * Process module factory.
+   * Get module instance info.
    *
    * @public
-   * @memberof Module
-   * @param {array} depModules
-   * @returns {Module} The instance on which this method was called.
+   * @memberof Module.prototype
+   * @returns {object}
    */
-  Module.prototype.process = function (depModules) {
-
-    var
-    instance = this,
-    factoryCtx,
-    factoryValue,
-    factoryAsync,
-    factoryInit = function (val) {
-
-      instance.initiate(arguments.length ? val : factoryValue);
-
-    };
-
-    if (typeOf(instance._factory, 'function')) {
-
-      factoryCtx = {
-        id: instance._id,
-        dependencies: {},
-        async: function () {
-
-          factoryAsync = true;
-
-          return factoryInit;
-
-        }
-      };
-
-      arrayEach(instance._dependencies, function (depId) {
-
-        factoryCtx.dependencies[depId] = modules[depId]._value;
-
-      });
-
-      factoryValue = instance._factory.apply(factoryCtx, depModules);
-
-      if (!factoryAsync) {
-
-        factoryInit(factoryValue);
-
-      }
-
-    }
-    else {
-
-      factoryInit(instance._factory);
-
-    }
-
-    return instance;
-
-  };
-
-  /**
-   * Initiate module.
-   *
-   * @public
-   * @memberof Module
-   * @param {*} value
-   * @returns {Module} The instance on which this method was called.
-   */
-  Module.prototype.initiate = function (value) {
+  Module.prototype.info = function () {
 
     var
     instance = this;
 
-    if (instance === modules[instance._id] && !instance._loaded) {
-
-      instance._value = value;
-      instance._loaded = true;
-      evHub.emit(evInitiate + '-' + instance._id, [instance]);
-      evHub.emit(evInitiate, [instance]);
-
-    }
-
-    return instance;
+    return {
+      id: instance._id,
+      state: instance._deferred.state(),
+      dependencies: copyArray(instance._dependencies),
+      value: instance._deferred.result()
+    };
 
   };
 
@@ -901,7 +838,7 @@
 
     if (typeOf(callback, 'function')) {
 
-      loadDependenciesAsync(sanitizeDependencies(dependencies), function (depModules) {
+      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
 
         callback.apply(null, depModules);
 
@@ -928,7 +865,7 @@
   }
 
   /**
-   * Load module dependencies synchronously.
+   * Load module dependencies asynchronously.
    *
    * @private
    * @param {array} dependencies
@@ -937,92 +874,60 @@
   function loadDependencies(dependencies, callback) {
 
     var
-    ret = [],
-    counter = 0,
-    tryResolve = function (module, i) {
+    defers = [];
 
-      ++counter;
-      module._locked = true;
-      ret[i] = module._value;
+    arrayEach(dependencies, function (depId) {
 
-      if (counter === dependencies.length) {
+      var
+      module = modules[depId];
 
-        callback(ret);
+      defers.push(module ? module._deferred : new Deferred(function (resolve) {
 
-      }
+        evHub.on(evInitiate + '-' + depId, function (ev, module) {
 
-    };
+          evHub.off(ev.type, ev.fn);
+          resolve(module._deferred.result());
 
-    if (dependencies.length) {
+        });
 
-      arrayEach(dependencies, function (depId, i) {
-
-        var
-        module = modules[depId];
-
-        if (module && module._loaded) {
-
-          tryResolve(module, i);
-
-        }
-        else {
-
-          evHub.on(evInitiate + '-' + depId, function (ev, module) {
-
-            evHub.off(ev.type, ev.fn);
-            tryResolve(module, i);
-
-          });
-
-        }
-
-      });
-    }
-    else {
-
-      callback(ret);
-
-    }
-
-  }
-
-  /**
-   * Load module dependencies asynchronously.
-   *
-   * @private
-   * @param {array} dependencies
-   * @param {function} callback
-   */
-  function loadDependenciesAsync(dependencies, callback) {
-
-    execAsync(function () {
-
-      loadDependencies(dependencies, callback);
+      }));
 
     });
 
+    when(defers).then(callback);
+
   }
 
   /**
-   * Returns a list of modules.
+   * Returns info about all modules or a single module. Returns null if no modules are found.
    *
    * @private
-   * @returns {object}
+   * @param {number} id
+   * @returns {null|object}
    */
-  function listModules() {
+  function moduleData(id) {
 
     var
-    ret = {},
-    module;
+    ret = null;
 
-    for (var prop in modules) {
+    if (id) {
 
-      module = modules[prop];
-      ret[module._id] = {
-        id: module._id,
-        loaded: module._loaded,
-        value: module._value
-      };
+      if (id in modules) {
+
+        ret = modules[id].info();
+
+      }
+
+    }
+    else {
+
+      ret = {};
+
+      for (var prop in modules) {
+
+        ret[prop] = modules[prop].info();
+
+      }
 
     }
 
@@ -1062,6 +967,37 @@
     }
 
     return isType ? type === isType : type;
+
+  }
+
+  /**
+   * Throw an error if a value is not of the expected type.
+   *
+   * @private
+   * @param {*} val
+   * @param {*} type
+   */
+  function typeCheck(val, type) {
+
+    var
+    ok = false,
+    typeArray = type.split('/');
+
+    arrayEach(typeArray, function (typeVariation) {
+
+      if (!ok) {
+
+        ok = typeVariation === 'deferred' ? val instanceof Deferred : typeOf(val, typeVariation);
+
+      }
+
+    });
+
+    if (!ok) {
+
+      throw TypeError(this + ' is not ' + type);
+
+    }
 
   }
 
@@ -1184,9 +1120,9 @@
 
   /**
    * @public
-   * @see listModules
+   * @see moduleData
    */
-  lib.list = listModules;
+  lib.moduleData = moduleData;
 
   /**
    * Public API - Deferred
