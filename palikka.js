@@ -10,6 +10,8 @@
  * @todo The API should be designed in a way where Modules are the main thing and Eventizer/Deferred are just utilities.
  * @todo An easy way to import third party libraries as modules.
  * @todo Use different eventizer instances for deferreds and modules.
+ * @todo define should not return Moudle objects anymore, just data objects.
+ * @todo A better name for moduleData method.
  * @todo Update tests and docs.
  */
 
@@ -715,8 +717,6 @@
 
     // Load dependencies and resolve factory value.
     loadDependencies(dependencies, function (depModules) {
-
-      console.log('moro');
 
       if (typeOf(factory, 'function')) {
 
