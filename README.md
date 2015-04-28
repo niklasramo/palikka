@@ -4,11 +4,11 @@
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Well, both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant.
+A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The goal of this project is to provide a solid module/event/promise system with only the essential features.
 
 ##Features
 
-* Lightweight, around 5kb minified.
+* Lightweight, less than 5kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase.
 * Comprehensive unit tests.
@@ -28,19 +28,11 @@ palikka.define('foo', ['bar'], function (bar) {
 // Define module "bar"
 palikka.define('bar', function () {
 
-  // Let's use asynchronous initiation
-  var init = this.async();
-
-  // Let's use promises (deferred)
-  var getSomeData = new palikka.Deferred(function (resolve, reject) {
+  // Let's use promises (deferred) to delay the initiation
+  return new palikka.Deferred(function (resolve, reject) {
     window.setTimeout(function () {
       resolve('bar');
     }, 1000);
-  });
-
-  // When data is fetched initiate module
-  getSomeData.onFulfilled(function (val) {
-    init(val);
   });
 
 });
@@ -56,7 +48,6 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 **[Modules](#modules)**
 
 * [.define()](#define)
-* [.undefine()](#undefine)
 * [.require()](#require)
 
 **[Events](#events)**
@@ -74,16 +65,14 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 * [.Deferred.prototype.result()](#deferredprototyperesult)
 * [.Deferred.prototype.resolve()](#deferredprototyperesolve)
 * [.Deferred.prototype.reject()](#deferredprototypereject)
-* [.Deferred.prototype.onFulfilled()](#deferredprototypeonFulfilled)
-* [.Deferred.prototype.onRejected()](#deferredprototypeonRejected)
-* [.Deferred.prototype.onSettled()](#deferredprototypeonSettled)
+* [.Deferred.prototype.onFulfilled()](#deferredprototypeonfulfilled)
+* [.Deferred.prototype.onRejected()](#deferredprototypeonrejected)
+* [.Deferred.prototype.onSettled()](#deferredprototypeonsettled)
 * [.Deferred.prototype.then()](#deferredprototypethen)
 * [.Deferred.prototype.and()](#deferredprototypeand)
 * [.when()](#when)
 
 ##Modules
-
-All modules are stored in private `palikka._modules` object, which holds the modue instances.
 
 ###.define()
 
@@ -102,12 +91,11 @@ Define a module. Please avoid defining circular modules (when two modules depend
 * **factory** &nbsp;&mdash;&nbsp; *function / object*
   * this.id &nbsp;&mdash;&nbsp; *string*
   * this.dependencies &nbsp;&mdash;&nbsp; *object*
-  * this.async &nbsp;&mdash;&nbsp; *function*
-  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. The factory callback receives the dependency modules as it's function arguments. The context's (this) async property is a function which defers the module's initiation upon execution and returns a new function that must be exectued in order to finish the module defintion.
+  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. If the return value is a deferred instance the module will be initiated when the deferred is resolved with the deferred's value assigned as the module's value.
 
 **Returns** &nbsp;&mdash;&nbsp; *array*
 
-Returns an array which contains instances of all modules that were successfully registered.
+Returns an array which contains ids of all modules that were successfully registered. If the array is empty it means that the module(s) was not registered, which is probably because a module with the same id already exists.
 
 **Usage**
 
@@ -125,12 +113,13 @@ palikka.define('foobar', ['foo', 'bar'], function (foo, bar) {
   return foo + bar.bar;
 });
 
-// Define a module using async initiation.
-palikka.define('async', function () {
-  var init = this.async();
-  window.setTimeout(function () {
-    init('I am an asynchronous module!');
-  }, 2000);
+// Define a module using delayed initiation.
+palikka.define('delayed', function () {
+  return new palikka.Deferred(function (resolve) {
+    window.setTimeout(function () {
+      resolve('I am delayed...');
+    }, 2000);
+  });
 });
 
 // Define multiple modules at once.
@@ -141,45 +130,9 @@ palikka.define(['a', 'b'], function () {
 });
 ```
 
-###.undefine()
-
-Undefine a module. Please keep in mind that if any other `define` or `require` instance depends on the module it cannot be undefined.
-
-**Syntax**
-
-`palikka.undefine( ids )`
-
-**Parameters**
-
-* **ids** &nbsp;&mdash;&nbsp; *array / string*
-  * Ids of the modules.
-
-**Returns** &nbsp;&mdash;&nbsp; *array*
-
-Returns ids of all modules that were successfully undefined.
-
-**Usage**
-
-```javascript
-palikka.define('foo', function () {
-  return 'foo';
-});
-palikka.define('bar', ['foo'], function () {
-  return 'bar';
-});
-
-// "foo" module can not be undefined since
-// it is required by module "bar" already.
-palikka.undefine('foo'); // []
-
-// "bar" module can be undefined since it is
-// not required by other modules yet.
-palikka.undefine('bar'); // ['bar']
-```
-
 ###.require()
 
-Require a module.
+Require a module. Loads modules at your disposal when they are loaded.
 
 **Syntax**
 
@@ -190,7 +143,7 @@ Require a module.
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
   * Refer to `.define()` method's dependencies parameter description.
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * The callback function that will be executed after all dependencies have loaded. Receives the required dependency modules as it's function arguments. If dependencies are defined as an object the module references are stored in a single data object which is accesible via the first function argument. In other cases the dependency modules are provided as function arguments in the same order they are defined in dependency argument.
+  * The callback function that will be executed after all dependencies have loaded. Receives the required dependency modules as function arguments in the same order they were required.
 
 **Usage**
 
@@ -318,7 +271,7 @@ Returns a new Eventizer instance or the object provided as **obj** argument.
 
 ###.Deferred()
 
-A constructor function that creates a deferred instance. The deferred is "thenable" and  Promises/A+ compliant. The API is based on jQuery's Deferred implementation and is Promises/A+ compatible.
+A constructor function that creates a deferred instance. The deferred is "thenable" and almost Promises/A+ compliant (slight deviations were made in favour of usability).
 
 **Syntax**
 
@@ -386,9 +339,9 @@ Retrieve the result value (the arguments with which the instance was resolved/re
 
 `d.result()`
 
-**Returns** &nbsp;&mdash;&nbsp; *undefined / array*
+**Returns** &nbsp;&mdash;&nbsp; *anything*
 
-Returns undefined if deferred is pending otherwise returns an array which contains the resolve/reject arguments.
+Returns undefined if deferred is pending otherwise returnsthe value the deferred was resolved/rejected with.
 
 **Usage**
 
@@ -486,7 +439,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. Returns a new deferred. Errors will fall through until they are "caught" with another ".then()" (with onRejected callback defined) in the same chain.
+Chain deferreds. Returns a new deferred. Errors will "fall through" until they are "caught" with another ".then()" (with onRejected callback defined) in the same chain.
 
 **Syntax**
 
@@ -507,11 +460,16 @@ Returns a new deferred.
 
 Returns a deferred that resolves when all of the arguments and the instance have resolved. The returned "master" deferred is rejected instantly if one of the arguments is rejected.
 
-`d.and( [deferreds] )`
+`d.and( deferreds [, resolveOnFirst] [, rejectOnFirst] )`
 
 **Parameters**
 
-* **deferreds** &nbsp;&mdash;&nbsp; *anything*
+* **deferreds** &nbsp;&mdash;&nbsp; *array*
+  * An array of deferreds, or any other values.
+* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+  * Optional. Defaults to false.
+* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+  * Optional. Defaults to true.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -527,9 +485,12 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 
 **Parameters**
 
-* **deferreds** &nbsp;&mdash;&nbsp; *anything*
+* **deferreds** &nbsp;&mdash;&nbsp; *array*
+  * An array of deferreds, or any other values.
 * **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+  * Optional. Defaults to false.
 * **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+  * Optional. Defaults to true.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 

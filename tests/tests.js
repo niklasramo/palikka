@@ -12,7 +12,7 @@
 
   Q.test('Modules.', function (assert) {
 
-    assert.expect(12);
+    assert.expect(35);
     var done = assert.async();
 
     var
@@ -60,13 +60,13 @@
     });
 
     // Get module data before it is initiated.
-    m1Data = palikka.moduleData(m1);
+    m1Data = palikka._modules(m1);
 
     // Module data id should always be an array.
     assert.strictEqual(m1Data.id, m1);
 
-    // Module state should always be "pending" before initiation.
-    assert.strictEqual(m1Data.state, 'pending');
+    // Module state should not be ready before initiation.
+    assert.strictEqual(m1Data.ready, false);
 
     // Module data value should always be undefined before factory is processed.
     assert.strictEqual(m1Data.value, undefined);
@@ -93,15 +93,80 @@
       assert.strictEqual('FAIL: Module was overriden.', 0);
     });
 
-    // @todo Define multiple modules with a single dependency.
+    // Define multiple modules with a single dependency.
+    palikka.define([m2, m3], m4, function (val) {
 
-    // @todo Define a single module with multiple dependencies.
+      // There should be as many arguments as there are required modules.
+      assert.strictEqual(arguments.length, 1);
 
-    // @todo Factory value as a deferred instance.
+      // Dependency values should be assigned as function arguments in the order they were defined.
+      assert.strictEqual(val, m4Val);
+
+      return this.id === m2 ? m2Val : m3Val;
+
+    });
+
+    // Define a single module with multiple dependencies.
+    palikka.define(m5, [m1, m2, m3, m4], function (val1, val2, val3, val4) {
+
+      // There should be as many arguments as there are required modules.
+      assert.strictEqual(arguments.length, 4);
+
+      // Dependency values should be assigned as function arguments in the order they were defined.
+      assert.strictEqual(val1, m1Val);
+      assert.strictEqual(val2, m2Val);
+      assert.strictEqual(val3, m3Val);
+      assert.strictEqual(val4, m4Val);
+
+      // Context dependencies should match the function arguments.
+      assert.strictEqual(this.dependencies[m1], m1Val);
+      assert.strictEqual(this.dependencies[m2], m2Val);
+      assert.strictEqual(this.dependencies[m3], m3Val);
+      assert.strictEqual(this.dependencies[m4], m4Val);
+
+      /** Deferred as a return value. */
+      return new palikka.Deferred(function (resolve) {
+        window.setTimeout(function () {
+          resolve(m5Val);
+        }, 100);
+      });
+
+    });
+
+    palikka.define(m4, [m1], function () {
+
+      return m4Val;
+
+    });
+
+    /** Check that data matches. */
+    window.setTimeout(function () {
+
+      var
+      m1Data = palikka._modules(m1),
+      m2Data = palikka._modules(m2),
+      m3Data = palikka._modules(m3),
+      m4Data = palikka._modules(m4),
+      m5Data = palikka._modules(m5);
+
+      /** Check module values. */
+      assert.strictEqual(m1Data.value, m1Val);
+      assert.strictEqual(m2Data.value, m2Val);
+      assert.strictEqual(m3Data.value, m3Val);
+      assert.strictEqual(m4Data.value, m4Val);
+      assert.strictEqual(m5Data.value, m5Val);
+
+      /** Check module states. */
+      assert.strictEqual(m1Data.ready, true);
+      assert.strictEqual(m2Data.ready, true);
+      assert.strictEqual(m3Data.ready, true);
+      assert.strictEqual(m4Data.ready, true);
+      assert.strictEqual(m5Data.ready, true);
+
+    }, 200);
 
     // @todo define return values
-
-    // @todo moduleData return values.
+    // @todo _modules return values.
 
     window.setTimeout(done, 1000);
 
@@ -365,7 +430,7 @@
 
     });
 
-    // Test fail callback execution, context and arguments.
+    /** Test fail callback execution, context and arguments. */
     (new palikka.Deferred())
     .reject()
     .then(
@@ -383,7 +448,7 @@
       }
     );
 
-    // Test fail callback arguments.
+    /** Test fail callback arguments. */
     (new palikka.Deferred())
     .reject(1,2,3)
     .then(null, function (val) {
@@ -393,7 +458,7 @@
 
     });
 
-    // Test chaining.
+    /** Test chaining. */
     var a = new palikka.Deferred();
     var b = a.then();
     var c = b.then();
@@ -402,7 +467,7 @@
     assert.strictEqual(b !== a, true);
     assert.strictEqual(c !== b, true);
 
-    // Test error throwing / catching.
+    /** @todo Test error throwing / catching. */
 
     setTimeout(function () {
       done();
@@ -529,28 +594,28 @@
 
   });
 
-  Q.test('Utils - typeOf', function (assert) {
+  Q.test('Utils - _typeOf', function (assert) {
 
     assert.expect(24);
 
     // Primitive (immutable) values
 
-    assert.strictEqual(palikka.typeOf(null), 'null');
-    assert.strictEqual(palikka.typeOf(undefined), 'undefined');
-    assert.strictEqual(palikka.typeOf(true), 'boolean');
-    assert.strictEqual(palikka.typeOf(false), 'boolean');
-    assert.strictEqual(palikka.typeOf(new Boolean()), 'boolean');
-    assert.strictEqual(palikka.typeOf(''), 'string');
-    assert.strictEqual(palikka.typeOf('1'), 'string');
-    assert.strictEqual(palikka.typeOf(new String()), 'string');
-    assert.strictEqual(palikka.typeOf(-1), 'number');
-    assert.strictEqual(palikka.typeOf(0), 'number');
-    assert.strictEqual(palikka.typeOf(1), 'number');
-    assert.strictEqual(palikka.typeOf(NaN), 'number');
-    assert.strictEqual(palikka.typeOf(Infinity), 'number');
-    assert.strictEqual(palikka.typeOf(new Number()), 'number');
+    assert.strictEqual(palikka._typeOf(null), 'null');
+    assert.strictEqual(palikka._typeOf(undefined), 'undefined');
+    assert.strictEqual(palikka._typeOf(true), 'boolean');
+    assert.strictEqual(palikka._typeOf(false), 'boolean');
+    assert.strictEqual(palikka._typeOf(new Boolean()), 'boolean');
+    assert.strictEqual(palikka._typeOf(''), 'string');
+    assert.strictEqual(palikka._typeOf('1'), 'string');
+    assert.strictEqual(palikka._typeOf(new String()), 'string');
+    assert.strictEqual(palikka._typeOf(-1), 'number');
+    assert.strictEqual(palikka._typeOf(0), 'number');
+    assert.strictEqual(palikka._typeOf(1), 'number');
+    assert.strictEqual(palikka._typeOf(NaN), 'number');
+    assert.strictEqual(palikka._typeOf(Infinity), 'number');
+    assert.strictEqual(palikka._typeOf(new Number()), 'number');
     if (window.Symbol) {
-      assert.strictEqual(palikka.typeOf(Symbol()), 'symbol');
+      assert.strictEqual(palikka._typeOf(Symbol()), 'symbol');
     }
     else {
       assert.strictEqual(true, true);
@@ -558,21 +623,21 @@
 
     // Objects
 
-    assert.strictEqual(palikka.typeOf({}), 'object');
-    assert.strictEqual(palikka.typeOf(new Object()), 'object');
+    assert.strictEqual(palikka._typeOf({}), 'object');
+    assert.strictEqual(palikka._typeOf(new Object()), 'object');
 
-    assert.strictEqual(palikka.typeOf([]), 'array');
-    assert.strictEqual(palikka.typeOf(new Array()), 'array');
+    assert.strictEqual(palikka._typeOf([]), 'array');
+    assert.strictEqual(palikka._typeOf(new Array()), 'array');
 
-    assert.strictEqual(palikka.typeOf(function () {}), 'function');
-    assert.strictEqual(palikka.typeOf(new Function()), 'function');
+    assert.strictEqual(palikka._typeOf(function () {}), 'function');
+    assert.strictEqual(palikka._typeOf(new Function()), 'function');
 
-    assert.strictEqual(palikka.typeOf(new Date()), 'date');
+    assert.strictEqual(palikka._typeOf(new Date()), 'date');
 
     // Specials
 
-    assert.strictEqual(palikka.typeOf(JSON), 'json');
-    assert.strictEqual(palikka.typeOf(arguments), 'arguments');
+    assert.strictEqual(palikka._typeOf(JSON), 'json');
+    assert.strictEqual(palikka._typeOf(arguments), 'arguments');
 
     // DOM (todo)
 

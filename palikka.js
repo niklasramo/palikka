@@ -6,15 +6,6 @@
  * Released under the MIT license
  */
 
-/*
- * @todo The API should be designed in a way where Modules are the main thing and Eventizer/Deferred are just utilities.
- * @todo An easy way to import third party libraries as modules.
- * @todo Use different eventizer instances for deferreds and modules.
- * @todo define should not return Moudle objects anymore, just data objects.
- * @todo A better name for moduleData method.
- * @todo Update tests and docs.
- */
-
 (function (glob) {
 
   'use strict';
@@ -282,7 +273,7 @@
      * The instance's result value is stored here.
      *
      * @protected
-     * @type {undefined|array}
+     * @type {*}
      */
     instance._result = undefined;
 
@@ -616,14 +607,12 @@
    * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
    *
    * @private
-   * @param {array} deferreds
-   * @param {boolean} [resolveOnFirst=false]
-   * @param {boolean} [rejectOnFirst=true]
+   * @param {array|arguments} deferreds
+   * @param {boolean|undefined} [resolveOnFirst=false]
+   * @param {boolean|undefined} [rejectOnFirst=true]
    * @returns {Deferred} A new deferred.
    */
   function when(deferreds, resolveOnFirst, rejectOnFirst) {
-
-    /** @todo Throw error if deferreds is not array. */
 
     resolveOnFirst = resolveOnFirst === true;
     rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
@@ -702,7 +691,6 @@
     // Module data.
     instance._id = id;
     instance._dependencies = dependencies;
-    instance._factory = factory;
     instance._deferred = deferred;
 
     // Add module to modules object.
@@ -760,7 +748,7 @@
 
     return {
       id: instance._id,
-      state: instance._deferred.state(),
+      ready: instance._deferred.state() === stateFulfilled,
       dependencies: copyArray(instance._dependencies),
       value: instance._deferred.result()
     };
@@ -773,10 +761,10 @@
    */
 
   /**
-   * Define a single module or multiple modules. Returns an array that contains instances of all modules that were succesfully registered.
+   * Define a single module or multiple modules. Returns an array that contains ids of all modules that were succesfully registered.
    *
    * @public
-   * @param {string|array} ids
+   * @param {array|string} ids
    * @param {array|string} [dependencies]
    * @param {function|object} factory
    * @returns {array}
@@ -795,7 +783,7 @@
 
       if (module) {
 
-        ret.push(module);
+        ret.push(id);
 
       }
 
@@ -971,17 +959,18 @@
   }
 
   /**
-   * Throw an error if a value is not of the expected type.
+   * Throw an error if a value is not of the expected type. Check against nultiple types using '|' as the delimiter.
+   * @todo All public API methods should be type checked.
    *
    * @private
    * @param {*} val
-   * @param {*} type
+   * @param {string} type
    */
   function typeCheck(val, type) {
 
     var
     ok = false,
-    typeArray = type.split('/');
+    typeArray = type.split('|');
 
     arrayEach(typeArray, function (typeVariation) {
 
@@ -1122,7 +1111,7 @@
    * @public
    * @see moduleData
    */
-  lib.moduleData = moduleData;
+  lib._modules = moduleData;
 
   /**
    * Public API - Deferred
@@ -1150,13 +1139,13 @@
    * @public
    * @see typeOf
    */
-  lib.typeOf = typeOf;
+  lib._typeOf = typeOf;
 
   /**
    * @public
    * @see execAsync
    */
-  lib.execAsync = execAsync;
+  lib._execAsync = execAsync;
 
   /**
    * Initiate
