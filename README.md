@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The goal of this project is to provide a solid module/event/promise system with only the essential features.
+A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The goal of this project is to provide a solid module/event/promise system with the essential features.
 
 ##Features
 
@@ -244,7 +244,7 @@ Trigger a custom event within an Eventizer instance. Provided context and argume
 
 * **type** &nbsp;&mdash;&nbsp; *string*
 * **args** &nbsp;&mdash;&nbsp; *array*
-* **context** &nbsp;&mdash;&nbsp; ***
+* **context** &nbsp;&mdash;&nbsp; *anything*
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer*
 
@@ -261,7 +261,9 @@ Creates a new Eventizer instance and returns it. If **obj** is provided the Even
 **Parameters**
 
 * **obj** &nbsp;&mdash;&nbsp; *object*
+  * Optional. If an object is provided a new eventizer instance is created and it's methods are transported to the object.
 * **listeners** &nbsp;&mdash;&nbsp; *object*
+  * Optional. If an object is provided the eventizer instance's listeners are stored to the object.
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
 
@@ -341,7 +343,7 @@ Retrieve the result value (the arguments with which the instance was resolved/re
 
 **Returns** &nbsp;&mdash;&nbsp; *anything*
 
-Returns undefined if deferred is pending otherwise returnsthe value the deferred was resolved/rejected with.
+Returns `undefined` if deferred is pending otherwise returns the value the deferred was resolved/rejected with.
 
 **Usage**
 
@@ -363,7 +365,7 @@ Resolve a deferred instance.
 **Parameters**
 
 * **result** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Defaults to undefined. A value that is passed on to the *onFulfilled* and *onSettled* callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
+  * Optional. Defaults to `undefined`. A value that is passed on to the *onFulfilled* and *onSettled* callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -397,7 +399,7 @@ Add a callback that will be called when the deferred is resolved.
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the deferred is resolved.
+  * Called when the deferred is resolved.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -414,7 +416,7 @@ Add a callback that will be called when the deferred is rejected.
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the deferred is rejected.
+  * Called when the deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -431,7 +433,7 @@ Add a callback that will be called when the deferred is either resolved or rejec
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * A function that is called when the deferred is either resolved or rejected.
+  * Called when the deferred is either resolved or rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -439,7 +441,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. Returns a new deferred. Errors will "fall through" until they are "caught" with another ".then()" (with onRejected callback defined) in the same chain.
+Chain deferreds. Returns a new deferred. Errors will "fall through" until they are "caught" with another `.then()` (with onRejected callback defined) in the same chain.
 
 **Syntax**
 
@@ -448,9 +450,9 @@ Chain deferreds. Returns a new deferred. Errors will "fall through" until they a
 **Parameters**
 
 * **onFulfilled** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the deferred is resolved.
+  * Optional. Called when the deferred is resolved.
 * **onRejected** &nbsp;&mdash;&nbsp; *function*
-  * Optional. A function that is called when the deferred is rejected.
+  * Optional. Called when the deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -458,18 +460,18 @@ Returns a new deferred.
 
 ###.Deferred.prototype.and()
 
-Returns a deferred that resolves when all of the arguments and the instance have resolved. The returned "master" deferred is rejected instantly if one of the arguments is rejected.
+Returns a master deferred that resolves when all of the arguments and the instance have resolved.
 
 `d.and( deferreds [, resolveOnFirst] [, rejectOnFirst] )`
 
 **Parameters**
 
 * **deferreds** &nbsp;&mdash;&nbsp; *array*
-  * An array of deferreds, or any other values.
+  * An `array` of deferreds, or any other values.
 * **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-  * Optional. Defaults to false.
+  * Optional. Defaults to `false`. If `true` the master deferred will be resolved immediately when the first deferred is resolved.
 * **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-  * Optional. Defaults to true.
+  * Optional. Defaults to `true`. If `true` the master deferred will be resolved immediately when the first deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -486,11 +488,11 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 **Parameters**
 
 * **deferreds** &nbsp;&mdash;&nbsp; *array*
-  * An array of deferreds, or any other values.
+  * An `array` of deferreds, or any other values.
 * **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-  * Optional. Defaults to false.
+  * Optional. Defaults to `false`. If `true` the master deferred will be resolved immediately when the first deferred is resolved.
 * **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
-  * Optional. Defaults to true.
+  * Optional. Defaults to `true`. If `true` the master deferred will be resolved immediately when the first deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 

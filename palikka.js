@@ -4,6 +4,11 @@
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
+ *
+ * @todo Peer review for the API.
+ * @todo Full compliance of the AMD and Promises A/+ spec, or not...?
+ * @todo Type checks and error throwing for public method arguments.
+ * @todo Make the codebase even more compact and performant.
  */
 
 (function (glob) {

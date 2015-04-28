@@ -28,7 +28,7 @@
     m3Val = 'cVal',
 
     m4 = 'd',
-    m4Val = 'dVal',
+    m4Val = {d: 'd'},
 
     m5 = 'e',
     m5Val = 'eVal',
@@ -133,11 +133,8 @@
 
     });
 
-    palikka.define(m4, [m1], function () {
-
-      return m4Val;
-
-    });
+    /** Define a moule using object as the facotry. */
+    palikka.define(m4, [m1], m4Val);
 
     /** Check that data matches. */
     window.setTimeout(function () {
