@@ -12,7 +12,7 @@
 
   Q.test('Modules.', function (assert) {
 
-    assert.expect(35);
+    assert.expect(37);
     var done = assert.async();
 
     var
@@ -35,22 +35,22 @@
 
     asyncTest = false;
 
-    // Define a single module without dependencies.
+    /** Define a single module without dependencies. */
     palikka.define(m1, function () {
 
-      // Context should be an object.
+      /** Context should be an object. */
       assert.strictEqual(typeof this, 'object');
 
-      // Context dependencies type should be an object.
+      /** Context dependencies type should be an object. */
       assert.strictEqual(typeof this.dependencies, 'object');
 
-      // Context id type should be a string.
+      /** Context id type should be a string. */
       assert.strictEqual(typeof this.id, 'string');
 
-      // Context id should be the module id.
+      /** Context id should be the module id. */
       assert.strictEqual(this.id, m1);
 
-      // There should be no arguments at all when there are no dependencies.
+      /** There should be no arguments at all when there are no dependencies. */
       assert.strictEqual(arguments.length, 0);
 
       asyncTest = true;
@@ -59,66 +59,69 @@
 
     });
 
-    // Get module data before it is initiated.
-    m1Data = palikka._modules(m1);
+    /** Get module data before it is initiated. */
+    m1Data = palikka._getModules(m1);
 
-    // Module data id should always be an array.
+    /** Module data id should always be an array. */
     assert.strictEqual(m1Data.id, m1);
 
-    // Module state should not be ready before initiation.
+    /** Module state should not be ready before initiation. */
     assert.strictEqual(m1Data.ready, false);
 
-    // Module data value should always be undefined before factory is processed.
+    /** Module data value should always be undefined before factory is processed. */
     assert.strictEqual(m1Data.value, undefined);
 
-    // Module data dependencies should always be an array.
+    /** Module data dependencies should always be an array. */
     assert.strictEqual(m1Data.dependencies instanceof Array, true);
 
-    // Factory function should be called asynchronously.
+    /** Factory function should be called asynchronously. */
     assert.strictEqual(asyncTest, false);
 
-    // Require a single module.
+    /** Require a single module. */
     palikka.require(m1, function (a) {
 
-      // There should be as many arguments as there are required modules.
+      /** There should be as many arguments as there are required modules. */
       assert.strictEqual(arguments.length, 1);
 
-      // Dependency values should be assigned as function arguments in the order they were defined.
+      /** Dependency values should be assigned as function arguments in the order they were defined. */
       assert.strictEqual(a, m1Val);
 
     });
 
-    // Try to redefine a module, should not be possible.
-    palikka.define(m1, function () {
-      assert.strictEqual('FAIL: Module was overriden.', 0);
-    });
+    /** Try to redefine a module, should not be possible. */
+    try {
+      palikka.define(m1, {});
+    }
+    catch (e) {
+      assert.strictEqual(1, 1);
+    }
 
-    // Define multiple modules with a single dependency.
+    /** Define multiple modules with a single dependency. */
     palikka.define([m2, m3], m4, function (val) {
 
-      // There should be as many arguments as there are required modules.
+      /** There should be as many arguments as there are required modules. */
       assert.strictEqual(arguments.length, 1);
 
-      // Dependency values should be assigned as function arguments in the order they were defined.
+      /** Dependency values should be assigned as function arguments in the order they were defined. */
       assert.strictEqual(val, m4Val);
 
       return this.id === m2 ? m2Val : m3Val;
 
     });
 
-    // Define a single module with multiple dependencies.
+    /** Define a single module with multiple dependencies. */
     palikka.define(m5, [m1, m2, m3, m4], function (val1, val2, val3, val4) {
 
-      // There should be as many arguments as there are required modules.
+      /** There should be as many arguments as there are required modules. */
       assert.strictEqual(arguments.length, 4);
 
-      // Dependency values should be assigned as function arguments in the order they were defined.
+      /** Dependency values should be assigned as function arguments in the order they were defined. */
       assert.strictEqual(val1, m1Val);
       assert.strictEqual(val2, m2Val);
       assert.strictEqual(val3, m3Val);
       assert.strictEqual(val4, m4Val);
 
-      // Context dependencies should match the function arguments.
+      /** Context dependencies should match the function arguments. */
       assert.strictEqual(this.dependencies[m1], m1Val);
       assert.strictEqual(this.dependencies[m2], m2Val);
       assert.strictEqual(this.dependencies[m3], m3Val);
@@ -140,11 +143,11 @@
     window.setTimeout(function () {
 
       var
-      m1Data = palikka._modules(m1),
-      m2Data = palikka._modules(m2),
-      m3Data = palikka._modules(m3),
-      m4Data = palikka._modules(m4),
-      m5Data = palikka._modules(m5);
+      m1Data = palikka._getModules(m1),
+      m2Data = palikka._getModules(m2),
+      m3Data = palikka._getModules(m3),
+      m4Data = palikka._getModules(m4),
+      m5Data = palikka._getModules(m5);
 
       /** Check module values. */
       assert.strictEqual(m1Data.value, m1Val);
@@ -162,8 +165,14 @@
 
     }, 200);
 
-    // @todo define return values
-    // @todo _modules return values.
+    /** Try to define two modules with circular dependency. */
+    try {
+      palikka.define('circ1', 'circ2', {});
+      palikka.define('circ2', 'circ1', {});
+    }
+    catch (e) {
+      assert.strictEqual(1, 1);
+    }
 
     window.setTimeout(done, 1000);
 
@@ -504,7 +513,7 @@
     m4 = d1.and([d2, d3, d4], true, true),
     m5 = d1.and([d2, d3, d4], false, false);
 
-    // Make sure master's returns deferred instance.
+    /** Make sure master's returns deferred instance. */
     assert.strictEqual(m1 instanceof palikka.Deferred, true);
     assert.strictEqual(m2 instanceof palikka.Deferred, true);
     assert.strictEqual(m3 instanceof palikka.Deferred, true);
@@ -595,7 +604,7 @@
 
     assert.expect(24);
 
-    // Primitive (immutable) values
+    /** Primitive (immutable) values */
 
     assert.strictEqual(palikka._typeOf(null), 'null');
     assert.strictEqual(palikka._typeOf(undefined), 'undefined');
@@ -618,7 +627,7 @@
       assert.strictEqual(true, true);
     }
 
-    // Objects
+    /** Objects */
 
     assert.strictEqual(palikka._typeOf({}), 'object');
     assert.strictEqual(palikka._typeOf(new Object()), 'object');
@@ -631,12 +640,12 @@
 
     assert.strictEqual(palikka._typeOf(new Date()), 'date');
 
-    // Specials
+    /** Specials */
 
     assert.strictEqual(palikka._typeOf(JSON), 'json');
     assert.strictEqual(palikka._typeOf(arguments), 'arguments');
 
-    // DOM (todo)
+    /** DOM (todo) */
 
   });
 

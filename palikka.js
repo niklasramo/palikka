@@ -4,12 +4,12 @@
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
- *
- * @todo Peer review for the API.
- * @todo Full compliance of the AMD and Promises A/+ spec, or not...?
- * @todo Type checks and error throwing for public method arguments.
- * @todo Make the codebase even more compact and performant.
  */
+
+ /*
+  * @todo Promise A/+ test suite.
+  * @todo Compare the Deferred API to other implementations and make sure it's good.
+  */
 
 (function (glob) {
 
@@ -26,7 +26,7 @@
   /** Modules container. */
   modules = {},
 
-  /** Private event hub + event names. */
+  /** Private event hub and event names. */
   evHub,
   evInitiate = 'initiate',
   evResolve = 'resolve',
@@ -47,8 +47,9 @@
   /** Check if strict mode is supported. */
   isStrict = !this === true,
 
-  /** Get reference to native Promise. */
+  /** Get reference to resolved native promise instance. */
   nativePromise = isNative(glob.Promise),
+  nativePromise = nativePromise && nativePromise.resolve(),
 
   /** Get reference to native setImmediate. */
   nativeSetImmediate = isNative(glob.setImmediate);
@@ -80,7 +81,6 @@
   /**
    * Bind an event listener.
    *
-   * @public
    * @memberof Eventizer
    * @param {string} type
    * @param {function} callback
@@ -101,7 +101,6 @@
   /**
    * Unbind an event listener. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
    *
-   * @public
    * @memberof Eventizer
    * @param {string} type
    * @param {function} [callback]
@@ -143,7 +142,6 @@
   /**
    * Emit event. Optionally one can provide context and additional arguments for the callback functions.
    *
-   * @public
    * @memberof Eventizer
    * @param {string} type
    * @param {array} [args]
@@ -182,7 +180,6 @@
   /**
    * Emit event asynchronously. Optionally one can provide context and additional arguments for the callback functions.
    *
-   * @public
    * @memberof Eventizer
    * @param {string} type
    * @param {array} [args]
@@ -247,7 +244,7 @@
    */
 
   /**
-   * Create a deferred object.
+   * Create a deferred object. Promises A/+ compatible.
    *
    * @class
    * @private
@@ -313,7 +310,6 @@
   /**
    * Get current state of the instance.
    *
-   * @public
    * @memberof Deferred.prototype
    * @returns {string} 'pending', 'fulfilled' or 'rejected'.
    */
@@ -326,7 +322,6 @@
   /**
    * Get instance's result value.
    *
-   * @public
    * @memberof Deferred.prototype
    * @returns {*}
    */
@@ -339,15 +334,20 @@
   /**
    * Resolve deferred. All provided arguments will be passed directly to 'onFulfilled' and 'onSettled' callback functions.
    *
-   * @public
    * @memberof Deferred.prototype
-   * @param {*} [val=undefined]
+   * @param {*} [val]
    * @returns {Deferred} The instance on which this method was called.
    */
   Deferred.prototype.resolve = function (val) {
 
     var
     instance = this;
+
+    if (val === this) {
+
+      this.reject(TypeError('A promise can not be resolved with itself.'));
+
+    }
 
     if (instance._state === statePending && !instance._locked) {
 
@@ -356,9 +356,9 @@
       if (val instanceof Deferred) {
 
         val
-        .onFulfilled(function (val) {
+        .onFulfilled(function (value) {
 
-          resolveHandler(instance, val);
+          resolveHandler(instance, value);
 
         })
         .onRejected(function (reason) {
@@ -383,7 +383,6 @@
   /**
    * Reject deferred. All provided arguments will be passed directly to 'onRejected' and 'onSettled' callback functions.
    *
-   * @public
    * @memberof Deferred.prototype
    * @returns {Deferred} The instance on which this method was called.
    */
@@ -406,7 +405,6 @@
   /**
    * Execute a callback function asynchronously when the deferred is resolved.
    *
-   * @public
    * @memberof Deferred.prototype
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
@@ -448,7 +446,6 @@
   /**
    * Execute a callback function asynchronously when the deferred is rejected.
    *
-   * @public
    * @memberof Deferred.prototype
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
@@ -490,7 +487,6 @@
   /**
    * Execute a callback function asynchronously when the deferred is resolved or rejected.
    *
-   * @public
    * @memberof Deferred.prototype
    * @param {function} callback
    * @returns {Deferred} The instance on which this method was called.
@@ -504,7 +500,6 @@
   /**
    * Chain deferreds.
    *
-   * @public
    * @memberof Deferred.prototype
    * @param {function} [onFulfilled]
    * @param {function} [onRejected]
@@ -558,7 +553,6 @@
   /**
    * Returns a "master" deferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
    *
-   * @public
    * @memberof Deferred.prototype
    * @param {array} deferreds
    * @param {boolean} [resolveOnFirst=false]
@@ -612,7 +606,7 @@
    * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
    *
    * @private
-   * @param {array|arguments} deferreds
+   * @param {arguments|array} deferreds
    * @param {boolean|undefined} [resolveOnFirst=false]
    * @param {boolean|undefined} [rejectOnFirst=true]
    * @returns {Deferred} A new deferred.
@@ -742,7 +736,6 @@
   /**
    * Get module instance info.
    *
-   * @public
    * @memberof Module.prototype
    * @returns {object}
    */
@@ -766,57 +759,80 @@
    */
 
   /**
-   * Define a single module or multiple modules. Returns an array that contains ids of all modules that were succesfully registered.
+   * Define a module or multiple modules.
    *
-   * @public
+   * @private
    * @param {array|string} ids
    * @param {array|string} [dependencies]
    * @param {function|object} factory
-   * @returns {array}
    */
-  function defineMultiple(ids, dependencies, factory) {
+  function defineModule(ids, dependencies, factory) {
 
     var
-    ret = [];
+    hasDeps = arguments.length > 2,
+    deps,
+    circDep;
 
+    /** Validate/sanitize ids. */
+    typeCheck(ids, 'array|string');
     ids = typeOf(ids, 'array') ? ids : [ids];
 
+    /** Validate/sanitize dependencies. */
+    if (hasDeps) {
+
+      typeCheck(dependencies, 'array|string');
+      deps = typeOf(dependencies, 'array') ? dependencies : [dependencies];
+
+    }
+    else {
+
+      deps = [];
+
+    }
+
+    /** Validate/sanitize factory. */
+    factory = hasDeps ? factory : dependencies;
+    typeCheck(factory, 'function|object');
+
+    /** Define modules. */
     arrayEach(ids, function (id) {
 
-      var
-      module = defineSingle(id, dependencies, factory);
+      /** Validate id type. */
+      typeCheck(id, 'string');
 
-      if (module) {
+      /** Make sure id is not empty. */
+      if (!id) {
 
-        ret.push(id);
+        throw Error('Module must have an id.');
 
       }
 
+      /** Make sure id is not reserved. */
+      if (modules[id] instanceof Module) {
+
+        throw Error('Module ' + id + ' is already defined.');
+
+      }
+
+      /** Detect circular dependencies. */
+      if (hasDeps && deps.length) {
+
+        circDep = getCircDependency(id, deps);
+
+        if (circDep) {
+
+          throw Error('Circular dependency between ' + id + ' and ' + circDep + '.');
+
+        }
+
+      }
+
+      /** Define the module. */
+      new Module(id, deps, factory);
+
     });
 
-    return ret;
-
-  }
-
-  /**
-   * Define a module. Returns module instance if module registration was successful, otherwise returns false.
-   *
-   * @private
-   * @param {string} id
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
-   * @returns {boolean|Module}
-   */
-  function defineSingle(id, dependencies, factory) {
-
-    var
-    hasDeps = factory,
-    depIds = hasDeps ? sanitizeDependencies(dependencies) : [],
-    factory = hasDeps ? factory : dependencies,
-    factoryType = typeOf(factory),
-    isValid = id && typeOf(id, 'string') && modules[id] === undefined && (factoryType === 'object' || factoryType === 'function');
-
-    return isValid ? new Module(id, depIds, factory) : false;
+    return lib;
 
   }
 
@@ -827,33 +843,19 @@
    * @param {array|string} dependencies
    * @param {function} callback
    */
-  function require(dependencies, callback) {
+  function requireModule(dependencies, callback) {
 
-    if (typeOf(callback, 'function')) {
+    typeCheck(callback, 'function');
+    typeCheck(dependencies, 'array|string');
+    dependencies = typeOf(dependencies, 'array') ? dependencies : [dependencies];
 
-      loadDependencies(sanitizeDependencies(dependencies), function (depModules) {
+    loadDependencies(dependencies, function (depModules) {
 
-        callback.apply(null, depModules);
+      callback.apply(null, depModules);
 
-      });
+    });
 
-    }
-
-  }
-
-  /**
-   * Sanitize dependencies argument of define and require methods.
-   *
-   * @private
-   * @param {array|string} dependencies
-   * @returns {array}
-   */
-  function sanitizeDependencies(dependencies) {
-
-    var
-    type = typeOf(dependencies);
-
-    return type === 'array' ? dependencies : type === 'string' ? [dependencies] : [];
+    return lib;
 
   }
 
@@ -870,6 +872,8 @@
     defers = [];
 
     arrayEach(dependencies, function (depId) {
+
+      typeCheck(depId, 'string');
 
       var
       module = modules[depId];
@@ -892,13 +896,58 @@
   }
 
   /**
+   * Return the first circular dependency's id or null.
+   *
+   * @private
+   * @param {string} id
+   * @param {array} dependencies
+   * @returns {null|string}
+   */
+  function getCircDependency(id, dependencies) {
+
+    var
+    ret = null;
+
+    arrayEach(dependencies, function (depId) {
+
+      var
+      depModule = modules[depId];
+
+      if (depModule) {
+
+        arrayEach(depModule._dependencies, function (depModuleDep) {
+
+          if (!ret && depModuleDep === id) {
+
+            ret = depModule._id;
+            return 1;
+
+          }
+
+        });
+
+      }
+
+      if (ret) {
+
+        return 1;
+
+      }
+
+    });
+
+    return ret;
+
+  }
+
+  /**
    * Returns info about all modules or a single module. Returns null if no modules are found.
    *
    * @private
-   * @param {number} id
+   * @param {number} [id]
    * @returns {null|object}
    */
-  function moduleData(id) {
+  function getModuleData(id) {
 
     var
     ret = null;
@@ -964,24 +1013,23 @@
   }
 
   /**
-   * Throw an error if a value is not of the expected type. Check against nultiple types using '|' as the delimiter.
-   * @todo All public API methods should be type checked.
+   * Throw a type error if a value is not of the expected type(s). Check against multiple types using '|' as the delimiter.
    *
    * @private
    * @param {*} val
-   * @param {string} type
+   * @param {string} types
    */
-  function typeCheck(val, type) {
+  function typeCheck(val, types) {
 
     var
     ok = false,
-    typeArray = type.split('|');
+    typesArray = types.split('|');
 
-    arrayEach(typeArray, function (typeVariation) {
+    arrayEach(typesArray, function (type) {
 
       if (!ok) {
 
-        ok = typeVariation === 'deferred' ? val instanceof Deferred : typeOf(val, typeVariation);
+        ok = type === 'deferred' ? val instanceof Deferred : typeOf(val, type);
 
       }
 
@@ -989,7 +1037,7 @@
 
     if (!ok) {
 
-      throw TypeError(this + ' is not ' + type);
+      throw TypeError(val + ' is not ' + types);
 
     }
 
@@ -1029,7 +1077,9 @@
 
       for (var i = 0, len = array.length; i < len; i++) {
 
-        callback(array[i], i);
+        if (callback(array[i], i)) {
+          break;
+        }
 
       }
 
@@ -1049,7 +1099,7 @@
 
     if (nativePromise) {
 
-      nativePromise.resolve().then(fn);
+      nativePromise.then(fn);
 
     }
     else if (nativeSetImmediate) {
@@ -1102,21 +1152,21 @@
 
   /**
    * @public
-   * @see defineMultiple
+   * @see defineModule
    */
-  lib.define = defineMultiple;
+  lib.define = defineModule;
 
   /**
    * @public
-   * @see require
+   * @see requireModule
    */
-  lib.require = require;
+  lib.require = requireModule;
 
   /**
    * @public
-   * @see moduleData
+   * @see getModuleData
    */
-  lib._modules = moduleData;
+  lib._getModules = getModuleData;
 
   /**
    * Public API - Deferred
@@ -1162,7 +1212,6 @@
 
   /**
    * Publish library using an adapted UMD pattern.
-   * https://github.com/umdjs/umd
    */
   if (typeOf(glob.define, 'function') && glob.define.amd) {
 

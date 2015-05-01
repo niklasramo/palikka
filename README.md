@@ -479,7 +479,7 @@ Returns a new deferred.
 
 ###.when()
 
-Returns a new deferred that will be resolved/rejected when all provided deferreds are resolved or rejected. Any non-deferred object within the deferreds array will be instantly resolved.
+Returns a new deferred that will be resolved/rejected when all provided deferreds are resolved or rejected. Any non-deferred object within the deferreds array will be instantly resolved with itself as the value.
 
 **Syntax**
 
@@ -488,7 +488,7 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 **Parameters**
 
 * **deferreds** &nbsp;&mdash;&nbsp; *array*
-  * An `array` of deferreds, or any other values.
+  * An `array` of deferreds, or any other objects.
 * **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
   * Optional. Defaults to `false`. If `true` the master deferred will be resolved immediately when the first deferred is resolved.
 * **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
