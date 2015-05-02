@@ -89,12 +89,9 @@
     });
 
     /** Try to redefine a module, should not be possible. */
-    try {
+    assert.throws(function () {
       palikka.define(m1, {});
-    }
-    catch (e) {
-      assert.strictEqual(1, 1);
-    }
+    });
 
     /** Define multiple modules with a single dependency. */
     palikka.define([m2, m3], m4, function (val) {
@@ -166,13 +163,10 @@
     }, 200);
 
     /** Try to define two modules with circular dependency. */
-    try {
-      palikka.define('circ1', 'circ2', {});
+    palikka.define('circ1', 'circ2', {});
+    assert.throws(function () {
       palikka.define('circ2', 'circ1', {});
-    }
-    catch (e) {
-      assert.strictEqual(1, 1);
-    }
+    });
 
     window.setTimeout(done, 1000);
 
@@ -406,7 +400,7 @@
   Q.test('Deferred - then.', function (assert) {
 
     var done = assert.async();
-    assert.expect(14);
+    assert.expect(20);
 
     // Test success callback execution, context and arguments.
     (new palikka.Deferred())
@@ -473,7 +467,80 @@
     assert.strictEqual(b !== a, true);
     assert.strictEqual(c !== b, true);
 
-    /** @todo Test error throwing / catching. */
+    /** Test resolving with self. */
+    a.resolve(a)
+    .onRejected(function (reason) {
+      assert.strictEqual(palikka._typeOf(reason), 'error');
+    });
+
+    /** Test error throwing and catching. */
+    (new palikka.Deferred())
+    .resolve()
+    .then(function () {
+
+      /** Here we go... */
+      throw Error('error-1');
+
+    })
+    .then(function () {
+
+      /** Success callback should not be fired before error is caught. */
+      assert.strictEqual(1, 0);
+
+    })
+    .then(null, function (reason) {
+
+      /** Fail callback should catch the error. */
+      assert.strictEqual(reason.message, 'error-1');
+
+    })
+    .then(function () {
+
+      /** Success callback should be fired after error is caught. */
+      assert.strictEqual(1, 1);
+
+      /** Let's throw another error. */
+      throw Error('error-2');
+
+    }, function () {
+
+      /** Fail callback should not be fired after error is caught, unless new error is thrown. */
+      assert.strictEqual(1, 0);
+
+    })
+    .then(null, function (reason) {
+
+      /** Fail callback should catch the error. */
+      assert.strictEqual(reason.message, 'error-2');
+
+      /** Throw new error within fail callback. */
+      throw Error('error-3');
+
+    })
+    .then(function () {
+
+      /** Success callback should not be fired before error is caught. */
+      assert.strictEqual(1, 0);
+
+    })
+    .then(function () {
+
+      /** Success callback should not be fired before error is caught. */
+      assert.strictEqual(1, 0);
+
+    })
+    .onRejected(function (reason) {
+
+      /** onRejected callback should NOT catch the error, but it should be able to "see" it before it falls down the then chain. */
+      assert.strictEqual(reason.message, 'error-3');
+
+    })
+    .then(null, function (reason) {
+
+      /** Fail callback should catch the error. */
+      assert.strictEqual(reason.message, 'error-3');
+
+    });
 
     setTimeout(function () {
       done();

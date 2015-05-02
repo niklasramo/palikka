@@ -8,12 +8,12 @@ A compact and well-tested JavaScript module/event/promise system that works in t
 
 ##Features
 
-* Lightweight, less than 5kb minified.
+* Lightweight, around 5kb minified.
 * Excellent browser support (IE7+).
 * Well documented codebase.
 * Comprehensive unit tests.
 * No dependencies.
-* Works in both the browser and Node.js.
+* Works in both the browser and Node.
 
 ##Basic usage
 
@@ -76,7 +76,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ###.define()
 
-Define a module. Please avoid defining circular modules (when two modules depend on each other) since there is currently no way of handling such situations and the modules just never get defined.
+Define a module. The definition process is asynchronous.
 
 **Syntax**
 
@@ -93,9 +93,9 @@ Define a module. Please avoid defining circular modules (when two modules depend
   * this.dependencies &nbsp;&mdash;&nbsp; *object*
   * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. If the return value is a deferred instance the module will be initiated when the deferred is resolved with the deferred's value assigned as the module's value.
 
-**Returns** &nbsp;&mdash;&nbsp; *array*
+**Returns** &nbsp;&mdash;&nbsp; *object*
 
-Returns an array which contains ids of all modules that were successfully registered. If the array is empty it means that the module(s) was not registered, which is probably because a module with the same id already exists.
+Returns palikka object, which means that you can chain `.define()` and `.require()` methods.
 
 **Usage**
 
@@ -145,17 +145,22 @@ Require a module. Loads modules at your disposal when they are loaded.
 * **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Receives the required dependency modules as function arguments in the same order they were required.
 
+**Returns** &nbsp;&mdash;&nbsp; *object*
+
+Returns palikka object, which means that you can chain `.define()` and `.require()` methods.
+
 **Usage**
 
 ```javascript
-palikka.define('foo', function () {
+palikka
+.define('foo', function () {
   return 'foo';
-});
-palikka.define('bar', function () {
+})
+.define('bar', function () {
   return 'bar';
-});
-palikka.require(['foo', 'bar'], function (foo, bar) {
-  // Do your stuff here.
+})
+.require(['foo', 'bar'], function (foo, bar) {
+  alert(foo + bar); // "foobar"
 });
 ```
 
@@ -273,7 +278,7 @@ Returns a new Eventizer instance or the object provided as **obj** argument.
 
 ###.Deferred()
 
-A constructor function that creates a deferred instance. The deferred is "thenable" and almost Promises/A+ compliant (slight deviations were made in favour of usability).
+A constructor function that creates a deferred instance. The `palikka.Deferred` is a spiced up version of the native ES6 Promise and fully Promises/A+ v1.1 compliant.
 
 **Syntax**
 
@@ -282,7 +287,7 @@ A constructor function that creates a deferred instance. The deferred is "thenab
 **Parameters**
 
 * **callback** &nbsp;&mdash;&nbsp; *function*
-  * Optional. The callback function has two arguments, *resolve* and *reject*, which can be used to resolve or reject the deferred.
+  * Optional. The callback function has two arguments, `resolve` and `reject` functions, which can be used to resolve or reject the deferred.
 
 **Usage**
 
@@ -365,7 +370,7 @@ Resolve a deferred instance.
 **Parameters**
 
 * **result** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Defaults to `undefined`. A value that is passed on to the *onFulfilled* and *onSettled* callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
+  * Optional. Defaults to `undefined`. A value that is passed on to the `onFulfilled` and `onSettled` callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -382,7 +387,7 @@ Reject a deferred instance.
 **Parameters**
 
 * **reason** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Defaults to undefined. A value (reason) that is passed on to the *onRejected* and *onSettled* callbacks.
+  * Optional. Defaults to undefined. A value (reason) that is passed on to the `onRejected` and `onSettled` callbacks.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -441,7 +446,7 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. Returns a new deferred. Errors will "fall through" until they are "caught" with another `.then()` (with onRejected callback defined) in the same chain.
+Chain deferreds. Returns a new deferred. Errors will fall down the `.then()` chain until they are "caught" with `.then()` using the second `onRejected` argument.
 
 **Syntax**
 

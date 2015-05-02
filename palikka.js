@@ -1,15 +1,10 @@
 /*!
  * @license
- * Palikka v0.3.0-beta
+ * Palikka v0.3.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
-
- /*
-  * @todo Promise A/+ test suite.
-  * @todo Compare the Deferred API to other implementations and make sure it's good.
-  */
 
 (function (glob) {
 
