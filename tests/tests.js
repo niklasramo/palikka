@@ -12,7 +12,7 @@
 
   Q.test('Modules.', function (assert) {
 
-    assert.expect(37);
+    assert.expect(42);
     var done = assert.async();
 
     var
@@ -160,12 +160,35 @@
       assert.strictEqual(m4Data.ready, true);
       assert.strictEqual(m5Data.ready, true);
 
+      /** Smoke test for getModules without value. */
+      assert.strictEqual(typeof palikka._getModules(), 'object');
+
     }, 200);
 
     /** Try to define two modules with circular dependency. */
     palikka.define('circ1', 'circ2', {});
     assert.throws(function () {
       palikka.define('circ2', 'circ1', {});
+    });
+
+    /** Try to define a module with an empty id. */
+    assert.throws(function () {
+      palikka.define('', [], {});
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define(1, {});
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define('1', 'test');
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define('1', [], 'test');
     });
 
     window.setTimeout(done, 1000);
@@ -175,7 +198,7 @@
   Q.test('Eventizer', function (assert) {
 
     var done = assert.async();
-    assert.expect(17);
+    assert.expect(18);
 
     var
     obj = {},
@@ -185,6 +208,7 @@
     /** Eventizing an object should return the same object that was eventized. */
     assert.strictEqual(evA instanceof palikka.Eventizer, false);
     assert.strictEqual(evA, obj);
+    assert.strictEqual(palikka.eventize() instanceof palikka.Eventizer, true);
 
     /** Creating a new Eventizer instance should return an Eventizer instance. */
     assert.strictEqual(evB instanceof palikka.Eventizer, true);
@@ -397,10 +421,46 @@
 
   });
 
+  Q.test('Deferred - resolve with another deferred.', function (assert) {
+
+    var done = assert.async();
+    assert.expect(2);
+
+    (new palikka.Deferred())
+    .resolve(new palikka.Deferred(function (resolve) {
+
+      resolve('a');
+
+    }))
+    .onFulfilled(
+      function (val) {
+
+        assert.strictEqual(val, 'a');
+
+      }
+    );
+
+    (new palikka.Deferred())
+    .resolve(new palikka.Deferred(function (resolve, reject) {
+
+      reject('a');
+
+    }))
+    .onRejected(
+      function (reason) {
+
+        assert.strictEqual(reason, 'a');
+        done();
+
+      }
+    );
+
+  });
+
   Q.test('Deferred - then.', function (assert) {
 
     var done = assert.async();
-    assert.expect(20);
+    assert.expect(21);
 
     // Test success callback execution, context and arguments.
     (new palikka.Deferred())
@@ -471,6 +531,15 @@
     a.resolve(a)
     .onRejected(function (reason) {
       assert.strictEqual(palikka._typeOf(reason), 'error');
+    });
+
+    /** Test success catching. */
+    (new palikka.Deferred())
+    .resolve('a')
+    .then()
+    .then()
+    .then(function (val) {
+      assert.strictEqual(val, 'a');
     });
 
     /** Test error throwing and catching. */

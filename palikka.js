@@ -1,6 +1,6 @@
 /*!
  * @license
- * Palikka v0.3.0
+ * Palikka v0.3.1-beta
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -17,6 +17,12 @@
 
   /** Public API interface. */
   lib = {},
+
+  /** Main configuration object. */
+  config = {
+    asyncDeferreds: true,
+    asyncModules: true
+  },
 
   /** Modules container. */
   modules = {},
@@ -44,10 +50,7 @@
 
   /** Get reference to resolved native promise instance. */
   nativePromise = isNative(glob.Promise),
-  nativePromise = nativePromise && nativePromise.resolve(),
-
-  /** Get reference to native setImmediate. */
-  nativeSetImmediate = isNative(glob.setImmediate);
+  nativePromise = nativePromise && nativePromise.resolve();
 
   /*
    * Eventizer - Constructor
@@ -186,11 +189,11 @@
     var
     instance = this;
 
-    execAsync(function () {
+    execFn(function () {
 
       instance.emit(type, args, ctx);
 
-    });
+    }, 1);
 
     return instance;
 
@@ -243,9 +246,9 @@
    *
    * @class
    * @private
-   * @param {function} callback
+   * @param {function} executor
    */
-  function Deferred(callback) {
+  function Deferred(executor) {
 
     var
     instance = this;
@@ -282,10 +285,18 @@
      */
     instance._state = statePending;
 
-    /** Call callback function if provided. */
-    if (typeOf(callback, 'function')) {
+    /**
+     * Indicates if the deferred instance is asynchronous (Promises A/+ compatible).
+     *
+     * @protected
+     * @type {boolean}
+     */
+    instance._asynchronous = config.asyncDeferreds;
 
-      callback(
+    /** Call executor function if provided. */
+    if (typeOf(executor, 'function')) {
+
+      executor(
         function (val) {
 
           instance.resolve(val);
@@ -301,6 +312,22 @@
     }
 
   }
+
+  /**
+   * Control instances asynchronity. Providing true as the value will set the instance to be asynchronous. Providing false will set the insrance synchronous.
+   *
+   * @protected
+   * @memberof Deferred.prototype
+   * @param {boolean} isAsync
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  Deferred.prototype._async = function (isAsync) {
+
+    this.asynchronous = isAsync ? true : false;
+
+    return this;
+
+  };
 
   /**
    * Get current state of the instance.
@@ -409,7 +436,7 @@
     var
     instance = this;
 
-    execAsync(function () {
+    execFn(function () {
 
       if (typeOf(callback, 'function')) {
 
@@ -432,7 +459,7 @@
 
       }
 
-    });
+    }, instance._asynchronous);
 
     return instance;
 
@@ -450,7 +477,7 @@
     var
     instance = this;
 
-    execAsync(function () {
+    execFn(function () {
 
       if (typeOf(callback, 'function')) {
 
@@ -473,7 +500,7 @@
 
       }
 
-    });
+    }, instance._asynchronous);
 
     return instance;
 
@@ -566,6 +593,19 @@
    * Deferred - Helpers
    * ******************
    */
+
+  /**
+   * Create a new deferred instance. Shorthand for "new Deferred()".
+   *
+   * @public
+   * @param {function} [executor]
+   * @returns {Deferred}
+   */
+  function defer(executor) {
+
+    return new Deferred(executor);
+
+  }
 
   /**
    * Resolve handler.
@@ -678,7 +718,7 @@
 
     var
     instance = this,
-    deferred = new Deferred(),
+    deferred = new Deferred()._async(false),
     factoryCtx,
     factoryValue;
 
@@ -886,7 +926,7 @@
 
     });
 
-    when(defers).then(callback);
+    when(defers)._async(config.asyncModules).onFulfilled(callback);
 
   }
 
@@ -1085,21 +1125,22 @@
   }
 
   /**
-   * Execute function asynchronously in the next event loop.
+   * Execute function, optionally asynchronously in the next event loop.
    *
    * @private
    * @param {function} fn
+   * @param {boolean} [async]
    */
-  function execAsync(fn) {
+  function execFn(fn, async) {
 
-    if (nativePromise) {
+    if (!async) {
 
-      nativePromise.then(fn);
+      fn();
 
     }
-    else if (nativeSetImmediate) {
+    else if (nativePromise) {
 
-      nativeSetImmediate(fn);
+      nativePromise.then(fn);
 
     }
     else {
@@ -1124,8 +1165,8 @@
   }
 
   /**
-   * Public API - Eventizer
-   * **********************
+   * Public API
+   * **********
    */
 
   /**
@@ -1141,9 +1182,22 @@
   lib.eventize = eventize;
 
   /**
-   * Public API - Modules
-   * ********************
+   * @public
+   * @see Deferred
    */
+  lib.Deferred = Deferred;
+
+  /**
+   * @public
+   * @see defer
+   */
+  lib.defer = defer;
+
+  /**
+   * @public
+   * @see when
+   */
+  lib.when = when;
 
   /**
    * @public
@@ -1164,28 +1218,6 @@
   lib._getModules = getModuleData;
 
   /**
-   * Public API - Deferred
-   * *********************
-   */
-
-  /**
-   * @public
-   * @see Deferred
-   */
-  lib.Deferred = Deferred;
-
-  /**
-   * @public
-   * @see when
-   */
-  lib.when = when;
-
-  /**
-   * Public API - Utils
-   * ******************
-   */
-
-  /**
    * @public
    * @see typeOf
    */
@@ -1193,9 +1225,15 @@
 
   /**
    * @public
-   * @see execAsync
+   * @see execFn
    */
-  lib._execAsync = execAsync;
+  lib._execFn = execFn;
+
+  /**
+   * @public
+   * @see config
+   */
+  lib._config = config;
 
   /**
    * Initiate
