@@ -76,9 +76,9 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 ##Modules
 
-The Module system API is derived from [AMD spec](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) and [RequireJS API](http://requirejs.org/docs/api.html). However, Palikka does not do any file loading so it is not AMD compatible. The purpose of the module system is to make it possible to split the codebase into separate self-functioning units which know their dependencies. Palikka then makes sure that the dependencies are loaded before the module is defined. In essence Palikka's modules are named [Promises](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise). The module system is tightly bound to Palikka's promise system (`palikka.Deferred`).
+The Module system API is derived from [AMD spec](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) and [RequireJS API](http://requirejs.org/docs/api.html). However, Palikka does not do any file loading so it is not AMD compatible. The purpose of the module system is to make it possible to split the codebase into separate self-functioning units which know their dependencies. Palikka then makes sure that the dependencies are loaded before the module is defined. In essence Palikka's modules are named [Promises](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise). The module system is tightly bound to Palikka's own promise system, [Deferreds](#deferreds).
 
-`palikka.define()` and `palikka.require()` method's are asynchronous by default, meaning that their factory/callback functions are called in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop), or more familiarly "next tick". Under the hood a module instance is basically just a lightweight wrapper around `palikka.Deferred()` instance, which is asynchronous by default as per [Promises/A+](https://promisesaplus.com/) specification. However, this behaviour can be switched off forcing `palikka.define()` and `palikka.require()` to execute their factory/callback functions synchronously: `palikka._config.asyncModules = false`.
+The `.define()` and `.require()` methods are asynchronous by default, meaning that their factory/callback functions are called in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop), or more familiarly "next tick". Under the hood a module instance is basically just a lightweight wrapper around `.Deferred()` instance, which is asynchronous by default as per [Promises/A+](https://promisesaplus.com/) specification. However, this behaviour can be switched off forcing `.define()` and `.require()` to execute their factory/callback functions synchronously: `palikka._config.asyncModules = false`.
 
 ###.define()
 
@@ -324,13 +324,13 @@ Returns a new Eventizer instance or the object provided as **obj** argument.
 
 ##Deferreds
 
-Palikka's promises are called "deferreds". `palikka.Deferred()` is not a polyfill for native ES6 Promise, but it does follow the [Promises/A+ v1.1](https://promisesaplus.com/) specification.
+Palikka's promises are called "deferreds". Please, do note that the `.Deferred()` constructor is not a polyfill for native ES6 Promise, but it does follow the [Promises/A+ v1.1](https://promisesaplus.com/) specification.
 
-By default the callbacks of `palikka.onFulfilled()`, `palikka.onRejected()`, `palikka.onSettled()` and `palikka.then()` methods are called asynchronously in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop) (as per Promises/A+ v1.1 specification). However, although not recommended, deferreds can be configured to work synchronously: `palikka._config.asyncDeferreds = false`. Please note that turning synchronous behaviour on is against the Promises/A+ v1.1 specification, so please do that only if you know what you are doing.
+By default the callbacks of `.Deferred.prototype.onFulfilled()`, `.Deferred.prototype.onRejected()`, `.Deferred.prototype.onSettled()` and `.Deferred.prototype.then()` methods are called asynchronously in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop) (as per Promises/A+ v1.1 specification). However, although not recommended, deferreds can be configured to work synchronously: `palikka._config.asyncDeferreds = false`. Please note that turning synchronous behaviour on is against the Promises/A+ v1.1 specification, so do that only if you know what you are doing.
 
 ###.Deferred()
 
-A constructor function that creates a deferred instance. The `palikka.Deferred` is a spiced up version of the native ES6 Promise and fully [Promises/A+ v1.1](https://promisesaplus.com/) compliant.
+A constructor function that creates a deferred instance, which is a spiced up version of the native ES6 Promise and [Promises/A+ v1.1](https://promisesaplus.com/) compliant.
 
 **Syntax**
 
