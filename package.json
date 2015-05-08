@@ -1,8 +1,8 @@
 {
   "name": "Palikka",
-  "version": "0.3.0",
+  "version": "0.3.1-beta",
   "description": "A tiny module/event/promise system for the browser and Node.",
-  "keywords": ["module","amd","define","require"],
+  "keywords": ["module","event","promise"],
   "homepage": "https://github.com/niklasramo/palikka",
   "license": "MIT",
   "author": {

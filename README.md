@@ -1,19 +1,18 @@
-#Palikka v0.3.0
+#Palikka v0.3.1
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.0)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.1)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.1)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
-A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a deferred system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The goal of this project is to provide a solid module/event/promise system with the essential features.
+A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a promise system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The primary goal of this project is to provide a solid [Promise](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise) based module system.
 
 ##Features
 
-* Lightweight, around 5kb minified.
-* Excellent browser support (IE7+).
+* Lightweight, around 5.5kb minified.
+* Works both in the browser (IE7+) and in Node.js.
 * Well documented codebase.
 * Comprehensive unit tests.
 * No dependencies.
-* Works in both the browser and Node.
 
 ##Basic usage
 
@@ -54,8 +53,10 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 * [.Eventizer()](#eventizer)
 * [.Eventizer.prototype.on()](#eventizerprototypeon)
+* [.Eventizer.prototype.one()](#eventizerprototypeone)
 * [.Eventizer.prototype.off()](#eventizerprototypeoff)
 * [.Eventizer.prototype.emit()](#eventizerprototypeemit)
+* [.Eventizer.prototype.emitAsync()](#eventizerprototypeemitasync)
 * [.eventize()](#eventize)
 
 **[Deferreds](#deferreds)**
@@ -70,13 +71,18 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 * [.Deferred.prototype.onSettled()](#deferredprototypeonsettled)
 * [.Deferred.prototype.then()](#deferredprototypethen)
 * [.Deferred.prototype.and()](#deferredprototypeand)
+* [.defer()](#defer)
 * [.when()](#when)
 
 ##Modules
 
+The Module system API is derived from [AMD spec](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) and [RequireJS API](http://requirejs.org/docs/api.html). However, Palikka does not do any file loading so it is not AMD compatible. The purpose of the module system is to make it possible to split the codebase into separate self-functioning units which know their dependencies. Palikka then makes sure that the dependencies are loaded before the module is defined. In essence Palikka's modules are named [Promises](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise). The module system is tightly bound to Palikka's promise system (`palikka.Deferred`).
+
+`palikka.define()` and `palikka.require()` method's are asynchronous by default, meaning that their factory/callback functions are called in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop), or more familiarly "next tick". Under the hood a module instance is basically just a lightweight wrapper around `palikka.Deferred()` instance, which is asynchronous by default as per [Promises A/+](https://promisesaplus.com/) specification. However, this behaviour can be switched off forcing `palikka.define()` and `palikka.require()` to execute their factory/callback functions synchronously: `palikka._config.asyncModules = false`.
+
 ###.define()
 
-Define a module. The definition process is asynchronous.
+Define a module.
 
 **Syntax**
 
@@ -91,7 +97,7 @@ Define a module. The definition process is asynchronous.
 * **factory** &nbsp;&mdash;&nbsp; *function / object*
   * this.id &nbsp;&mdash;&nbsp; *string*
   * this.dependencies &nbsp;&mdash;&nbsp; *object*
-  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. If the return value is a deferred instance the module will be initiated when the deferred is resolved with the deferred's value assigned as the module's value.
+  * If the factory is a plain object it is directly assigned as the module's value. If the factory is a function it is executed once after all dependencies have loaded and it's return value will be assigned as the module's value. If the return value is a deferred instance the module will be initiated when the deferred is resolved with the deferred's value assigned as the module's value. If the deferred is rejected the module will not be defined.
 
 **Returns** &nbsp;&mdash;&nbsp; *object*
 
@@ -168,7 +174,7 @@ palikka
 
 ###.Eventizer()
 
-A constructor function that builds a fully functional event system instance. The instance has ***.on()***, ***.off()*** and ***.emit()*** methods and a private object ***._listeners***  where all event callbacks are stored.
+A constructor function that builds a fully functional "event hub" instance. The instance has `.on()`, `.off()` and `.emit()` methods and a private `._listeners` object where all the events are stored.
 
 **Syntax**
 
@@ -189,6 +195,7 @@ eventizer
 .on('test', function (ev, a, b) {
 
     console.log(this); // eventizer
+    console.log(ev.id); // a unique id (number), which can be used to unbind this specific callback
     console.log(ev.type); // 'test'
     console.log(ev.fn); // callback function
     console.log(a); // "a"
@@ -205,7 +212,7 @@ eventizer
 
 ###.Eventizer.prototype.on()
 
-Bind a custom event listener to an Eventizer instance. The callback argument onSettled receives an event data object as it's first argument.
+Bind a custom event listener to an Eventizer instance. The callback argument receives an event data object as it's first argument.
 
 **Syntax**
 
@@ -214,7 +221,28 @@ Bind a custom event listener to an Eventizer instance. The callback argument onS
 **Parameters**
 
 * **type** &nbsp;&mdash;&nbsp; *string*
+  * The type of the event.
 * **callback** &nbsp;&mdash;&nbsp; *function*
+  * A callback function that will be executed, when this type of event is emitted.
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+###.Eventizer.prototype.one()
+
+Same as `.Eventizer.prototype.on()` with the exeception that the callback function will be only executed once after which the event is automatically unbound.
+
+**Syntax**
+
+`e.one( type, callback )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+  * The type of the event.
+* **callback** &nbsp;&mdash;&nbsp; *function*
+  * A callback function that will be executed, when this type of event is emitted.
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer*
 
@@ -222,16 +250,18 @@ Returns the instance that called the method.
 
 ###.Eventizer.prototype.off()
 
-Unbind a custom event listener from an Eventizer instance. If a callback function is not provided all listeners for the specified type will be removed, otherwise only the provided callback instances will be removed.
+Unbind event listener(s) from an Eventizer instance.
 
 **Syntax**
 
-`e.off( type [, cbRef] )`
+`e.off( type [, target] )`
 
 **Parameters**
 
 * **type** &nbsp;&mdash;&nbsp; *string*
-* **cbRef** &nbsp;&mdash;&nbsp; *function*
+  * The type of the event.
+* **target** &nbsp;&mdash;&nbsp; *function / number*
+  * Optional. If not provided all listeners for the specified type will be removed. If a function is provided, all listeners which match the function will be removed. If an id (number) is provided only that specific listener will be removed which matches the id.
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer*
 
@@ -244,6 +274,24 @@ Trigger a custom event within an Eventizer instance. Provided context and argume
 **Syntax**
 
 `e.emit( type [, args] [, context] )`
+
+**Parameters**
+
+* **type** &nbsp;&mdash;&nbsp; *string*
+* **args** &nbsp;&mdash;&nbsp; *array*
+* **context** &nbsp;&mdash;&nbsp; *anything*
+
+**Returns** &nbsp;&mdash;&nbsp; *Eventizer*
+
+Returns the instance that called the method.
+
+###.Eventizer.prototype.emitAsync()
+
+Same as `.Eventizer.prototype.emit()` with the exeception that event will be emitted in the next turn of [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop).
+
+**Syntax**
+
+`e.emitAsync( type [, args] [, context] )`
 
 **Parameters**
 
@@ -282,12 +330,12 @@ A constructor function that creates a deferred instance. The `palikka.Deferred` 
 
 **Syntax**
 
-`palikka.Deferred( [callback] )`
+`palikka.Deferred( [executor] )`
 
 **Parameters**
 
-* **callback** &nbsp;&mdash;&nbsp; *function*
-  * Optional. The callback function has two arguments, `resolve` and `reject` functions, which can be used to resolve or reject the deferred.
+* **executor** &nbsp;&mdash;&nbsp; *function*
+  * Optional. The executor function has two arguments, `resolve` and `reject` functions, which can be used to resolve or reject the deferred.
 
 **Usage**
 
@@ -482,6 +530,21 @@ Returns a master deferred that resolves when all of the arguments and the instan
 
 Returns a new deferred.
 
+###.defer()
+
+Create and return a new deferred instance. Shorthand for `new palikka.Deferred()`.
+
+**Syntax**
+
+`palikka.defer( [executor] )`
+
+**Parameters**
+
+* **executor** &nbsp;&mdash;&nbsp; *function*
+  * Optional. The executor function has two arguments, `resolve` and `reject` functions, which can be used to resolve or reject the deferred.
+
+**Returns** &nbsp;&mdash;&nbsp; *Deferred*
+
 ###.when()
 
 Returns a new deferred that will be resolved/rejected when all provided deferreds are resolved or rejected. Any non-deferred object within the deferreds array will be instantly resolved with itself as the value.
@@ -507,6 +570,8 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 
 * [RequireJS](http://requirejs.org/)
 * [Browserify](http://browserify.org/)
+* [webpack](http://webpack.github.io/)
+* [SystemJS](https://github.com/systemjs/systemjs)
 * [modulejs](http://larsjung.de/modulejs/)
 
 **Promises**
@@ -517,7 +582,11 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 
 **Events**
 
+* [JS-Signals](https://github.com/millermedeiros/js-signals)
+* [EventEmitter](https://github.com/Wolfy87/EventEmitter)
+* [microevent](https://github.com/jeromeetienne/microevent.js)
 * [minivents](https://github.com/allouis/minivents)
+* [bullet](https://github.com/munkychop/bullet)
 
 ##License
 

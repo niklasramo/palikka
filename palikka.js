@@ -6,7 +6,7 @@
  * Released under the MIT license
  */
 
-(function (glob) {
+(function (glob, undefined) {
 
   'use strict';
 
@@ -39,20 +39,22 @@
   stateRejected = 'rejected',
 
   /** Deferred id counter. */
-  deferredId = 0,
+  uuid = 0,
 
-  /* Cache native toString and slice methods. */
-  toString = ({}).toString,
-  slice = ([]).slice,
+  /** Cache native toString and slice methods. */
+  toString = {}.toString,
+  slice = [].slice,
 
   /** Check if strict mode is supported. */
   isStrict = !this === true,
 
-  /** Get reference to resolved native promise instance. */
-  nativePromise = isNative(glob.Promise),
-  nativePromise = nativePromise && nativePromise.resolve();
+  /** Check if we are in Node.js environment. */
+  isNode = typeOf(glob.process, 'process'),
 
-  /*
+  /** Get next tick method. */
+  nextTick = getNextTick();
+
+  /**
    * Eventizer - Constructor
    * ***********************
    */
@@ -89,43 +91,81 @@
     var
     listeners = this._listeners;
 
-    listeners[type] = listeners[type] || [];
-    listeners[type].push(callback);
+    if (typeOf(callback, 'function')) {
+
+      listeners[type] = listeners[type] || [];
+      listeners[type].push({
+        id: ++uuid,
+        type: type,
+        fn: callback
+      });
+
+    }
 
     return this;
 
   };
 
   /**
-   * Unbind an event listener. If a callback function is not provided all listeners for the type will be removed, otherwise only the provided function instances will be removed.
+   * Bind an event listener.
    *
    * @memberof Eventizer
    * @param {string} type
-   * @param {function} [callback]
+   * @param {function} callback
    * @returns {Eventizer} The instance on which this method was called.
    */
-  Eventizer.prototype.off = function (type, callback) {
+  Eventizer.prototype.one = function (type, callback) {
+
+    var
+    instance = this;
+
+    instance.on(type, function (e) {
+
+      instance.off(e.type, e.id);
+      callback.apply(this, arguments);
+
+    });
+
+    return instance;
+
+  };
+
+  /**
+   * Unbind event listeners based on event's type. Optionally one can provide a target that can be a callback function or an id that will be matched used to target specific events. If no target is provided all listeners for the specified type will be removed.
+   *
+   * @memberof Eventizer
+   * @param {string} type
+   * @param {function|number} [target]
+   * @returns {Eventizer} The instance on which this method was called.
+   */
+  Eventizer.prototype.off = function (type, target) {
 
     var
     listeners = this._listeners,
-    typeCallbacks = listeners[type],
+    targetType = typeOf(target),
+    targetId = targetType === 'number',
+    targetFn = targetType === 'function',
+    eventObjects = listeners[type],
+    eventObject,
     i;
 
-    if (typeCallbacks) {
+    if (eventObjects) {
 
-      i = typeCallbacks.length;
+      i = eventObjects.length;
 
       while (i--) {
 
-        if (!callback || (callback && typeCallbacks[i] === callback)) {
+        eventObject = eventObjects[i];
 
-          typeCallbacks.splice(i, 1);
+        if (!target || (targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
+
+          eventObjects.splice(i, 1);
 
         }
 
       }
 
-      if (!typeCallbacks.length) {
+      if (!eventObjects.length) {
 
         delete listeners[type];
 
@@ -150,20 +190,25 @@
 
     var
     instance = this,
-    typeCallbacks = instance._listeners[type];
+    eventObjects = instance._listeners[type];
 
-    if (typeCallbacks) {
+    if (eventObjects) {
 
-      arrayEach(copyArray(typeCallbacks), function (callback) {
+      arrayEach(copyArray(eventObjects), function (eventObject) {
 
-        if (typeOf(callback, 'function')) {
+        if (typeOf(eventObject.fn, 'function')) {
 
           var
           cbArgs = copyArray(args),
-          cbCtx = typeOf(ctx, 'undefined') ? instance : ctx;
+          cbCtx = ctx === undefined ? instance : ctx;
 
-          cbArgs.unshift({type: type, fn: callback});
-          callback.apply(cbCtx, cbArgs);
+          cbArgs.unshift({
+            id: eventObject.id,
+            type: eventObject.type,
+            fn: eventObject.fn
+          });
+
+          eventObject.fn.apply(cbCtx, cbArgs);
 
         }
 
@@ -221,6 +266,7 @@
 
       obj._listeners = eventizer._listeners;
       obj.on = eventizer.on;
+      obj.one = eventizer.one;
       obj.off = eventizer.off;
       obj.emit = eventizer.emit;
       obj.emitAsync = eventizer.emitAsync;
@@ -259,7 +305,7 @@
      * @protected
      * @type {string}
      */
-    instance._id = ++deferredId;
+    instance._id = ++uuid;
 
     /**
      * Indicates if the instance can be resolved/rejected while in pending state. This property will be set to true on the first resolve/reject call.
@@ -448,10 +494,9 @@
 
         if (instance._state === statePending) {
 
-          evHub.on(evResolve + instance._id, function (e) {
+          evHub.one(evResolve + instance._id, function () {
 
             callback(instance.result());
-            evHub.off(e.type, e.fn);
 
           });
 
@@ -489,10 +534,9 @@
 
         if (instance._state === statePending) {
 
-          evHub.on(evReject + instance._id, function (e) {
+          evHub.one(evReject + instance._id, function () {
 
             callback(instance.result());
-            evHub.off(e.type, e.fn);
 
           });
 
@@ -589,7 +633,7 @@
 
   };
 
-  /*
+  /**
    * Deferred - Helpers
    * ******************
    */
@@ -700,7 +744,7 @@
 
   }
 
-  /*
+  /**
    * Module - Constructor
    * ********************
    */
@@ -788,7 +832,7 @@
 
   };
 
-  /*
+  /**
    * Module - Helpers
    * ****************
    */
@@ -915,9 +959,8 @@
 
       defers.push(module ? module._deferred : new Deferred(function (resolve) {
 
-        evHub.on(evInitiate + '-' + depId, function (ev, module) {
+        evHub.one(evInitiate + '-' + depId, function (ev, module) {
 
-          evHub.off(ev.type, ev.fn);
           resolve(module._deferred.result());
 
         });
@@ -1125,7 +1168,112 @@
   }
 
   /**
-   * Execute function, optionally asynchronously in the next event loop.
+   * Create cross-browser next tick implementation. Returns a function that accepts a function as a parameter.
+   *
+   * @todo Add some faster fallbacks such onreadystatechange for IE7-IE10. setImmediate is broken unfortunately.
+   * @todo Create test case for testing callback order when doing inner async calls.
+   * @todo Webworker tests.
+   *
+   * @private
+   * @returns {function}
+   */
+  function getNextTick() {
+
+    var
+    nativePromise = isNative(glob.Promise),
+    nativeMT,
+    queueEmpty,
+    processQueue,
+    tryFireTick,
+    fireTick,
+    observerTarget;
+
+    /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
+    if (nativePromise) {
+
+      nativePromise = nativePromise.resolve();
+
+      /** Return next tick function. */
+      return function (cb) {
+
+        nativePromise.then(cb);
+
+      };
+
+    }
+    /** Node.js has good existing next tick implementations, so let's use them. */
+    else if (isNode) {
+
+      return glob.setImmediate || glob.process.nextTick;
+
+    }
+    /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
+    else {
+
+      /** Let's check if mutation observer is supported. */
+      nativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
+
+      /** Flag for checking the state of the queue. */
+      queueEmpty = 1;
+
+      /** Function to process the queue (fire the callbacks). */
+      processQueue = function () {
+
+        queueEmpty = 1;
+        evHub.emit('tick');
+
+      };
+
+      /** Function to try trigger next tick.  */
+      tryFireTick = function () {
+
+        if (queueEmpty) {
+
+          queueEmpty = 0;
+          fireTick();
+
+        }
+
+      };
+
+      /** MutationObserver fallback. */
+      if (nativeMT) {
+
+        observerTarget = document.createElement('i');
+        (new nativeMT(processQueue)).observe(observerTarget, {attributes: true});
+
+        fireTick = function () {
+
+          observerTarget.id = '';
+
+        };
+
+      }
+      /** setTimeout fallback. */
+      else {
+
+        fireTick = function () {
+
+          glob.setTimeout(processQueue, 0);
+
+        };
+
+      }
+
+      /** Return next tick function. */
+      return function (cb) {
+
+        evHub.one('tick', cb);
+        tryFireTick();
+
+      };
+
+    }
+
+  }
+
+  /**
+   * Execute a function, sync or async, it's up to you.
    *
    * @private
    * @param {function} fn
@@ -1133,21 +1281,7 @@
    */
   function execFn(fn, async) {
 
-    if (!async) {
-
-      fn();
-
-    }
-    else if (nativePromise) {
-
-      nativePromise.then(fn);
-
-    }
-    else {
-
-      glob.setTimeout(fn, 0);
-
-    }
+    async ? nextTick(fn) : fn();
 
   }
 
@@ -1225,9 +1359,9 @@
 
   /**
    * @public
-   * @see execFn
+   * @see nextTick
    */
-  lib._execFn = execFn;
+  lib._nextTick = nextTick;
 
   /**
    * @public
