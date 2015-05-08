@@ -195,6 +195,65 @@
 
   });
 
+  Q.test('Modules - asynchronous test.', function (assert) {
+
+    var done = assert.async();
+    assert.expect(1);
+
+    var test = [];
+
+    test.push(1);
+
+    palikka.require('asyncTest', function () {
+      test.push(2);
+    });
+
+    palikka.define('asyncTest2', ['asyncTest'], function () {
+      test.push(3);
+      assert.deepEqual(test, [1, 5, 4, 2, 3]);
+      done();
+    });
+
+    palikka.define('asyncTest', function () {
+      test.push(4);
+      return 'asyncTest';
+    });
+
+    test.push(5);
+
+  });
+
+  Q.test('Modules - synchronous test.', function (assert) {
+
+    assert.expect(1);
+
+    var test = [];
+
+    palikka._config.asyncModules = false;
+
+    test.push(1);
+
+    palikka.require('syncTest', function () {
+      test.push(2);
+    });
+
+    palikka.define('syncTest2', ['syncTest'], function () {
+      test.push(3);
+    });
+
+    palikka.define('syncTest', function () {
+      test.push(4);
+      return 'asyncTest';
+    });
+
+    test.push(5);
+
+    assert.deepEqual(test, [1, 4, 2, 3, 5]);
+
+    palikka._config.asyncModules = true;
+
+  });
+
   Q.test('Eventizer', function (assert) {
 
     var done = assert.async();
@@ -215,6 +274,7 @@
 
     /** Eventizer instance methods should be chainable. */
     assert.strictEqual(evA.on('chainable'), evA);
+    assert.strictEqual(evA.one('chainable'), evA);
     assert.strictEqual(evA.off('chainable'), evA);
     assert.strictEqual(evA.emit('chainable'), evA);
     assert.strictEqual(evA.emitAsync('chainable'), evA);
@@ -275,16 +335,106 @@
     .off('ev-3')
     .emit('ev-3');
 
-    /** Async emit. */
-    evA
-    .emitAsync('ev-4')
-    .on('ev-4', function () {
+    window.setTimeout(done, 1000);
 
+  });
+
+  Q.test('Eventizer - Automatic unbinding with ".one()".', function (assert) {
+
+    assert.expect(1);
+
+    var
+    eHub = palikka.eventize();
+
+    eHub
+    .one('a', function () {
       assert.strictEqual(1, 1);
+    })
+    .emit('a')
+    .emit('a');
+
+  });
+
+  Q.test('Eventizer - Asynchronous emit.', function (assert) {
+
+    var done = assert.async();
+    assert.expect(1);
+
+    var
+    eHub = palikka.eventize(),
+    test = [];
+
+    test.push(1);
+
+    eHub.emitAsync('a');
+
+    test.push(2);
+
+    eHub.on('a', function () {
+
+      test.push(3);
 
     });
 
-    window.setTimeout(done, 1000);
+    test.push(4);
+
+    eHub.one('a', function () {
+
+      test.push(5);
+      assert.deepEqual(test, [1, 2, 4, 6, 3, 5]);
+      done();
+
+    });
+
+    test.push(6);
+
+  });
+
+  Q.test('Eventizer - Bind/unbind multiple identical listeners (callback based unbind).', function (assert) {
+
+    assert.expect(6);
+
+    var
+    eHub = palikka.eventize(),
+    args = [1, 2, 3, 4, 5],
+    cb = function (ev, a1, a2, a3, a4, a5) {
+      assert.deepEqual(args, [a1, a2, a3, a4, a5]);
+    };
+
+    eHub
+    .on('a', cb)
+    .on('a', cb)
+    .on('a', cb)
+    .emit('a', args)
+    .emit('a', args)
+    .off('a', cb)
+    .emit('a', args);
+
+  });
+
+  Q.test('Eventizer - Unbind a single listener (id based unbind).', function (assert) {
+
+    assert.expect(6);
+
+    var
+    eHub = palikka.eventize(),
+    id  = null,
+    cb = function (ev) {
+      id = ev.id;
+      assert.strictEqual(1, 1);
+    };
+
+    eHub
+    .on('a', cb)
+    .on('a', cb)
+    .on('a', cb)
+    .emit('a')
+    .off('a', id)
+    .emit('a')
+    .off('a', id)
+    .emit('a')
+    .off('a', id)
+    .emit('a');
 
   });
 
@@ -306,15 +456,121 @@
 
   Q.test('Deferred - Instance creation.', function (assert) {
 
-    assert.expect(2);
+    assert.expect(6);
 
     /** Constructor should return a palikka.Deferred instance. */
     var y = new palikka.Deferred(function () {});
     assert.strictEqual(y instanceof palikka.Deferred, true);
+    assert.strictEqual(y.state(), 'pending');
 
     /** Constructor callback should be optional. */
     var x = new palikka.Deferred();
     assert.strictEqual(x instanceof palikka.Deferred, true);
+    assert.strictEqual(x.state(), 'pending');
+
+    /** Shorthand instance creation. */
+    var z = palikka.defer();
+    assert.strictEqual(z instanceof palikka.Deferred, true);
+    assert.strictEqual(z.state(), 'pending');
+
+  });
+
+  Q.test('Deferred - asynchronous test.', function (assert) {
+
+    var done = assert.async();
+    assert.expect(1);
+
+    var test = [];
+
+    palikka
+    .defer()
+    .resolve()
+    .onFulfilled(function () {
+      test.push(1);
+    });
+
+    test.push(2);
+
+    palikka
+    .defer()
+    .reject()
+    .onRejected(function () {
+      test.push(3);
+    });
+
+    test.push(4);
+
+    palikka
+    .defer()
+    .resolve()
+    .then(function () {
+      test.push(5);
+    });
+
+    test.push(6);
+
+    palikka
+    .defer()
+    .reject()
+    .then(null, function () {
+      test.push(7);
+      assert.deepEqual(test, [2, 4, 6, 8, 1, 3, 5, 7]);
+      done();
+    })
+    .resolve();
+
+    test.push(8);
+
+  });
+
+  Q.test('Deferred - synchronous test.', function (assert) {
+
+    assert.expect(1);
+
+    var test = [];
+
+    palikka._config.asyncDeferreds = false;
+
+    palikka
+    .defer()
+    .resolve()
+    .onFulfilled(function () {
+      test.push(1);
+    });
+
+    test.push(2);
+
+    palikka
+    .defer()
+    .reject()
+    .onRejected(function () {
+      test.push(3);
+    });
+
+    test.push(4);
+
+    palikka
+    .defer()
+    .resolve()
+    .then(function () {
+      test.push(5);
+    });
+
+    test.push(6);
+
+    palikka
+    .defer()
+    .reject()
+    .then(null, function () {
+      test.push(7);
+    })
+    .resolve();
+
+    test.push(8);
+
+    assert.deepEqual(test, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+    palikka._config.asyncDeferreds = true;
 
   });
 
@@ -781,7 +1037,89 @@
     assert.strictEqual(palikka._typeOf(JSON), 'json');
     assert.strictEqual(palikka._typeOf(arguments), 'arguments');
 
-    /** DOM (todo) */
+    /** DOM... (frowns)... later... */
+
+  });
+
+  Q.test('Utils - _nextTick', function (assert) {
+
+    var done = assert.async();
+    assert.expect(1);
+
+    var test = [];
+
+    palikka._nextTick(function () {
+
+      test.push(2);
+
+      palikka._nextTick(function () {
+
+        test.push(5);
+
+        palikka._nextTick(function () {
+
+          palikka._nextTick(function () {
+
+            palikka._nextTick(function () {
+
+              test.push(10);
+
+              assert.deepEqual(test, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+              done();
+
+            });
+
+          });
+
+        });
+
+      });
+
+    });
+
+    palikka._nextTick(function () {
+
+      test.push(3);
+
+      palikka._nextTick(function () {
+
+        test.push(6);
+
+        palikka._nextTick(function () {
+
+          palikka._nextTick(function () {
+
+            test.push(9);
+
+          });
+
+        });
+
+      });
+
+    });
+
+    palikka._nextTick(function () {
+
+      test.push(4);
+
+      palikka._nextTick(function () {
+
+        test.push(7);
+
+          palikka._nextTick(function () {
+
+            test.push(8);
+
+          });
+
+      });
+
+
+    });
+
+    test.push(1);
 
   });
 

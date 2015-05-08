@@ -360,7 +360,7 @@
   }
 
   /**
-   * Control instances asynchronity. Providing true as the value will set the instance to be asynchronous. Providing false will set the insrance synchronous.
+   * Control instances asynchronity. Providing true as the value will set the instance to be asynchronous. Providing false will set the instance synchronous.
    *
    * @protected
    * @memberof Deferred.prototype
@@ -369,7 +369,7 @@
    */
   Deferred.prototype._async = function (isAsync) {
 
-    this.asynchronous = isAsync ? true : false;
+    this._asynchronous = isAsync ? true : false;
 
     return this;
 
@@ -575,7 +575,7 @@
 
     var
     instance = this,
-    next = new Deferred(),
+    next = defer(),
     isFulfilled,
     fateCallback;
 
@@ -696,7 +696,7 @@
     rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
 
     var
-    master = new Deferred(),
+    master = defer(),
     masterArgs = [],
     counter = deferreds.length,
     firstRejection;
@@ -705,7 +705,7 @@
 
       arrayEach(deferreds, function (deferred, i) {
 
-        deferred = deferred instanceof Deferred ? deferred : (new Deferred()).resolve(deferred);
+        deferred = deferred instanceof Deferred ? deferred : defer()._async(false).resolve(deferred);
 
         deferred.onSettled(function () {
 
@@ -762,7 +762,7 @@
 
     var
     instance = this,
-    deferred = new Deferred()._async(false),
+    deferred = defer()._async(false),
     factoryCtx,
     factoryValue;
 
@@ -957,7 +957,7 @@
       var
       module = modules[depId];
 
-      defers.push(module ? module._deferred : new Deferred(function (resolve) {
+      defers.push(module ? module._deferred : defer(function (resolve) {
 
         evHub.one(evInitiate + '-' + depId, function (ev, module) {
 
@@ -965,7 +965,7 @@
 
         });
 
-      }));
+      })._async(config.asyncModules));
 
     });
 
@@ -1171,8 +1171,6 @@
    * Create cross-browser next tick implementation. Returns a function that accepts a function as a parameter.
    *
    * @todo Add some faster fallbacks such onreadystatechange for IE7-IE10. setImmediate is broken unfortunately.
-   * @todo Create test case for testing callback order when doing inner async calls.
-   * @todo Webworker tests.
    *
    * @private
    * @returns {function}
@@ -1375,7 +1373,7 @@
    */
 
   /** Initialize private event hub. */
-  evHub = new Eventizer();
+  evHub = eventize();
 
   /**
    * Publish library using an adapted UMD pattern.
