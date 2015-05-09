@@ -166,7 +166,7 @@ a:hover {
   display: block;
   position: absolute;
   left: -17px;
-  top: 7px;
+  top: 11px;
   width: 5px;
   height: 5px;
   -webkit-border-radius: 4px;
@@ -666,9 +666,6 @@ a.big.button:hover:visited {
 .menu a:visited {
   color: #888888;
 }
-.menu a:hover {
-  color: #3875CA;
-}
 .menu a.level-1 {
   font-family: "montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   text-transform: uppercase;
@@ -677,21 +674,20 @@ a.big.button:hover:visited {
 }
 .menu a.level-1,
 .menu a.level-1:visited {
-  color: #9090aa;
-}
-.menu a.level-1:hover {
-  color: #565666;
+  color: #505050;
+  font-size: 16px;
 }
 .menu a.level-2 {
-  font-weight: normal;
+  font-weight: 500;
+  color: #505050;
 }
 .menu a.level-3 {
   font-weight: normal;
   font-size: 0.95em;
   padding-left: 10px;
 }
-.menu a.active {
-  font-weight: bold !important;
+.menu a:hover {
+  color: #3875CA !important;
 }
 .menu a.active,
 .menu a.active:visited,
