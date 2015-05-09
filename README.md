@@ -19,15 +19,15 @@ A compact and well-tested JavaScript module/event/promise system that works in t
 Include [palikka.js](https://github.com/niklasramo/palikka/blob/dev/v0.3.0/palikka.js) somewhere on your site (before any code that requires Palikka).
 
 ```javascript
-// Define module "foo" which requires module "bar"
+// Define module "foo" which requires module "bar".
 palikka.define('foo', ['bar'], function (bar) {
   return 'foo';
 });
 
-// Define module "bar"
+// Define module "bar".
 palikka.define('bar', function () {
 
-  // Let's use promises (deferred) to delay the initiation
+  // Use promises (deferred) to delay the initiation.
   return new palikka.Deferred(function (resolve, reject) {
     window.setTimeout(function () {
       resolve('bar');
@@ -36,7 +36,7 @@ palikka.define('bar', function () {
 
 });
 
-// Require modules "foo" and "bar"
+// Require modules "foo" and "bar".
 palikka.require(['foo', 'bar'], function (foo, bar) {
   console.log(foo + bar); // "foobar"
 });
@@ -196,7 +196,7 @@ eventizer
 
     console.log(this); // eventizer
     console.log(ev.id); // a unique id (number), which can be used to unbind this specific callback
-    console.log(ev.type); // 'test'
+    console.log(ev.type); // "test"
     console.log(ev.fn); // callback function
     console.log(a); // "a"
     console.log(b); // "b"
