@@ -722,7 +722,11 @@ code .keyword {
   font-weight: bold;
   color: #E05A5A;
 }
-code .comment {
+code .comment,
+code .comment .string,
+code .comment .number,
+code .comment .keyword,
+code .comment .init {
   color: #999;
 }
 .content > h1:first-child + p,
