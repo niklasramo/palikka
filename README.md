@@ -568,6 +568,45 @@ Returns a new deferred that will be resolved/rejected when all provided deferred
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
+##Advanced examples
+
+**Importing third party modules**
+
+Not all JavaScript libraries are palikka modules, so we have tried to make importing third party libraries as easy as possible. Assuming all third party libraries populate a namespace in window object we can import (define) multiple modules at once. In the example below we assume that jQuery and Modernizr are loaded before executing the script.
+
+```
+<script src="palikka.js"></script>
+<script src="jquery.js"></script>
+<script src="modernizr.js"></script>
+<script>
+palikka.define(['jQuery', 'Modernizr'], function () {
+  // We assume that the id of the library matches it’s global namespace
+  return window[this.id];
+});
+</script>
+```
+
+The problem with the above way of importing is that we have to just trust that the imported objects exist. Taking the import script a bit further we can add a little polling function that will import the object as soon as it exists. You might want to add some extra logic to the script, e.g. limiting the total amount of poll events, but this is a good starting point.
+
+```
+<script src="palikka.js"></script>
+<script>
+palikka.define(['jQuery', 'Modernizr'], function () {
+  var id = this.id;
+  return palikka.defer(function (resolve) {
+    var poller = window.setInterval(function () {
+      if (id in window) {
+        clearInterval(poller);
+        resolve(window[id]);
+      }
+    }, 20);
+  });
+});
+</script>
+<script src="jquery.js"></script>
+<script src="modernizr.js"></script>
+```
+
 ##Alternatives
 
 **Modules**
