@@ -1,12 +1,10 @@
 #Palikka v0.3.1
 
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.1)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.1)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.0)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.1)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.1)
 [![Bower version](https://badge.fury.io/bo/palikka.svg)](http://badge.fury.io/bo/palikka)
 
 A compact and well-tested JavaScript module/event/promise system that works in the browser (all the way down to IE7) and Node.js. So, why bundle three different libraries together? Both a module and a promise system require an event system to work so it makes sense to optimize their synergies internally in order to keep the code DRY and performant. The primary goal of this project is to provide a solid [Promise](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise) based module system.
-
-##Features
 
 * Lightweight, around 5.8kb minified and 2.3kb minified and gzipped.
 * Works both in the browser (IE7+) and in Node.js.
@@ -16,7 +14,7 @@ A compact and well-tested JavaScript module/event/promise system that works in t
 
 ##Basic usage
 
-Include [palikka.js](https://github.com/niklasramo/palikka/blob/dev/v0.3.0/palikka.js) somewhere on your site (before any code that requires Palikka).
+Include [palikka.js](https://github.com/niklasramo/palikka/blob/v0.3.1/palikka.js) somewhere on your site (before any code that requires Palikka).
 
 ```javascript
 // Define module "foo" which requires module "bar".
@@ -78,7 +76,7 @@ palikka.require(['foo', 'bar'], function (foo, bar) {
 
 The Module system API is derived from [AMD spec](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) and [RequireJS API](http://requirejs.org/docs/api.html). However, Palikka does not do any file loading so it is not AMD compatible. The purpose of the module system is to make it possible to split the codebase into separate self-functioning units which know their dependencies. Palikka then makes sure that the dependencies are loaded before the module is defined. In essence Palikka's modules are named [Promises](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Promise). The module system is tightly bound to Palikka's own promise system, [Deferreds](#deferreds).
 
-The `.define()` and `.require()` methods are asynchronous by default, meaning that their factory/callback functions are called in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop), or more familiarly "next tick". Under the hood a module instance is basically just a lightweight wrapper around `.Deferred()` instance, which is asynchronous by default as per [Promises/A+](https://promisesaplus.com/) specification. However, this behaviour can be switched off forcing `.define()` and `.require()` to execute their factory/callback functions synchronously: `palikka._config.asyncModules = false`.
+The [`.define()`](#define) and [`.require()`](#require) methods are asynchronous by default, meaning that their factory/callback functions are called in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop), or more familiarly "next tick". Under the hood a module instance is basically just a lightweight wrapper around `.Deferred()` instance, which is asynchronous by default as per [Promises/A+](https://promisesaplus.com/) specification. However, this behaviour can be switched off forcing [`.define()`](#define) and [`.require()`](#require) to execute their factory/callback functions synchronously: `palikka._config.asyncModules = false`.
 
 ###.define()
 
@@ -122,7 +120,7 @@ palikka.define('foobar', ['foo', 'bar'], function (foo, bar) {
 // Define a module using delayed initiation.
 palikka.define('delayed', function () {
   return new palikka.Deferred(function (resolve) {
-    window.setTimeout(function () {
+    setTimeout(function () {
       resolve('I am delayed...');
     }, 2000);
   });
@@ -138,7 +136,7 @@ palikka.define(['a', 'b'], function () {
 
 ###.require()
 
-Require a module. Loads modules at your disposal when they are loaded.
+Require modules (dependencies) and execute a function when they are loaded.
 
 **Syntax**
 
@@ -147,7 +145,7 @@ Require a module. Loads modules at your disposal when they are loaded.
 **Parameters**
 
 * **dependencies** &nbsp;&mdash;&nbsp; *array / string*
-  * Refer to `.define()` method's dependencies parameter description.
+  * Optional. Define multiple dependencies as an array of module ids and a single dependency as a string.
 * **callback** &nbsp;&mdash;&nbsp; *function*
   * The callback function that will be executed after all dependencies have loaded. Receives the required dependency modules as function arguments in the same order they were required.
 
@@ -172,9 +170,11 @@ palikka
 
 ##Events
 
+A very straightforward event system implementation with the ability to optionally emit events asynchronously.
+
 ###.Eventizer()
 
-A constructor function that builds a fully functional "event hub" instance. The instance has `.on()`, `.off()` and `.emit()` methods and a private `._listeners` object where all the events are stored.
+A constructor function that builds a fully functional "event hub" instance. All the event listeners are stored in a protected "listeners" object accesible via `instance._listeners`. However, it is not recommended to manipulate the object directly.
 
 **Syntax**
 
@@ -287,7 +287,7 @@ Returns the instance that called the method.
 
 ###.Eventizer.prototype.emitAsync()
 
-Same as `.Eventizer.prototype.emit()` with the exeception that event will be emitted in the next turn of [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop).
+Same as [`.Eventizer.prototype.emit()`](#eventizerprototypeemit) with the exeception that the event will be emitted in the next turn of [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop).
 
 **Syntax**
 
@@ -305,7 +305,7 @@ Returns the instance that called the method.
 
 ###.eventize()
 
-Creates a new Eventizer instance and returns it. If **obj** is provided the Eventizer instance's methods are ported to the provided object.
+Creates and returns a new Eventizer instance.
 
 **Syntax**
 
@@ -320,13 +320,13 @@ Creates a new Eventizer instance and returns it. If **obj** is provided the Even
 
 **Returns** &nbsp;&mdash;&nbsp; *Eventizer / object*
 
-Returns a new Eventizer instance or the object provided as **obj** argument.
+Returns a new Eventizer instance, or if the **obj** argument was provided returns the provided object.
 
 ##Deferreds
 
 Palikka's promises are called "deferreds". Please, do note that the `.Deferred()` constructor is not a polyfill for native ES6 Promise, but it does follow the [Promises/A+ v1.1](https://promisesaplus.com/) specification.
 
-By default the callbacks of `.Deferred.prototype.onFulfilled()`, `.Deferred.prototype.onRejected()`, `.Deferred.prototype.onSettled()` and `.Deferred.prototype.then()` methods are called asynchronously in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop) (as per Promises/A+ v1.1 specification). However, although not recommended, deferreds can be configured to work synchronously: `palikka._config.asyncDeferreds = false`. Please note that turning synchronous behaviour on is against the Promises/A+ v1.1 specification, so do that only if you know what you are doing.
+By default the callback methods are called asynchronously in the beginning of the next [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop) (as per Promises/A+ v1.1 specification). However, deferreds can be configured to work synchronously also: `palikka._config.asyncDeferreds = false`. Please note that turning synchronous behaviour on is against the Promises/A+ v1.1 specification, so do that only if you know what you are doing.
 
 ###.Deferred()
 
@@ -346,11 +346,11 @@ A constructor function that creates a deferred instance, which is a spiced up ve
 ```javascript
 var defer = new palikka.Deferred(function (resolve, reject) {
 
-  window.setTimeout(function () {
+  setTimeout(function () {
     resolve('done');
   }, Math.floor(Math.random() * 1000));
 
-  window.setTimeout(function () {
+  setTimeout(function () {
     reject('fail');
   }, Math.floor(Math.random() * 1000));
 
@@ -370,15 +370,15 @@ defer
 
 ###.Deferred.prototype.state()
 
-Retrieve the current state of the deferred: "pending", "resolved" or "rejected".
+Retrieve the current state of the deferred.
 
 **Syntax**
 
-`d.state()`
+`deferred.state()`
 
-**Returns** &nbsp;&mdash;&nbsp; *Deferred*
+**Returns** &nbsp;&mdash;&nbsp; *string*
 
-Returns the instance that called the method.
+Returns the state of the deferred instance: "pending", "resolved" or "rejected".
 
 **Usage**
 
@@ -392,11 +392,11 @@ console.log(d2.reject().state()); // "rejected"
 
 ###.Deferred.prototype.result()
 
-Retrieve the result value (the arguments with which the instance was resolved/rejected) of the instance.
+Retrieve the result, the value with which the deferred instance was resolved or rejected, of the deferred instance.
 
 **Syntax**
 
-`d.result()`
+`deferred.result()`
 
 **Returns** &nbsp;&mdash;&nbsp; *anything*
 
@@ -413,16 +413,16 @@ d2.reject(2).result(); // 2
 
 ###.Deferred.prototype.resolve()
 
-Resolve a deferred instance.
+Resolve the deferred instance.
 
 **Syntax**
 
-`d.resolve( [result] )`
+`deferred.resolve( [result] )`
 
 **Parameters**
 
 * **result** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Defaults to `undefined`. A value that is passed on to the `onFulfilled` and `onSettled` callbacks. If this is another deferred the instance will wait for it to settle and then adopt it's fate.
+  * Optional. Defaults to `undefined`. A value that is passed on to the `onFulfilled` and `onSettled` callbacks. If result is another deferred the current deferred instance will wait for the provided deferred to settle and then adopt it's fate. Resolving a deferred with itself as the value is not allowed and will result in an error.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -430,16 +430,16 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.reject()
 
-Reject a deferred instance.
+Reject the deferred instance.
 
 **Syntax**
 
-`d.reject( [reason] )`
+`deferred.reject( [reason] )`
 
 **Parameters**
 
 * **reason** &nbsp;&mdash;&nbsp; *anything*
-  * Optional. Defaults to undefined. A value (reason) that is passed on to the `onRejected` and `onSettled` callbacks.
+  * Optional. Defaults to `undefined`. A reason for rejection which is passed on to the `onRejected` and `onSettled` callbacks.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
@@ -451,7 +451,7 @@ Add a callback that will be called when the deferred is resolved.
 
 **Syntax**
 
-`d.onFulfilled( callback )`
+`deferred.onFulfilled( callback )`
 
 **Parameters**
 
@@ -468,7 +468,7 @@ Add a callback that will be called when the deferred is rejected.
 
 **Syntax**
 
-`d.onRejected( callback )`
+`deferred.onRejected( callback )`
 
 **Parameters**
 
@@ -485,7 +485,7 @@ Add a callback that will be called when the deferred is either resolved or rejec
 
 **Syntax**
 
-`d.onSettled( callback )`
+`deferred.onSettled( callback )`
 
 **Parameters**
 
@@ -498,11 +498,11 @@ Returns the instance that called the method.
 
 ###.Deferred.prototype.then()
 
-Chain deferreds. Returns a new deferred. Errors will fall down the `.then()` chain until they are "caught" with `.then()` using the second `onRejected` argument.
+Chain deferreds. Returns a new deferred. Thrown errors will be automatically silenced and will fall down the `.then()` method chain until they are "caught" with `.then(null, onRejected)`. Note that `.onRejected()` and `.onSettled()` callback methods will not catch thrown errors. They can access the error, but it will continue to fall down the `.then()` method chain.
 
 **Syntax**
 
-`d.then( [onFulfilled] [, onRejected] )`
+`deferred.then( [onFulfilled] [, onRejected] )`
 
 **Parameters**
 
@@ -517,17 +517,17 @@ Returns a new deferred.
 
 ###.Deferred.prototype.and()
 
-Returns a master deferred that resolves when all of the arguments and the instance have resolved.
+This method is basically just a wrapper for [`.when()`](#when) with the addition that the deferred instance which called the method is automatically included in the deferreds argument.
 
-`d.and( deferreds [, resolveOnFirst] [, rejectOnFirst] )`
+`deferred.and( deferreds [, resolveImmediately] [, rejectImmediately] )`
 
 **Parameters**
 
 * **deferreds** &nbsp;&mdash;&nbsp; *array*
   * An `array` of deferreds, or any other values.
-* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **resolveImmediately** &nbsp;&mdash;&nbsp; *boolean*
   * Optional. Defaults to `false`. If `true` the master deferred will be resolved immediately when the first deferred is resolved.
-* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **rejectImmediately** &nbsp;&mdash;&nbsp; *boolean*
   * Optional. Defaults to `true`. If `true` the master deferred will be resolved immediately when the first deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
@@ -551,26 +551,26 @@ Create and return a new deferred instance. Shorthand for `new palikka.Deferred()
 
 ###.when()
 
-Returns a new deferred that will be resolved/rejected when all provided deferreds are resolved or rejected. Any non-deferred object within the deferreds array will be instantly resolved with itself as the value.
+Returns a new master deferred that will be resolved when all provided deferreds are resolved. By default the master deferred will be rejected instantly when one of the provided deferreds is rejected. Any non-deferred object will be turned into a deferred and resolved immediately with the object itself as the fulfillment value.
 
 **Syntax**
 
-`palikka.when( deferreds [, resolveOnFirst] [, rejectOnFirst] )`
+`palikka.when( deferreds [, resolveImmediately] [, rejectImmediately] )`
 
 **Parameters**
 
 * **deferreds** &nbsp;&mdash;&nbsp; *array*
   * An `array` of deferreds, or any other objects.
-* **resolveOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **resolveImmediately** &nbsp;&mdash;&nbsp; *boolean*
   * Optional. Defaults to `false`. If `true` the master deferred will be resolved immediately when the first deferred is resolved.
-* **rejectOnFirst** &nbsp;&mdash;&nbsp; *boolean*
+* **rejectImmediately** &nbsp;&mdash;&nbsp; *boolean*
   * Optional. Defaults to `true`. If `true` the master deferred will be resolved immediately when the first deferred is rejected.
 
 **Returns** &nbsp;&mdash;&nbsp; *Deferred*
 
 ##Advanced examples
 
-**Importing third party modules**
+**Importing third party libraries as Palikka modules**
 
 Not all JavaScript libraries are palikka modules, so we have tried to make importing third party libraries as easy as possible. Assuming all third party libraries populate a namespace in window object we can import (define) multiple modules at once. In the example below we assume that jQuery and Modernizr are loaded before executing the script.
 
@@ -594,7 +594,7 @@ The problem with the above way of importing is that we have to just trust that t
 palikka.define(['jQuery', 'Modernizr'], function () {
   var id = this.id;
   return palikka.defer(function (resolve) {
-    var poller = window.setInterval(function () {
+    var poller = setInterval(function () {
       if (id in window) {
         clearInterval(poller);
         resolve(window[id]);
