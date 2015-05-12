@@ -122,6 +122,46 @@ a:hover {
   box-sizing: border-box;
 }
 
+/* Splash */
+
+.splash {
+  position: relative;
+  height: 100%;
+  background: #2E5FAB;
+}
+.splash-wrapper {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+  height: 100%;
+}
+.splash-wrapper-inner {
+  display: table-cell;
+  vertical-align: middle;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+}
+.splash h1 {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  color: #fff;
+  font-weight: 500;
+  font-size: 32px;
+  text-transform: uppercase;
+  letter-spacing: 10px;
+}
+.splash h2 {
+  position: relative;
+  margin: 10px 0 0 0;
+  padding: 0;
+  color: rgba(255,255,255,0.3);
+  font-weight: 300;
+  font-style: italic;
+  font-size: 22px;
+}
+
 /* Content */
 
 .content p,

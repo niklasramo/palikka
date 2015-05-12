@@ -9,14 +9,14 @@
 
   <!-- Flatdoc -->
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script src='https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/legacy.js'></script>
-  <script src='https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/flatdoc.js'></script>
+  <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/legacy.js"></script>
+  <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/flatdoc.js"></script>
 
   <!-- Flatdoc theme -->
-  <link href='http://fonts.googleapis.com/css?family=Inconsolata:400,700' rel='stylesheet' type='text/css'>
+  <link href="http://fonts.googleapis.com/css?family=Inconsolata:400,700" rel="stylesheet" type="text/css">
   <script type="text/javascript">
     WebFontConfig = {
-      google: { families: [ 'Droid+Sans+Mono::latin', 'Roboto:400,300,300italic,400italic,500,500italic,700,700italic:latin',  ] }
+      google: { families: [ "Droid+Sans+Mono::latin", "Roboto:400,300,300italic,400italic,500,500italic,700,700italic:latin",  ] }
     };
     (function() {
       var wf = document.createElement('script');
@@ -28,8 +28,8 @@
       s.parentNode.insertBefore(wf, s);
     })();
   </script>
-  <link  href='style.css' rel='stylesheet'>
-  <script src='https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/theme-white/script.js'></script>
+  <link  href="style.css" rel="stylesheet">
+  <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/theme-white/script.js"></script>
 
   <!-- Meta -->
   <meta content="Palikka" property="og:title">
@@ -42,27 +42,36 @@
     });
   </script>
 </head>
-<body role='flatdoc'>
+<body role="flatdoc">
 
-  <div class='header'>
-    <div class='left'>
+  <div class="splash">
+    <div class="splash-wrapper">
+      <div class="splash-wrapper-inner">
+        <h1>Palikka</h1>
+        <h2>A tiny module system for the browser and Node.js</h2>
+      </div>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="left">
       <h1>Palikka</h1>
       <ul>
-        <li><a href='https://github.com/niklasramo/palikka'>View on GitHub</a></li>
-        <li><a href='https://github.com/niklasramo/palikka/issues'>Issues</a></li>
+        <li><a href="https://github.com/niklasramo/palikka">View on GitHub</a></li>
+        <li><a href="https://github.com/niklasramo/palikka/issues">Issues</a></li>
       </ul>
     </div>
-    <div class='right'>
+    <div class="right">
       <!-- GitHub buttons: see http://ghbtns.com -->
       <iframe src="http://ghbtns.com/github-btn.html?user=niklasramo&amp;repo=palikka&amp;type=watch&amp;count=true" allowtransparency="true" frameborder="0" scrolling="0" width="110" height="20"></iframe>
     </div>
   </div>
 
-  <div class='content-root'>
-    <div class='menubar'>
-      <div class='menu section' role='flatdoc-menu'></div>
+  <div class="content-root">
+    <div class="menubar">
+      <div class="menu section" role="flatdoc-menu"></div>
     </div>
-    <div role='flatdoc-content' class='content'></div>
+    <div role="flatdoc-content" class="content"></div>
   </div>
 
 </body>
