@@ -289,12 +289,6 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 2px;
 }
-@media (max-width: 768px) {
-  .header-logo {
-    width: auto;
-    margin-right: 0;
-  }
-}
 .header-logo a,
 .header-logo a:hover {
   color: #fff;
@@ -329,6 +323,12 @@ a:hover {
 .header-links a:hover {
   color: #fff;
   text-decoration: none;
+}
+@media (max-width: 768px) {
+  .header-logo {
+    width: auto;
+    margin-right: 0;
+  }
 }
 
 /* Content root */
@@ -382,11 +382,6 @@ a:hover {
   border-top: 0;
   padding-top: 0;
 }
-@media (max-width: 768px) {
-  .menubar {
-    display: none;
-  }
-}
 .menu ul.level-1 > li + li {
   margin-top: 10px;
 }
@@ -428,6 +423,11 @@ a:hover {
 .menu a.active:visited,
 .menu a.active:hover {
   color: #2E5FA3 !important;
+}
+@media (max-width: 768px) {
+  .menubar {
+    display: none;
+  }
 }
 
 /* Content */
@@ -599,6 +599,10 @@ a:hover {
 .content h3 {
   padding-top: 80px;
 }
+.content h1:first-child,
+.content h2:first-child {
+  margin-top: -80px;
+}
 .content h1:before,
 .content h2:before,
 .content .big-heading:before,
@@ -612,22 +616,9 @@ a:hover {
   margin: 0 -30px;
   width: auto;
 }
-@media (max-width: 768px) {
-  .content h1,
-  .content h2,
-  .content .big-heading,
-  .content h3 {
-    padding-top: 40px;
-  }
-  .content h1:before,
-  .content h2:before,
-  .content .big-heading:before,
-  .content h3:before {
-    background: #d5d5d5;
-    left: -30px;
-    top: -20px;
-    width: 120%;
-  }
+.content h1:first-child:before,
+.content h2:first-child:before {
+  display: none;
 }
 .content h4,
 .content h5,
@@ -636,25 +627,6 @@ a:hover {
   color: #9090aa;
   padding-top: 30px;
   padding-bottom: 10px;
-}
-.content h1:first-child,
-.content h2:first-child {
-  padding-top: 0;
-}
-.content h1:first-child:before,
-.content h2:first-child:before {
-  display: none;
-}
-@media (max-width: 480px) {
-  .content {
-    padding: 20px;
-    padding-top: 40px;
-  }
-  .content h4,
-  .content h5,
-  .content .small-heading {
-    padding-top: 10px;
-  }
 }
 .content pre > code {
   display: block;
@@ -683,37 +655,6 @@ a:hover {
   background: #999;
   -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
   box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
-}
-@media (max-width: 1180px) {
-  .content pre > code {
-    background: #f3f6fb;
-    border: solid 1px #e7eaee;
-    border-top: solid 1px #dbdde2;
-    border-left: solid 1px #e2e5e9;
-    display: block;
-    padding: 10px;
-    -webkit-border-radius: 2px;
-    border-radius: 2px;
-    overflow: auto;
-  }
-  .content pre > code {
-    -webkit-overflow-scrolling: touch;
-  }
-  .content pre > code::-webkit-scrollbar {
-    width: 15px;
-    height: 15px;
-  }
-  .content pre > code::-webkit-scrollbar-thumb {
-    background: #ddd;
-    -webkit-border-radius: 8px;
-    border-radius: 8px;
-    border: solid 4px #f3f6fb;
-  }
-  .content pre > code:hover::-webkit-scrollbar-thumb {
-    background: #999;
-    -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
-    box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
-  }
 }
 .button {
   font-weight: 500;
@@ -810,4 +751,67 @@ a.big.button:hover {
 a.big.button:hover,
 a.big.button:hover:visited {
   color: #fff;
+}
+@media (max-width: 1180px) {
+  .content pre > code {
+    background: #f3f6fb;
+    border: solid 1px #e7eaee;
+    border-top: solid 1px #dbdde2;
+    border-left: solid 1px #e2e5e9;
+    display: block;
+    padding: 10px;
+    -webkit-border-radius: 2px;
+    border-radius: 2px;
+    overflow: auto;
+  }
+  .content pre > code {
+    -webkit-overflow-scrolling: touch;
+  }
+  .content pre > code::-webkit-scrollbar {
+    width: 15px;
+    height: 15px;
+  }
+  .content pre > code::-webkit-scrollbar-thumb {
+    background: #ddd;
+    -webkit-border-radius: 8px;
+    border-radius: 8px;
+    border: solid 4px #f3f6fb;
+  }
+  .content pre > code:hover::-webkit-scrollbar-thumb {
+    background: #999;
+    -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
+    box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
+  }
+}
+@media (max-width: 768px) {
+  .content h1,
+  .content h2,
+  .content .big-heading,
+  .content h3 {
+    padding-top: 40px;
+  }
+  .content h1:first-child,
+  .content h2:first-child {
+    margin-top: -40px;
+  }
+  .content h1:before,
+  .content h2:before,
+  .content .big-heading:before,
+  .content h3:before {
+    background: #d5d5d5;
+    left: -30px;
+    top: -20px;
+    width: 120%;
+  }
+}
+@media (max-width: 480px) {
+  .content {
+    padding: 20px;
+    padding-top: 40px;
+  }
+  .content h4,
+  .content h5,
+  .content .small-heading {
+    padding-top: 10px;
+  }
 }
