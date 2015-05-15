@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width">
     <meta content="Palikka" property="og:title">
     <meta content="A tiny module system for the browser and Node.js" name="description">
-    <title>Palikka - A JavaScript module system for the browser and Node.js</title>
-    <link  href="static/css/style.css" rel="stylesheet">
+    <title>Palikka - v0.3.1 Documentation</title>
+    <link  href="../static/css/style.css" rel="stylesheet">
     <script type="text/javascript">
       WebFontConfig = {
         google: { families: [ "Droid+Sans+Mono::latin", "Roboto:400,300,300italic,400italic,500,500italic,700,700italic:latin",  ] }
@@ -23,19 +23,30 @@
       })();
     </script>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/legacy.js"></script>
+    <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/flatdoc.js"></script>
+    <script src="https://cdn.rawgit.com/rstacruz/flatdoc/v0.9.0/theme-white/script.js"></script>
+    <script>
+      Flatdoc.run({
+        fetcher: Flatdoc.file('0.3.1_raw.md')
+      });
+    </script>
   </head>
-  <body>
-    <div class="splash">
-      <div class="splash-wrapper">
-        <div class="splash-wrapper-inner">
-          <h1>Palikka</h1>
-          <h2>A tiny module system for the browser and Node.js</h2>
-          <div class="splash-meta">Currently v0.3.1</div>
-          <div class="splash-actions">
-            <a class="btn" href="https://raw.githubusercontent.com/niklasramo/palikka/v0.3.1/palikka.js">Download</a><a class="btn" href="docs/0.3.1.html">Docs</a><a class="btn" href="https://github.com/niklasramo/palikka">GitHub</a>
-          </div>
-        </div>
+  <body role="flatdoc">
+    <div class="header">
+      <div class="left">
+        <h1><a href="/">Palikka</a></h1>
+        <ul>
+          <li>Docs</li>
+          <li>0.3.1</li>
+        </ul>
       </div>
+    </div>
+    <div class="content-root">
+      <div class="menubar">
+        <div class="menu section" role="flatdoc-menu"></div>
+      </div>
+      <div role="flatdoc-content" class="content"></div>
     </div>
   </body>
 </html>
