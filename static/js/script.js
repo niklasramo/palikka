@@ -1,37 +1,45 @@
 (function($) {
-  var $window = $(window);
-  var $document = $(document);
 
- /*
-  * Scrollspy.
-  */
+  $(document).on('flatdoc:ready', function() {
 
- $document.on('flatdoc:ready', function() {
+    // Scrollspy.
     $("h2, h3").scrollagent(function(cid, pid, currentElement, previousElement) {
+
       if (pid) {
        $("[href='#"+pid+"']").removeClass('active');
       }
+
       if (cid) {
        $("[href='#"+cid+"']").addClass('active');
       }
+
     });
-  });
 
- /*
-  * Anchor jump links.
-  */
+    // Fix ids and links, and bind anchorjump.
+    $('h1, h2, h3, h4, h5, h6, a').each(function () {
 
- $document.on('flatdoc:ready', function() {
-   $('a').each(function () {
       var $item = $(this);
+      var id = $item.attr('id');
       var link = $item.attr('href');
+
+      if (id && id.indexOf('-') === 0) {
+        $item.attr('id', id.split('-')[1]);
+      }
+
+      if (link && link.indexOf('#-') === 0) {
+        $item.attr('href', '#' + link.split('#-')[1]);
+      }
+
       if (link && link.indexOf('#') === 0) {
         $item.anchorjump();
       }
-   });
- });
+
+    });
+
+  });
 
 })(jQuery);
+
 /*! jQuery.scrollagent (c) 2012, Rico Sta. Cruz. MIT License.
  *  https://github.com/rstacruz/jquery-stuff/tree/master/scrollagent */
 

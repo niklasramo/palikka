@@ -388,7 +388,7 @@ a:hover {
   }
 }
 .menu ul.level-1 > li + li {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 .menu a {
   position: relative;
