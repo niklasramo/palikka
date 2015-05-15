@@ -2,19 +2,6 @@
 
   $(document).on('flatdoc:ready', function() {
 
-    // Scrollspy.
-    $("h2, h3").scrollagent(function(cid, pid, currentElement, previousElement) {
-
-      if (pid) {
-       $("[href='#"+pid+"']").removeClass('active');
-      }
-
-      if (cid) {
-       $("[href='#"+cid+"']").addClass('active');
-      }
-
-    });
-
     // Fix ids and links, and bind anchorjump.
     $('h1, h2, h3, h4, h5, h6, a').each(function () {
 
@@ -32,6 +19,19 @@
 
       if (link && link.indexOf('#') === 0) {
         $item.anchorjump();
+      }
+
+    });
+
+    // Scrollspy.
+    $("h2, h3").scrollagent(function(cid, pid, currentElement, previousElement) {
+
+      if (pid) {
+       $("[href='#"+pid+"']").removeClass('active');
+      }
+
+      if (cid) {
+       $("[href='#"+cid+"']").addClass('active');
       }
 
     });
