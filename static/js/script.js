@@ -23,8 +23,10 @@
 
  $document.on('flatdoc:ready', function() {
    $('a').each(function () {
-      if ($(this).attr('id').indexOf('#') === 0) {
-        $(this).anchorjump();
+      var $item = $(this);
+      var link = $item.attr('href');
+      if (link && link.indexOf('#') === 0) {
+        $item.anchorjump();
       }
    });
  });

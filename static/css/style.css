@@ -289,6 +289,12 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 2px;
 }
+@media (max-width: 768px) {
+  .header-logo {
+    width: auto;
+    margin-right: 0;
+  }
+}
 .header-logo a,
 .header-logo a:hover {
   color: #fff;
@@ -387,9 +393,9 @@ a:hover {
 .menu a {
   position: relative;
   display: block;
-  padding-top: 1px;
-  padding-bottom: 1px;
-  margin-right: -30px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .menu a,
 .menu a:visited {
@@ -413,6 +419,7 @@ a:hover {
   font-weight: normal;
   font-size: 0.95em;
   padding-left: 10px;
+  line-height: 1.8;
 }
 .menu a:hover {
   color: #3875CA !important;
@@ -422,23 +429,13 @@ a:hover {
 .menu a.active:hover {
   color: #2E5FA3 !important;
 }
-.menu a.active:after {
-  content: '';
-  display: block;
-  position: absolute;
-  top: 0px;
-  bottom: 0px;
-  right: 0px;
-  width: 3px;
-  background: #2E5FA3;
-}
 
 /* Content */
 
 .content {
   padding: 30px;
   zoom: 1;
-  max-width: 700px;
+  max-width: 752px;
 }
 .content:before,
 .content:after {
@@ -612,7 +609,7 @@ a:hover {
   height: 1px;
   position: relative;
   top: -40px;
-  margin: 0 -40px;
+  margin: 0 -30px;
   width: auto;
 }
 @media (max-width: 768px) {
@@ -627,7 +624,7 @@ a:hover {
   .content .big-heading:before,
   .content h3:before {
     background: #d5d5d5;
-    left: -40px;
+    left: -30px;
     top: -20px;
     width: 120%;
   }
@@ -640,21 +637,13 @@ a:hover {
   padding-top: 30px;
   padding-bottom: 10px;
 }
-.content h1:first-child {
+.content h1:first-child,
+.content h2:first-child {
   padding-top: 0;
 }
-.content h1:first-child,
-.content h1:first-child a,
-.content h1:first-child a:visited {
-  color: #505050;
-}
-.content h1:first-child:before {
+.content h1:first-child:before,
+.content h2:first-child:before {
   display: none;
-}
-@media (max-width: 768px) {
-  .content h4,
-  .content h5,
-  .content .small-heading,
 }
 @media (max-width: 480px) {
   .content {
