@@ -23,11 +23,11 @@
       var link = $item.attr('href');
 
       if (id && id.indexOf('-') === 0) {
-        $item.attr('id', id.split('-')[1]);
+        $item.attr('id', id.replace('-', ''));
       }
 
       if (link && link.indexOf('#-') === 0) {
-        $item.attr('href', '#' + link.split('#-')[1]);
+        $item.attr('href', link.replace('#-', '#'));
       }
 
       if (link && link.indexOf('#') === 0) {
