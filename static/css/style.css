@@ -129,6 +129,7 @@ a:hover {
 .btn:hover,
 .btn:active,
 .btn:visited {
+  position: relative;
   display: inline-block;
   padding: 0px 12px;
   margin: 0;
@@ -153,17 +154,23 @@ a:hover {
   user-select: none;
   -webkit-border-radius: 3px;
   border-radius: 3px;
-  -webkit-transition: all 0.2s ease-out;
-  -moz-transition: all 0.2s ease-out;
-  -ms-transition: all 0.2s ease-out;
-  -o-transition: all 0.2s ease-out;
-  transition: all 0.2s ease-out;
+  -webkit-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -moz-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -ms-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -o-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
 }
 .btn:focus,
 .btn:hover,
 .btn:active {
   background: #3875CA;
   color: #fff;
+}
+.btn .fa.align-left {
+  margin-right: 10px;
+}
+.btn .fa.align-right {
+  margin-left: 10px;
 }
 
 /* Splash */
@@ -185,6 +192,7 @@ a:hover {
   text-align: center;
   width: 100%;
   height: 100%;
+  padding: 20px;
 }
 .splash h1 {
   position: relative;
@@ -224,7 +232,7 @@ a:hover {
   height: 50px;
   padding-left: 0;
   padding-right: 0;
-  width: 150px;
+  width: 180px;
   margin-right: 20px;
   line-height: 46px;
   text-transform: uppercase;
@@ -249,6 +257,32 @@ a:hover {
   background: transparent;
   border-color: #fff;
   color: #fff;
+}
+@media (max-width: 768px) {
+  .splash-wrapper {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .splash h1 {
+    font-size: 32px;
+  }
+  .splash h2 {
+    font-size: 22px;
+  }
+  .splash .btn,
+  .splash .btn:focus,
+  .splash .btn:hover,
+  .splash .btn:active,
+  .splash .btn:visited,
+  .splash .btn:first-child,
+  .splash .btn:first-child:focus,
+  .splash .btn:first-child:hover,
+  .splash .btn:first-child:active,
+  .splash .btn:first-child:visited {
+    display: block;
+    width: 100%;
+    margin: 0 0 15px 0;
+  }
 }
 
 /* Header */
@@ -303,7 +337,9 @@ a:hover {
 }
 .header-links {
   display: block;
-  float: right;
+  position: absolute;
+  right: 0;
+  top: 0;
   height: 50px;
 }
 .header-links a {
@@ -314,20 +350,53 @@ a:hover {
   line-height: 50px;
   text-align: center;
   color: #46DB9D;
-  -webkit-transition: all 0.2s ease-out;
-  -moz-transition: all 0.2s ease-out;
-  -ms-transition: all 0.2s ease-out;
-  -o-transition: all 0.2s ease-out;
-  transition: all 0.2s ease-out;
+  -webkit-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -moz-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -ms-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -o-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+}
+.header-links a .fa {
+  margin-right: 7px;
 }
 .header-links a:hover {
   color: #fff;
   text-decoration: none;
 }
-@media (max-width: 768px) {
+@media (max-width: 959px) {
+  .header-links a {
+    font-size: 24px;
+  }
+  .header-links a .fa {
+    margin-right: 0px;
+  }
+  .header-links a span {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .header {
+    position: relative;
+    left: auto;
+    top: auto;
+    right: auto;
+    width: auto;
+    height: auto;
+  }
   .header-logo {
     width: auto;
-    margin-right: 0;
+    margin: 0 -15px;
+    padding: 0 15px;
+    float: none;
+    width: auto;
+  }
+  .header-title {
+    float: none;
+    height: 40px;
+    line-height: 40px;
+    margin: 0 -15px;
+    padding: 0 15px;
+    background-color: rgba(0,0,0,0.15);
   }
 }
 
@@ -339,9 +408,10 @@ a:hover {
   padding-top: 50px;
   min-height: 100%;
 }
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .content-root {
     padding-left: 0;
+    padding-top: 0;
   }
 }
 
@@ -418,22 +488,32 @@ a:hover {
 }
 .menu a:hover {
   color: #3875CA !important;
+  text-decoration: none;
 }
-.menu a.active,
-.menu a.active:visited,
-.menu a.active:hover {
-  color: #2E5FA3 !important;
+@media (min-width: 768px) {
+  .menu a.scrollspy-active,
+  .menu a.scrollspy-active:visited,
+  .menu a.scrollspy-active:hover {
+    color: #2E5FA3 !important;
+  }
 }
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .menubar {
-    display: none;
+    position: relative;
+    left: auto;
+    top: auto;
+    bottom: auto;
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid #d5d5d5;
+    overflow-y: visible;
   }
 }
 
 /* Content */
 
 .content {
-  padding: 30px;
+  padding: 0 30px 30px 30px;
   zoom: 1;
   max-width: 752px;
 }
@@ -597,22 +677,23 @@ a:hover {
 .content h2,
 .content .big-heading,
 .content h3 {
-  padding-top: 80px;
+  padding-top: 30px;
+  margin-top: 30px;
 }
 .content h1:first-child,
 .content h2:first-child {
-  margin-top: -80px;
+  margin-top: 0px;
 }
 .content h1:before,
 .content h2:before,
 .content .big-heading:before,
 .content h3:before {
   display: block;
-  content: "";
+  content: " ";
   background: #d5d5d5;
   height: 1px;
   position: relative;
-  top: -40px;
+  top: -30px;
   margin: 0 -30px;
   width: auto;
 }
@@ -695,9 +776,7 @@ code .string,
 code .number {
   color: #5A7BE0;
 }
-code .init {
-  color: #383;
-}
+code .init {}
 code .keyword {
   color: #E05A5A;
 }
@@ -781,37 +860,5 @@ a.big.button:hover:visited {
     background: #999;
     -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
     box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
-  }
-}
-@media (max-width: 768px) {
-  .content h1,
-  .content h2,
-  .content .big-heading,
-  .content h3 {
-    padding-top: 40px;
-  }
-  .content h1:first-child,
-  .content h2:first-child {
-    margin-top: -40px;
-  }
-  .content h1:before,
-  .content h2:before,
-  .content .big-heading:before,
-  .content h3:before {
-    background: #d5d5d5;
-    left: -30px;
-    top: -20px;
-    width: 120%;
-  }
-}
-@media (max-width: 480px) {
-  .content {
-    padding: 20px;
-    padding-top: 40px;
-  }
-  .content h4,
-  .content h5,
-  .content .small-heading {
-    padding-top: 10px;
   }
 }
