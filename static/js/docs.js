@@ -1,26 +1,8 @@
-palikka.require(['jQuery', 'docs.scrollspy', 'docs.scrollToElem', 'jQuery.velocity', 'flatdocReady'], function ($, scrollspy, scrollToElem) {
+palikka.require(['jQuery', 'docs.scrollspy', 'docs.scrollToElem', 'jQuery.velocity', 'docReady'], function ($, scrollspy, scrollToElem) {
 
   var
   $header = $('.header'),
   headerHeight = $header.height();
-
-  // Fix broken ids and links.
-  $('[id], [href]').each(function () {
-
-    var
-    $item = $(this),
-    id = $item.attr('id'),
-    link = $item.attr('href');
-
-    if (id && id.indexOf('-') === 0) {
-      $item.attr('id', id.replace('-', ''));
-    }
-
-    if (link && link.indexOf('#-') === 0) {
-      $item.attr('href', link.replace('#-', '#'));
-    }
-
-  });
 
   // Bind id anchors.
   $('body [href]').each(function () {

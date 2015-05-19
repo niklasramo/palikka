@@ -1,178 +1,4 @@
 
-/* Base */
-
-html,
-body,
-div,
-span,
-applet,
-object,
-iframe,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-blockquote,
-pre,
-a,
-abbr,
-acronym,
-address,
-big,
-cite,
-code,
-del,
-dfn,
-em,
-img,
-ins,
-kbd,
-q,
-s,
-samp,
-small,
-strike,
-strong,
-sub,
-sup,
-tt,
-var,
-dl,
-dt,
-dd,
-ol,
-ul,
-li,
-fieldset,
-form,
-label,
-legend,
-table,
-caption,
-tbody,
-tfoot,
-thead,
-tr,
-th,
-td {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  font-weight: inherit;
-  font-style: inherit;
-  font-family: inherit;
-  font-size: 100%;
-  vertical-align: baseline;
-}
-body {
-  line-height: 1;
-  color: #000;
-  background: #fff;
-}
-ol,
-ul {
-  list-style: none;
-}
-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  vertical-align: middle;
-}
-caption,
-th,
-td {
-  text-align: left;
-  font-weight: normal;
-  vertical-align: middle;
-}
-a img {
-  border: none;
-}
-html,
-body {
-  height: 100%;
-}
-html {
-  overflow-x: hidden;
-}
-body,
-td,
-textarea,
-input {
-  font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  line-height: 1.6;
-  font-size: 16px;
-  color: #505050;
-}
-a {
-  color: #2E5FA3;
-  text-decoration: none;
-}
-a:hover {
-  color: #3875CA;
-  text-decoration: underline;
-}
-* {
-  -webkit-box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
-
-/* Component - Button */
-
-.btn,
-.btn:focus,
-.btn:hover,
-.btn:active,
-.btn:visited {
-  position: relative;
-  display: inline-block;
-  padding: 0px 12px;
-  margin: 0;
-  font-size: 14px;
-  height: 40px;
-  line-height: 38px;
-  font-weight: 400;
-  text-align: center;
-  white-space: nowrap;
-  vertical-align: top;
-  cursor: pointer;
-  text-decoration: none;
-  border: 1px solid transparent;
-  background: #2E5FA3;
-  color: #fff;
-  font-weight: 500;
-  -ms-touch-action: manipulation;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  -webkit-border-radius: 3px;
-  border-radius: 3px;
-  -webkit-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
-  -moz-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
-  -ms-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
-  -o-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
-  transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
-}
-.btn:focus,
-.btn:hover,
-.btn:active {
-  background: #3875CA;
-  color: #fff;
-}
-.btn .fa.align-left {
-  margin-right: 10px;
-}
-.btn .fa.align-right {
-  margin-left: 10px;
-}
-
 /* Splash */
 
 .splash {
@@ -408,6 +234,9 @@ a:hover {
   padding-top: 50px;
   min-height: 100%;
 }
+.content-root.no-menu {
+  padding-left: 0px;
+}
 @media (max-width: 767px) {
   .content-root {
     padding-left: 0;
@@ -442,18 +271,8 @@ a:hover {
   -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
   box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
 }
-.menubar .section {
+.menu {
   padding: 30px;
-}
-.menubar .section + .section {
-  border-top: solid 1px #d5d5d5;
-}
-.menubar .section.no-line {
-  border-top: 0;
-  padding-top: 0;
-}
-.menu ul.level-1 > li + li {
-  margin-top: 10px;
 }
 .menu a {
   position: relative;
@@ -467,20 +286,20 @@ a:hover {
   color: #888888;
 }
 .menu a.level-1 {
-  text-transform: uppercase;
-  font-size: 0.9em;
+  margin-top: 10px;
   font-weight: 500;
+  color: #505050;
+}
+.menu a.level-1:first-child {
+  margin-top: 0px;
 }
 .menu a.level-1,
 .menu a.level-1:visited {
   color: #505050;
   font-size: 16px;
 }
-.menu a.level-2 {
-  font-weight: 500;
-  color: #505050;
-}
-.menu a.level-3 {
+.menu a.level-2,
+.menu a.level-2:visited {
   font-weight: normal;
   font-size: 0.95em;
   padding-left: 10px;
@@ -488,7 +307,7 @@ a:hover {
 }
 .menu a:hover {
   color: #3875CA !important;
-  text-decoration: none;
+  text-decoration: none !important;
 }
 @media (min-width: 768px) {
   .menu a.scrollspy-active,
@@ -525,6 +344,9 @@ a:hover {
 .content:after {
   clear: both;
 }
+
+/* Content - Generic spacing */
+
 .content p,
 .content ul,
 .content ol,
@@ -537,7 +359,11 @@ a:hover {
 .content pre,
 .content blockquote {
   padding: 10px 0;
+  margin: 0;
 }
+
+/* Content - Headings */
+
 .content h1,
 .content h2,
 .content h3,
@@ -546,9 +372,67 @@ a:hover {
 .content h6 {
   font-weight: 500;
 }
-.content pre {
-  font-family: "Droid Sans Mono", monospace;
+.content h1,
+.content h2,
+.content h3 {
+  padding-bottom: 0;
 }
+.content h1 + p,
+.content h2 + p,
+.content h3 + p,
+.content h1 ul,
+.content h2 ul,
+.content h3 ul,
+.content h1 ol,
+.content h2 ol,
+.content h3 ol {
+  padding-top: 10px;
+}
+.content h1,
+.content h2 {
+  letter-spacing: 1px;
+  font-weight: 300;
+  font-size: 1.8em;
+}
+.content h3 {
+  font-size: 1.2em;
+}
+.content h1,
+.content h2,
+.content h3 {
+  padding-top: 30px;
+  margin-top: 30px;
+}
+.content h1:first-child,
+.content h2:first-child {
+  margin-top: 0px;
+}
+.content h1:before,
+.content h2:before,
+.content h3:before {
+  display: block;
+  content: " ";
+  background: #d5d5d5;
+  height: 1px;
+  position: relative;
+  top: -30px;
+  margin: 0 -30px;
+  width: auto;
+}
+.content h1:first-child:before,
+.content h2:first-child:before {
+  display: none;
+}
+.content h4,
+.content h5 {
+  border-bottom: solid 1px rgba(0,0,0,0.07);
+  color: #9090aa;
+  padding-top: 30px;
+  padding-bottom: 10px;
+}
+
+/* Content - Lists */
+
 .content ul > li {
   list-style-type: disc;
 }
@@ -579,34 +463,9 @@ a:hover {
 .content li > :first-child {
   padding-top: 0;
 }
-.content strong,
-.content b {
-  font-weight: 500;
-}
-.content i,
-.content em {
-  font-style: italic;
-  color: #9090aa;
-}
-.content code {
-  font-family: "Droid Sans Mono", monospace;
-  border: 1px solid #bbb;
-  color: #4A5562;
-  padding: 1px 5px;
-  border-radius: 2px;
-  font-size: 13px;
-}
-.content pre > code {
-  display: block;
-  background: transparent;
-  font-size: 14px;
-}
-.content blockquote :first-child {
-  padding-top: 0;
-}
-.content blockquote :last-child {
-  padding-bottom: 0;
-}
+
+/* Content - Tables */
+
 .content table {
   margin-top: 10px;
   margin-bottom: 10px;
@@ -644,83 +503,59 @@ a:hover {
 .content table tr td :last-child {
   margin-bottom: 0;
 }
+
+/* Content - Blockquotes */
+
 .content blockquote {
   color: #9090aa;
   text-shadow: 0 1px 0 rgba(255,255,255,0.5);
 }
-.content h1,
-.content h2,
-.content h3 {
+.content blockquote :first-child {
+  padding-top: 0;
+}
+.content blockquote :last-child {
   padding-bottom: 0;
 }
-.content h1 + p,
-.content h2 + p,
-.content h3 + p,
-.content h1 ul,
-.content h2 ul,
-.content h3 ul,
-.content h1 ol,
-.content h2 ol,
-.content h3 ol {
-  padding-top: 10px;
+
+/* Content - Bold */
+
+.content strong,
+.content b {
+  font-weight: 500;
 }
-.content h1,
-.content h2 {
-  letter-spacing: 1px;
-  font-weight: 300;
-  font-size: 1.8em;
-}
-.content h3 {
-  font-size: 1.2em;
-}
-.content h1,
-.content h2,
-.content .big-heading,
-.content h3 {
-  padding-top: 30px;
-  margin-top: 30px;
-}
-.content h1:first-child,
-.content h2:first-child {
-  margin-top: 0px;
-}
-.content h1:before,
-.content h2:before,
-.content .big-heading:before,
-.content h3:before {
-  display: block;
-  content: " ";
-  background: #d5d5d5;
-  height: 1px;
-  position: relative;
-  top: -30px;
-  margin: 0 -30px;
-  width: auto;
-}
-.content h1:first-child:before,
-.content h2:first-child:before {
-  display: none;
-}
-.content h4,
-.content h5,
-.content .small-heading {
-  border-bottom: solid 1px rgba(0,0,0,0.07);
+
+/* Content - Italic */
+
+.content i,
+.content em {
+  font-style: italic;
   color: #9090aa;
-  padding-top: 30px;
-  padding-bottom: 10px;
+}
+
+/* Content - Code */
+
+.content pre,
+.content code {
+  font-family: "Droid Sans Mono", monospace;
+}
+.content code {
+  border: 1px solid #bbb;
+  color: #4A5562;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 13px;
 }
 .content pre > code {
   display: block;
+  font-size: 14px;
   padding: 10px;
   background: #f3f6fb;
   color: #333;
   border: solid 1px #d5d5d5;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   -webkit-border-radius: 2px;
   border-radius: 2px;
-  overflow: auto;
-}
-.content pre > code {
-  -webkit-overflow-scrolling: touch;
 }
 .content pre > code::-webkit-scrollbar {
   width: 15px;
@@ -737,99 +572,20 @@ a:hover {
   -webkit-box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
   box-shadow: inset 2px 2px 3px rgba(0,0,0,0.2);
 }
-.button {
-  font-weight: 500;
-  display: inline-block;
-  padding: 3px 25px;
-  border: solid 2px #2E5FA3;
-  -webkit-border-radius: 20px;
-  border-radius: 20px;
-  margin-right: 15px;
-}
-.button,
-.button:visited {
-  background: #2E5FA3;
-  color: #fff;
-  text-shadow: none;
-}
-.button:hover {
-  border-color: #111;
-  background: #111;
-  color: #fff;
-}
-.button.light,
-.button.light:visited {
-  background: transparent;
-  color: #9090aa;
-  border-color: #9090aa;
-  text-shadow: none;
-}
-.button.light:hover {
-  border-color: #9090aa;
-  background: #9090aa;
-  color: #fff;
-}
-.content .button + em {
-  color: #9090aa;
-}
-code .string,
-code .number {
+.content code .hljs-string,
+.content code .hljs-number {
   color: #5A7BE0;
 }
-code .init {}
-code .keyword {
+.content code .hljs-init {}
+.content code .hljs-keyword {
   color: #E05A5A;
 }
-code .comment,
-code .comment .string,
-code .comment .number,
-code .comment .keyword,
-code .comment .init {
+.content code .hljs-comment,
+.content code .hljs-comment .hljs-string,
+.content code .hljs-comment .hljs-number,
+.content code .hljs-comment .hljs-keyword,
+.content code .hljs-comment .hljs-init {
   color: #999;
-}
-.content > h1:first-child + p,
-.content > p.brief {
-  font-size: 1.3em;
-  font-weight: 300;
-}
-.title-area {
-  min-height: 100px;
-  text-align: center;
-  border-bottom: solid 1px #d5d5d5;
-  overflow: hidden;
-}
-.title-area > img.bg {
-  z-index: 0;
-  position: absolute;
-  left: -9999px;
-}
-.title-area > div {
-  position: relative;
-  z-index: 1;
-}
-a.big.button {
-  display: block;
-  width: 100%;
-  padding: 10px 20px;
-  text-align: center;
-  font-weight: 500;
-  font-size: 1.1em;
-  background: transparent;
-  border: solid 3px #2E5FA3;
-  -webkit-border-radius: 30px;
-  border-radius: 30px;
-}
-a.big.button,
-a.big.button:visited {
-  color: #2E5FA3;
-  text-decoration: none;
-}
-a.big.button:hover {
-  background: #2E5FA3;
-}
-a.big.button:hover,
-a.big.button:hover:visited {
-  color: #fff;
 }
 @media (max-width: 1180px) {
   .content pre > code {

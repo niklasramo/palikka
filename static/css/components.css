@@ -1,0 +1,51 @@
+
+/* Button */
+
+.btn,
+.btn:focus,
+.btn:hover,
+.btn:active,
+.btn:visited {
+  position: relative;
+  display: inline-block;
+  padding: 0px 12px;
+  margin: 0;
+  font-size: 14px;
+  height: 40px;
+  line-height: 38px;
+  font-weight: 400;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: top;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  background: #2E5FA3;
+  color: #fff;
+  font-weight: 500;
+  -ms-touch-action: manipulation;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-border-radius: 3px;
+  border-radius: 3px;
+  -webkit-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -moz-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -ms-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  -o-transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+  transition: color 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out;
+}
+.btn:focus,
+.btn:hover,
+.btn:active {
+  background: #3875CA;
+  color: #fff;
+}
+.btn .fa.align-left {
+  margin-right: 10px;
+}
+.btn .fa.align-right {
+  margin-left: 10px;
+}
