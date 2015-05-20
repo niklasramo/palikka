@@ -12,7 +12,7 @@
 
   Q.test('Modules.', function (assert) {
 
-    assert.expect(42);
+    assert.expect(43);
     var done = assert.async();
 
     var
@@ -79,6 +79,9 @@
 
     /** Require a single module. */
     palikka.require(m1, function (a) {
+
+      /** Require callback's context should be an object which contains all the modules as key value pairs. */
+      assert.strictEqual(this.dependencies[m1], a);
 
       /** There should be as many arguments as there are required modules. */
       assert.strictEqual(arguments.length, 1);

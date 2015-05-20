@@ -1,6 +1,6 @@
 /*!
  * @license
- * Palikka v0.3.1
+ * Palikka v0.3.2-beta
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -782,20 +782,14 @@
     });
 
     // Load dependencies and resolve factory value.
-    loadDependencies(dependencies, function (depModules) {
+    loadDependencies(dependencies, function (depModules, depHash) {
 
       if (typeOf(factory, 'function')) {
 
         factoryCtx = {
           id: id,
-          dependencies: {}
+          dependencies: depHash
         };
-
-        arrayEach(dependencies, function (depId, i) {
-
-          factoryCtx.dependencies[depId] = depModules[i];
-
-        });
 
         factoryValue = factory.apply(factoryCtx, depModules);
 
@@ -918,7 +912,7 @@
   /**
    * Require a module.
    *
-   * @public
+   * @private
    * @param {array|string} dependencies
    * @param {function} callback
    */
@@ -928,9 +922,9 @@
     typeCheck(dependencies, 'array|string');
     dependencies = typeOf(dependencies, 'array') ? dependencies : [dependencies];
 
-    loadDependencies(dependencies, function (depModules) {
+    loadDependencies(dependencies, function (depModules, depHash) {
 
-      callback.apply(null, depModules);
+      callback.apply({dependencies: depHash}, depModules);
 
     });
 
@@ -948,7 +942,8 @@
   function loadDependencies(dependencies, callback) {
 
     var
-    defers = [];
+    defers = [],
+    hash = {};
 
     arrayEach(dependencies, function (depId) {
 
@@ -969,7 +964,17 @@
 
     });
 
-    when(defers)._async(config.asyncModules).onFulfilled(callback);
+    when(defers)._async(config.asyncModules).onFulfilled(function (depModules) {
+
+      arrayEach(dependencies, function (depId, i) {
+
+        hash[depId] = depModules[i];
+
+      });
+
+      callback(depModules, hash);
+
+    });
 
   }
 
