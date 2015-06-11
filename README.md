@@ -3,11 +3,19 @@
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.2)](https://travis-ci.org/niklasramo/palikka)
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.2)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.2)
 
-A compact module system that works in the browser (all the way down to IE7) and Node.js. Palikka uses it's own event system and promise system, both of which are exposed to pulic API, to manage the module system so you are getting a triple threat here. No code wasted. The idea is to optimize the synergies of all three components internally to keep the code DRY and performant.
+In a nutshell Palikka is a very lightweight and performant module/event/promise system that works in the browser (all the way down to IE7) and Node.js. The primary goal of this project is to provide a solid Promise based module system, but that's just half of the story. Palikka uses it's own event system and promise system, both of which are exposed to pulic API, to manage the module system so you are getting a triple treat here. No code wasted.
 
-* **[Project website](http://niklasramo.github.io/palikka)**
-* **[API documentation](http://niklasramo.github.io/palikka/0.3.2)**
-* **[Download v0.3.2](https://raw.githubusercontent.com/niklasramo/palikka/v0.3.2/palikka.js)**
+* **[Website](http://niklasramo.github.io/palikka)**
+* **[Docs](https://github.com/niklasramo/palikka/wiki/v0.3.2-Docs)**
+* **[Download](https://raw.githubusercontent.com/niklasramo/palikka/v0.3.2/palikka.js)**
+
+##Why Palikka?
+
+* Lightweight, around 5.8kb minified and 2.3kb minified and gzipped.
+* Works both in the browser (IE7+) and in Node.js.
+* Well documented codebase.
+* Comprehensive unit tests.
+* No dependencies.
 
 ##Getting started
 
