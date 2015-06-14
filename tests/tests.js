@@ -139,6 +139,32 @@
     /** Define a moule using object as the facotry. */
     palikka.define(m4, [m1], m4Val);
 
+    /** Try to define two modules with circular dependency. */
+    palikka.define('circ1', 'circ2', {});
+    assert.throws(function () {
+      palikka.define('circ2', 'circ1', {});
+    });
+
+    /** Try to define a module with an empty id. */
+    assert.throws(function () {
+      palikka.define('', [], {});
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define(1, {});
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define('1', 'test');
+    });
+
+    /** Try to define a module with wrong types. */
+    assert.throws(function () {
+      palikka.define('1', [], 'test');
+    });
+
     /** Check that data matches. */
     window.setTimeout(function () {
 
@@ -166,35 +192,9 @@
       /** Smoke test for getModules without value. */
       assert.strictEqual(typeof palikka._getModules(), 'object');
 
-    }, 200);
+      done();
 
-    /** Try to define two modules with circular dependency. */
-    palikka.define('circ1', 'circ2', {});
-    assert.throws(function () {
-      palikka.define('circ2', 'circ1', {});
-    });
-
-    /** Try to define a module with an empty id. */
-    assert.throws(function () {
-      palikka.define('', [], {});
-    });
-
-    /** Try to define a module with wrong types. */
-    assert.throws(function () {
-      palikka.define(1, {});
-    });
-
-    /** Try to define a module with wrong types. */
-    assert.throws(function () {
-      palikka.define('1', 'test');
-    });
-
-    /** Try to define a module with wrong types. */
-    assert.throws(function () {
-      palikka.define('1', [], 'test');
-    });
-
-    window.setTimeout(done, 1000);
+    }, 500);
 
   });
 

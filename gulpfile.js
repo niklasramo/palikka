@@ -2,6 +2,7 @@ var paths = {
   main: './palikka.js',
   readme: './README.md',
   tests: './tests/tests.js',
+  promiseTests: './tests/promises.js',
   coverage: './coverage',
   coverageLcov: './coverage/**/lcov.info',
   jscsRules: './jscsrc.json',
@@ -13,6 +14,7 @@ var paths = {
 var gulp = require('gulp');
 var gulpJscs = require('gulp-jscs');
 var gulpKarma = require('gulp-karma');
+var gulpMocha = require('gulp-mocha');
 var rimraf = require('rimraf');
 var runSequence = require('run-sequence');
 
@@ -96,6 +98,17 @@ gulp.task('test-ci', function (cb) {
     .on('error', function (err) {
       throw err;
     });
+
+});
+
+gulp.task('test-promises', function () {
+
+  return gulp.src(paths.promiseTests, {read: false})
+    .pipe(gulpMocha({
+      reporter: 'nyan',
+      timeout: 400,
+      bail: true
+    }));
 
 });
 
