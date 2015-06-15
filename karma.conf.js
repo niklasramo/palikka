@@ -72,14 +72,6 @@ module.exports = function (config) {
     IE7: {
       base: 'IE',
       'x-ua-compatible': 'IE=EmulateIE7'
-    },
-    SL_Chrome: {
-      base: 'SauceLabs',
-      browserName: 'chrome'
-    },
-    SL_Firefox: {
-      base: 'SauceLabs',
-      browserName: 'firefox'
     }
   };
 
@@ -93,15 +85,6 @@ module.exports = function (config) {
   stn.browserDisconnectTolerance = 2;
   stn.browserDisconnectTimeout = 10000;
   stn.browserNoActivityTimeout = 120000;
-
-  stn.sauceLabs = {
-    recordVideo: false,
-    startConnect: true,
-    tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER,
-    build: process.env.TRAVIS_BUILD_NUMBER,
-    testName: process.env.COMMIT_MESSAGE,
-    tags: ['palikka', 'test']
-  };
 
   // Continuous Integration mode
   // if true, Karma captures browsers, runs the tests and exits
