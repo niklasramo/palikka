@@ -6,13 +6,6 @@
  * Released under the MIT license
  */
 
-/*
-  @todo Make the lib pass promise tests
-        -> 2.3.3.3 functionalty is missing, not sure if this behaviour is wanted though...
-        -> Add the tests as a part of the test suite, possibly even rewrite current tests in mocha
-        -> IE10- fails randomly after updates, check it out, probably something to do with nextTick and where it was moved to
-*/
-
 (function (undefined) {
 
   'use strict';
@@ -1092,6 +1085,7 @@
           if (!ret && depModuleDep === id) {
 
             ret = depModule._id;
+
             return 1;
 
           }
@@ -1272,8 +1266,8 @@
   function getNextTick() {
 
     var
-    nativePromise = isNative(glob.Promise),
-    nativeMT,
+    NativePromise = isNative(glob.Promise),
+    NativeMT,
     queueEmpty,
     processQueue,
     tryFireTick,
@@ -1281,31 +1275,29 @@
     observerTarget;
 
     /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
-    if (nativePromise) {
+    if (NativePromise) {
 
-      nativePromise = nativePromise.resolve();
+      NativePromise = NativePromise.resolve();
 
       /** Return next tick function. */
       return function (cb) {
 
-        nativePromise.then(cb);
+        NativePromise.then(cb);
 
       };
 
     }
     /** Node.js has good existing next tick implementations, so let's use them. */
-    /*
     else if (isNode) {
 
       return glob.setImmediate || process.nextTick;
 
     }
-    */
     /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
     else {
 
       /** Let's check if mutation observer is supported. */
-      nativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
+      NativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
 
       /** Flag for checking the state of the queue. */
       queueEmpty = 1;
@@ -1331,10 +1323,10 @@
       };
 
       /** MutationObserver fallback. */
-      if (nativeMT) {
+      if (NativeMT) {
 
         observerTarget = document.createElement('i');
-        (new nativeMT(processQueue)).observe(observerTarget, {attributes: true});
+        (new NativeMT(processQueue)).observe(observerTarget, {attributes: true});
 
         fireTick = function () {
 
