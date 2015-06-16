@@ -1,9 +1,10 @@
 var
 paths = {
-  main: './palikka.js',
+  palikka: './palikka.js',
+  palikkaMin: './palikka.min.js',
   readme: './README.md',
   tests: './tests/tests.js',
-  promiseTests: './tests/promises.js',
+  promisesaplus: './tests/promisesaplus.js',
   coverage: './coverage',
   coverageLcov: './coverage/**/lcov.info',
   jscsRules: './jscsrc.json',
@@ -15,13 +16,16 @@ gulp = require('gulp'),
 gulpJscs = require('gulp-jscs'),
 gulpKarma = require('gulp-karma'),
 gulpMocha = require('gulp-mocha'),
+gulpUglify = require('gulp-uglify'),
+gulpRename = require('gulp-rename'),
+gulpSize = require('gulp-size'),
 rimraf = require('rimraf'),
 runSequence = require('run-sequence');
 
 gulp.task('validate', function () {
 
   return gulp
-  .src(paths.main)
+  .src(paths.palikka)
   .pipe(gulpJscs(paths.jscsRules));
 
 });
@@ -48,7 +52,7 @@ gulp.task('test-main', function (cb) {
   }
 
   return gulp
-  .src([paths.main, paths.tests])
+  .src([paths.palikka, paths.tests])
   .pipe(gulpKarma(karmaOpts))
   .on('error', function (err) {
     throw err;
@@ -59,7 +63,7 @@ gulp.task('test-main', function (cb) {
 gulp.task('test-promises', function () {
 
   return gulp
-  .src(paths.promiseTests, {read: false})
+  .src(paths.promisesaplus, {read: false})
   .pipe(gulpMocha({
     reporter: 'nyan',
     timeout: 400,
@@ -74,13 +78,23 @@ gulp.task('clean', function (cb) {
 
 });
 
+gulp.task('compress', function() {
+
+  return gulp
+  .src(paths.palikka)
+  .pipe(gulpSize({title: 'development'}))
+  .pipe(gulpUglify({
+    preserveComments: 'some'
+  }))
+  .pipe(gulpSize({title: 'minified'}))
+  .pipe(gulpSize({title: 'gzipped', gzip: true}))
+  .pipe(gulpRename('palikka.min.js'))
+  .pipe(gulp.dest('./'));
+
+});
+
 gulp.task('default', function (cb) {
 
-  if (process.env.CI) {
-    runSequence('validate', 'test-main', 'test-promises', 'clean', cb);
-  }
-  else {
-    runSequence('validate', 'test-main', 'test-promises', cb);
-  }
+  runSequence('validate', 'test-main', 'test-promises', 'clean', cb);
 
 });
