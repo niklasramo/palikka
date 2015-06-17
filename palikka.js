@@ -1,12 +1,12 @@
 /*!
  * @license
- * Palikka v0.3.1
+ * Palikka v0.3.2
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
 
-(function (glob, undefined) {
+(function (undefined) {
 
   'use strict';
 
@@ -48,8 +48,11 @@
   /** Check if strict mode is supported. */
   isStrict = !this === true,
 
-  /** Check if we are in Node.js environment. */
-  isNode = typeOf(glob.process, 'process'),
+  /** Environment check. */
+  isNode = typeof process === 'object' && typeOf(process, 'process'),
+
+  /** Global object. */
+  glob = isNode ? global : window,
 
   /** Get next tick method. */
   nextTick = getNextTick();
@@ -411,36 +414,10 @@
     var
     instance = this;
 
-    if (val === this) {
-
-      this.reject(TypeError('A promise can not be resolved with itself.'));
-
-    }
-
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
-
-      if (val instanceof Deferred) {
-
-        val
-        .onFulfilled(function (value) {
-
-          resolveHandler(instance, value);
-
-        })
-        .onRejected(function (reason) {
-
-          rejectHandler(instance, reason);
-
-        });
-
-      }
-      else {
-
-        resolveHandler(instance, val);
-
-      }
+      processResolve(instance, val);
 
     }
 
@@ -462,7 +439,7 @@
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
-      rejectHandler(instance, reason);
+      finalizeReject(instance, reason);
 
     }
 
@@ -479,34 +456,7 @@
    */
   Deferred.prototype.onFulfilled = function (callback) {
 
-    var
-    instance = this;
-
-    execFn(function () {
-
-      if (typeOf(callback, 'function')) {
-
-        if (instance._state === stateFulfilled) {
-
-          callback(instance.result());
-
-        }
-
-        if (instance._state === statePending) {
-
-          evHub.one(evResolve + instance._id, function () {
-
-            callback(instance.result());
-
-          });
-
-        }
-
-      }
-
-    }, instance._asynchronous);
-
-    return instance;
+    return deferredEventHandler(this, callback, stateFulfilled, evResolve);
 
   };
 
@@ -519,34 +469,7 @@
    */
   Deferred.prototype.onRejected = function (callback) {
 
-    var
-    instance = this;
-
-    execFn(function () {
-
-      if (typeOf(callback, 'function')) {
-
-        if (instance._state === stateRejected) {
-
-          callback(instance.result());
-
-        }
-
-        if (instance._state === statePending) {
-
-          evHub.one(evReject + instance._id, function () {
-
-            callback(instance.result());
-
-          });
-
-        }
-
-      }
-
-    }, instance._asynchronous);
-
-    return instance;
+    return deferredEventHandler(this, callback, stateRejected, evReject);
 
   };
 
@@ -652,13 +575,119 @@
   }
 
   /**
-   * Resolve handler.
+   * Process deferred instance's resolve method.
    *
    * @private
    * @param {Deferred} instance
    * @param {*} val
    */
-  function resolveHandler(instance, val) {
+  function processResolve(instance, val) {
+
+    if (val === instance) {
+
+      finalizeReject(instance, TypeError('A promise can not be resolved with itself.'));
+
+    }
+    else if (val instanceof Deferred) {
+
+      val
+      .onFulfilled(function (value) {
+
+        finalizeResolve(instance, value);
+
+      })
+      .onRejected(function (reason) {
+
+        finalizeReject(instance, reason);
+
+      });
+
+    }
+    else if (typeOf(val, 'function') || typeOf(val, 'object')) {
+
+      processThenable(instance, val);
+
+    }
+    else {
+
+      finalizeResolve(instance, val);
+
+    }
+
+  }
+
+  /**
+   * Process a thenable value within a deferred's resolve process.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} val
+   */
+  function processThenable(instance, val) {
+
+    try {
+
+      var
+      then = val.then,
+      thenHandled = 0;
+
+      if (typeOf(then, 'function')) {
+
+        try {
+
+          then.call(
+            val,
+            function (value) {
+
+              if (!thenHandled) {
+                thenHandled = 1;
+                processResolve(instance, value);
+              }
+
+            },
+            function (reason) {
+
+              if (!thenHandled) {
+                thenHandled = 1;
+                finalizeReject(instance, reason);
+              }
+
+            }
+          );
+
+        }
+        catch (e) {
+
+          if (!thenHandled) {
+            finalizeReject(instance, e);
+          }
+
+        }
+
+      }
+      else {
+
+        finalizeResolve(instance, val);
+
+      }
+
+    }
+    catch (e) {
+
+      finalizeReject(instance, e);
+
+    }
+
+  }
+
+  /**
+   * Finalize deferred instance's resolve method.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} val
+   */
+  function finalizeResolve(instance, val) {
 
     instance._result = val;
     instance._state = stateFulfilled;
@@ -667,17 +696,70 @@
   }
 
   /**
-   * Reject handler.
+   * Finalize deferred instance's reject method.
    *
    * @private
    * @param {Deferred} instance
    * @param {*} reason
    */
-  function rejectHandler(instance, reason) {
+  function finalizeReject(instance, reason) {
 
     instance._result = reason;
     instance._state = stateRejected;
     evHub.emit(evReject + instance._id, [reason]);
+
+  }
+
+  /**
+   * Handler for onResolved and onRejected methods.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {function} callback
+   * @param {string} refState
+   * @param {string} refEvent
+   * @returns {Deferred}
+   */
+  function deferredEventHandler(instance, callback, refState, refEvent) {
+
+    if (typeOf(callback, 'function')) {
+
+      if (instance._state === refState) {
+
+        deferredEventExec(instance, callback);
+
+      }
+
+      if (instance._state === statePending) {
+
+        evHub.one(refEvent + instance._id, function () {
+
+          deferredEventExec(instance, callback);
+
+        });
+
+      }
+
+    }
+
+    return instance;
+
+  }
+
+  /**
+   * Callback executor helper function for onResolved and onRejected.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {function} callback
+   */
+  function deferredEventExec(instance, callback) {
+
+    execFn(function () {
+
+      callback(instance.result());
+
+    }, instance._asynchronous);
 
   }
 
@@ -766,36 +848,30 @@
     factoryCtx,
     factoryValue;
 
-    // Module data.
+    /** Module data. */
     instance._id = id;
     instance._dependencies = dependencies;
     instance._deferred = deferred;
 
-    // Add module to modules object.
+    /** Add module to modules object. */
     modules[id] = instance;
 
-    // Emit initiation event when module is loaded.
+    /** Emit initiation event when module is loaded. */
     deferred.onFulfilled(function () {
 
       evHub.emit(evInitiate + '-' + id, [instance]);
 
     });
 
-    // Load dependencies and resolve factory value.
-    loadDependencies(dependencies, function (depModules) {
+    /** Load dependencies and resolve factory value. */
+    loadDependencies(dependencies, function (depModules, depHash) {
 
       if (typeOf(factory, 'function')) {
 
         factoryCtx = {
           id: id,
-          dependencies: {}
+          dependencies: depHash
         };
-
-        arrayEach(dependencies, function (depId, i) {
-
-          factoryCtx.dependencies[depId] = depModules[i];
-
-        });
 
         factoryValue = factory.apply(factoryCtx, depModules);
 
@@ -918,7 +994,7 @@
   /**
    * Require a module.
    *
-   * @public
+   * @private
    * @param {array|string} dependencies
    * @param {function} callback
    */
@@ -928,9 +1004,9 @@
     typeCheck(dependencies, 'array|string');
     dependencies = typeOf(dependencies, 'array') ? dependencies : [dependencies];
 
-    loadDependencies(dependencies, function (depModules) {
+    loadDependencies(dependencies, function (depModules, depHash) {
 
-      callback.apply(null, depModules);
+      callback.apply({dependencies: depHash}, depModules);
 
     });
 
@@ -948,7 +1024,8 @@
   function loadDependencies(dependencies, callback) {
 
     var
-    defers = [];
+    defers = [],
+    hash = {};
 
     arrayEach(dependencies, function (depId) {
 
@@ -969,7 +1046,17 @@
 
     });
 
-    when(defers)._async(config.asyncModules).onFulfilled(callback);
+    when(defers)._async(config.asyncModules).onFulfilled(function (depModules) {
+
+      arrayEach(dependencies, function (depId, i) {
+
+        hash[depId] = depModules[i];
+
+      });
+
+      callback(depModules, hash);
+
+    });
 
   }
 
@@ -998,6 +1085,7 @@
           if (!ret && depModuleDep === id) {
 
             ret = depModule._id;
+
             return 1;
 
           }
@@ -1072,14 +1160,14 @@
 
     var
     type = (
-      obj === null ? 'null' : // IE 7/8 fix -> null check
-      obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
+      obj === null ? 'null' : /** IE 7/8 fix -> null check. */
+      obj === undefined ? 'undefined' : /** IE 7/8 fix -> undefined check. */
       typeof obj
     );
 
     type = type !== 'object' ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
 
-    // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
+    /** IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed). */
     if (!isStrict && type === 'object') {
 
       type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
@@ -1178,8 +1266,8 @@
   function getNextTick() {
 
     var
-    nativePromise = isNative(glob.Promise),
-    nativeMT,
+    NativePromise = isNative(glob.Promise),
+    NativeMT,
     queueEmpty,
     processQueue,
     tryFireTick,
@@ -1187,14 +1275,14 @@
     observerTarget;
 
     /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
-    if (nativePromise) {
+    if (NativePromise) {
 
-      nativePromise = nativePromise.resolve();
+      NativePromise = NativePromise.resolve();
 
       /** Return next tick function. */
       return function (cb) {
 
-        nativePromise.then(cb);
+        NativePromise.then(cb);
 
       };
 
@@ -1202,14 +1290,14 @@
     /** Node.js has good existing next tick implementations, so let's use them. */
     else if (isNode) {
 
-      return glob.setImmediate || glob.process.nextTick;
+      return glob.setImmediate || process.nextTick;
 
     }
     /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
     else {
 
       /** Let's check if mutation observer is supported. */
-      nativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
+      NativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
 
       /** Flag for checking the state of the queue. */
       queueEmpty = 1;
@@ -1235,10 +1323,10 @@
       };
 
       /** MutationObserver fallback. */
-      if (nativeMT) {
+      if (NativeMT) {
 
         observerTarget = document.createElement('i');
-        (new nativeMT(processQueue)).observe(observerTarget, {attributes: true});
+        (new NativeMT(processQueue)).observe(observerTarget, {attributes: true});
 
         fireTick = function () {
 
@@ -1378,14 +1466,14 @@
   /**
    * Publish library using an adapted UMD pattern.
    */
-  if (typeOf(glob.define, 'function') && glob.define.amd) {
+  if (typeof define === 'function' && define.amd) {
 
-    glob.define([], lib);
+    define([], lib);
 
   }
-  else if (typeOf(glob.exports, 'object')) {
+  else if (typeof exports === 'object') {
 
-    glob.module.exports = lib;
+    module.exports = lib;
 
   }
   else {
@@ -1394,4 +1482,4 @@
 
   }
 
-})(this);
+})();

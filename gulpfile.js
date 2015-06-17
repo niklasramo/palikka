@@ -1,101 +1,57 @@
-var paths = {
-  main: './palikka.js',
+var
+paths = {
+  palikka: './palikka.js',
+  palikkaMin: './palikka.min.js',
   readme: './README.md',
   tests: './tests/tests.js',
+  promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
-  coverageLcov: './coverage/**/lcov.info',
   jscsRules: './jscsrc.json',
   karmaConf: './karma.conf.js',
   pkg: './package.json',
   pkgBower: './bower.json'
-};
-
-var gulp = require('gulp');
-var gulpJscs = require('gulp-jscs');
-var gulpKarma = require('gulp-karma');
-var rimraf = require('rimraf');
-var runSequence = require('run-sequence');
+},
+gulp = require('gulp'),
+gulpJscs = require('gulp-jscs'),
+gulpKarma = require('gulp-karma'),
+gulpMocha = require('gulp-mocha'),
+gulpUglify = require('gulp-uglify'),
+gulpRename = require('gulp-rename'),
+gulpSize = require('gulp-size'),
+rimraf = require('rimraf'),
+runSequence = require('run-sequence');
 
 gulp.task('validate', function () {
 
-  return gulp.src(paths.main)
-    .pipe(gulpJscs(paths.jscsRules));
+  return gulp
+  .src(paths.palikka)
+  .pipe(gulpJscs(paths.jscsRules));
 
 });
 
-gulp.task('test-phantom', function (cb) {
+gulp.task('test-main', function (cb) {
 
-  return gulp.src([paths.main, paths.tests])
-    .pipe(gulpKarma({
-      configFile: paths.karmaConf,
-      browsers: ['PhantomJS'],
-      preprocessors: {'palikka.js': ['coverage']},
-      reporters: ['progress', 'coverage'],
-      coverageReporter: {
-        type: 'lcov',
-        dir: paths.coverage
-      },
-      action: 'run'
-    }))
-    .on('error', function (err) {
-      throw err;
-    });
+  return gulp
+  .src([paths.palikka, paths.tests])
+  .pipe(gulpKarma({
+    configFile: paths.karmaConf,
+    action: 'run'
+  }))
+  .on('error', function (err) {
+    throw err;
+  });
 
 });
 
-gulp.task('test-local', function (cb) {
+gulp.task('test-promises', function () {
 
-  return gulp.src([paths.main, paths.tests])
-    .pipe(gulpKarma({
-      configFile: paths.karmaConf,
-      browsers: ['PhantomJS', 'Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'],
-      preprocessors: {'palikka.js': ['coverage']},
-      reporters: ['progress', 'coverage'],
-      coverageReporter: {
-        type: 'lcov',
-        dir: paths.coverage
-      },
-      action: 'run'
-    }))
-    .on('error', function (err) {
-      throw err;
-    });
-
-});
-
-gulp.task('test-sauce', function (cb) {
-
-  // Not tested yet.
-  return gulp.src([paths.main, paths.tests])
-    .pipe(gulpKarma({
-      configFile: paths.karmaConf,
-      browsers: ['SL_Chrome', 'SL_Firefox'],
-      reporters: ['progress', 'saucelabs'],
-      action: 'run'
-    }))
-    .on('error', function (err) {
-      throw err;
-    });
-
-});
-
-gulp.task('test-ci', function (cb) {
-
-  return gulp.src([paths.main, paths.tests])
-    .pipe(gulpKarma({
-      configFile: paths.karmaConf,
-      browsers: ['PhantomJS'],
-      preprocessors: {'palikka.js': ['coverage']},
-      reporters: ['progress', 'coverage', 'coveralls'],
-      coverageReporter: {
-        type: 'lcov',
-        dir: paths.coverage
-      },
-      action: 'run'
-    }))
-    .on('error', function (err) {
-      throw err;
-    });
+  return gulp
+  .src(paths.promisesaplus, {read: false})
+  .pipe(gulpMocha({
+    reporter: 'nyan',
+    timeout: 400,
+    bail: true
+  }));
 
 });
 
@@ -105,8 +61,23 @@ gulp.task('clean', function (cb) {
 
 });
 
+gulp.task('compress', function() {
+
+  return gulp
+  .src(paths.palikka)
+  .pipe(gulpSize({title: 'development'}))
+  .pipe(gulpUglify({
+    preserveComments: 'some'
+  }))
+  .pipe(gulpSize({title: 'minified'}))
+  .pipe(gulpSize({title: 'gzipped', gzip: true}))
+  .pipe(gulpRename('palikka.min.js'))
+  .pipe(gulp.dest('./'));
+
+});
+
 gulp.task('default', function (cb) {
 
-  runSequence('validate', 'test-ci', 'clean', cb);
+  runSequence('validate', 'test-main', 'test-promises', 'clean', cb);
 
 });
