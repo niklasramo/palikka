@@ -6,6 +6,7 @@
     "module",
     "event",
     "promise",
+    "promises-aplus",
     "deferred"
   ],
   "homepage": "https://github.com/niklasramo/palikka",

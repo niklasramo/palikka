@@ -4,7 +4,7 @@ paths = {
   palikkaMin: './palikka.min.js',
   readme: './README.md',
   tests: './tests/tests.js',
-  promisesaplus: './tests/promisesaplus.js',
+  promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
   coverageLcov: './coverage/**/lcov.info',
   jscsRules: './jscsrc.json',

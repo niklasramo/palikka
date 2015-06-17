@@ -1471,7 +1471,7 @@
     define([], lib);
 
   }
-  else if (typeof module === 'object' && typeof module.exports === 'object') {
+  else if (typeof exports === 'object') {
 
     module.exports = lib;
 
