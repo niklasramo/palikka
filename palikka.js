@@ -1,6 +1,6 @@
 /*!
  * @license
- * Palikka v0.3.2-beta
+ * Palikka v0.3.2
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license

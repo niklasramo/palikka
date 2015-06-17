@@ -1,6 +1,6 @@
 {
   "name": "Palikka",
-  "version": "0.3.2-beta",
+  "version": "0.3.2",
   "description": "A tiny module/event/promise system for the browser and Node.",
   "keywords": [
     "module",
@@ -43,7 +43,6 @@
     "karma-ie-launcher": "^0.1.5",
     "karma-phantomjs-launcher": "^0.1.4",
     "karma-qunit": "^0.1.4",
-    "karma-sauce-launcher": "^0.2.10",
     "karma-story-reporter": "^0.3.1",
     "phantomjs": "^1.9.15",
     "promises-aplus-tests": "^2.1.0",

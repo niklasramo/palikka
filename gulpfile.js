@@ -6,7 +6,6 @@ paths = {
   tests: './tests/tests.js',
   promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
-  coverageLcov: './coverage/**/lcov.info',
   jscsRules: './jscsrc.json',
   karmaConf: './karma.conf.js',
   pkg: './package.json',
@@ -32,28 +31,12 @@ gulp.task('validate', function () {
 
 gulp.task('test-main', function (cb) {
 
-  var
-  karmaOpts = {
-    configFile: paths.karmaConf,
-    browsers: ['PhantomJS', 'Chrome', 'Firefox', 'IE11', 'IE10', 'IE9', 'IE8', 'IE7'],
-    preprocessors: {'palikka.js': ['coverage']},
-    reporters: ['progress', 'coverage'],
-    coverageReporter: {
-      type: 'lcov',
-      dir: paths.coverage
-    },
-    action: 'run'
-  };
-
-  // Special for CI
-  if (process.env.CI) {
-    karmaOpts.browsers = ['PhantomJS'];
-    karmaOpts.reporters.push('coveralls');
-  }
-
   return gulp
   .src([paths.palikka, paths.tests])
-  .pipe(gulpKarma(karmaOpts))
+  .pipe(gulpKarma({
+    configFile: paths.karmaConf,
+    action: 'run'
+  }))
   .on('error', function (err) {
     throw err;
   });

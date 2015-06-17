@@ -3,8 +3,7 @@
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.2)](https://travis-ci.org/niklasramo/palikka)
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.2)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.2)
 
-[<img src="http://promises-aplus.github.com/promises-spec/assets/logo-small.png" alt="Promises/A+ logo" title="Promises/A+ 1.1 compliant" align="right"/>](http://promises-aplus.github.com/promises-spec)
-In a nutshell Palikka is a lightweight and performant module/event/promise system that works in the browser (all the way down to IE7) and Node.js. The primary goal of this project is to provide a solid Promise based module system, but that's just half of the story. Palikka uses it's own event system and promise system, both of which are exposed to pulic API, to manage the module system so you are getting a triple treat here. No code wasted.
+Palikka is a lightweight and performant module/event/promise system that works in the browser (all the way down to IE7) and Node.js.
 
 * **[Website](http://niklasramo.github.io/palikka)**
 * **[Docs](https://github.com/niklasramo/palikka/wiki/v0.3.2-Docs)**
@@ -12,8 +11,12 @@ In a nutshell Palikka is a lightweight and performant module/event/promise syste
 
 ##Why Palikka?
 
-* Lightweight: 6.26kb minified and 2.6kb minified and gzipped.
+[<img src="http://promises-aplus.github.com/promises-spec/assets/logo-small.png" alt="Promises/A+ logo" title="Promises/A+ 1.1 compliant" align="right"/>](http://promises-aplus.github.com/promises-spec)
+Originally this project was intended just to provide a simple synchronous module system, but it has now expanded to also provide a solid event system and promises too. A case of feature creep? Perhaps. However, the original goal still remains. The module system has always used the event system internally so I thought why not expose it to the public API, right? After thinking about the architecture of the module system I realized that modules are actually pretty much like promises, but with names (or ids). So *then* came promises. In the end it makes a lot of sense to bundle these three different components together: the event system powers promises which in turn power the module system.
+
+* Lightweight: 6.25kb minified and 2.6kb minified and gzipped.
 * Works both in the browser (IE7+) and in Node.js.
+* Promises/A+ 1.1 compliant.
 * Well documented codebase.
 * Comprehensive unit tests.
 * No dependencies.
