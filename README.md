@@ -1,13 +1,13 @@
-#Palikka v0.3.2
+#Palikka v0.4.0
 
-[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.3.2)](https://travis-ci.org/niklasramo/palikka)
-[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.3.2)](https://coveralls.io/r/niklasramo/palikka?branch=v0.3.2)
+[![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.4.0)](https://travis-ci.org/niklasramo/palikka)
+[![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.4.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.4.0)
 
 Palikka is a lightweight and performant module/event/promise system that works in the browser (all the way down to IE7) and Node.js.
 
 * **[Website](http://niklasramo.github.io/palikka)**
-* **[Docs](https://github.com/niklasramo/palikka/wiki/v0.3.2-Docs)**
-* **[Download](https://raw.githubusercontent.com/niklasramo/palikka/v0.3.2/palikka.js)**
+* **[Docs](https://github.com/niklasramo/palikka/wiki/v0.4.0-Docs)**
+* **[Download](https://raw.githubusercontent.com/niklasramo/palikka/v0.4.0/palikka.js)**
 
 ##Why Palikka?
 
