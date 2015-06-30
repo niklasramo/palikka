@@ -17,19 +17,22 @@
  * ==========
  *
  * @idea .bind() -> Check Bluebird.
- * @idea .done() -> Check Q and Bluebird.
  * @idea Drop circular dependency detection.
  * @idea Drop type checks.
  * @idea Separate Promise from Deferred.
  * @idea Make private properties of Deferred truly private -> invisible to user. Needs perf tests to see the if it's worth it.
  * @idea Check memory leaks -> Perf tests -> Benchmark.js / jsperf.com
  *
+ * @idea .done() -> Check Q and Bluebird.
  * @todo Better handling for collections: https://github.com/petkaantonov/bluebird/blob/master/API.md#collections
  * @todo Update docs and give an example on how to promisify crippled promises -> palikka.when([crippledPromise]);
+ * @todo Major test overhaul -> Isolate cases more clearly and add cover more areas.
  * @todo Streamline module system. Try to make it just a thin layer over the promise system.
  *
  * @done Deferred.prototype.spread().
  * @done Deferred.prototype.inspect().
+ * @done Deferred.prototype.async().
+ * @done Deferred.prototype.sync().
  * @done Better error data for when method in the case when the rejectImmediately argument is false.
  * @done Remove module listing functionality and instead just provide a direct access to to modules object.
  * @done Remove underscore prefix from typeOf, config and nextTick methods.
@@ -426,6 +429,34 @@
   };
 
   /**
+   * Set current instance to run synchronously.
+   *
+   * @memberof Deferred.prototype
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.sync = function () {
+
+    this._async = false;
+
+    return this;
+
+  };
+
+  /**
+   * Set current instance to run asynchronously.
+   *
+   * @memberof Deferred.prototype
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.async = function () {
+
+    this._async = true;
+
+    return this;
+
+  };
+
+  /**
    * Resolve deferred. All provided arguments will be passed directly to 'onFulfilled' and 'onSettled' callback functions.
    *
    * @memberof Deferred.prototype
@@ -538,7 +569,7 @@
   };
 
   /**
-   * Returns a new deferred that resolves when all provided values and are resolved. The calling instance is automatically added as the first value of the deferreds array. Non-thenable values are "promisified" and resolved immediately.
+   * Alias for when() to be used within the deferred chain. The calling instance is automatically added as the first value of the deferreds array.
    *
    * @memberof Deferred.prototype
    * @param {array} deferreds
@@ -627,7 +658,7 @@
 
       var
       then = val.then,
-      thenHandled = 0;
+      thenHandled;
 
       if (typeOf(then, typeFunction)) {
 
@@ -695,7 +726,10 @@
 
     instance._result = val;
     instance._state = stateFulfilled;
-    evHub.emit(evResolve + instance._id, [val]);
+
+    evHub
+    .emit(evResolve + instance._id, [val])
+    .off(evReject + instance._id);
 
   }
 
@@ -710,23 +744,10 @@
 
     instance._result = reason;
     instance._state = stateRejected;
-    evHub.emit(evReject + instance._id, [reason]);
 
-  }
-
-  /**
-   * Force a deferred instance to work asynchronously or synchronously.
-   *
-   * @private
-   * @param {Deferred} instance
-   * @param {boolean} isAsync
-   * @returns {Deferred}
-   */
-  function setAsync(instance, isAsync) {
-
-    instance._async = isAsync ? true : false;
-
-    return instance;
+    evHub
+    .emit(evReject + instance._id, [reason])
+    .off(evResolve + instance._id);
 
   }
 
@@ -839,7 +860,7 @@
   }
 
   /**
-   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
+   * Returns a new deferred that resolves when all provided values and are resolved. Non-thenable values are "promisified" and resolved immediately.
    *
    * @private
    * @param {array} deferreds
@@ -921,7 +942,7 @@
 
     var
     instance = this,
-    deferred = setAsync(defer(), 0);
+    deferred = defer().sync();
 
     /** Module data. */
     instance.id = id;
@@ -1071,7 +1092,7 @@
 
       typeCheck(depId, typeString);
 
-      defers.push(modules[depId] ? modules[depId].deferred : setAsync(defer(function (resolve) {
+      defers.push(modules[depId] ? modules[depId].deferred : defer(function (resolve) {
 
         evHub.one(evInitiate + depId, function (ev, module) {
 
@@ -1079,11 +1100,12 @@
 
         });
 
-      }), 0));
+      }).sync());
 
     });
 
-    setAsync(when(defers), config.asyncModules)
+    when(defers)
+    [config.asyncModules ? 'async' : 'sync']()
     .onFulfilled(function (depModules) {
 
       arrayEach(dependencies, function (depId, i) {
