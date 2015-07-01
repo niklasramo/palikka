@@ -12,7 +12,7 @@
 
   Q.test('Modules', function (assert) {
 
-    assert.expect(42);
+    assert.expect(45);
     var done = assert.async();
 
     var
@@ -34,6 +34,12 @@
     m5Val = 'eVal',
 
     asyncTest = false;
+
+    /** List method should always return a new object. */
+    assert.notEqual(palikka.list(), palikka.list());
+
+    /** List method should return an empty object when no modules are defined. */
+    assert.deepEqual(palikka.list(), {});
 
     /** Define a single module without dependencies. */
     palikka.define(m1, function () {
@@ -59,20 +65,25 @@
 
     });
 
-    /** Get module data before it is initiated. */
-    m1Data = palikka._modules[m1];
+    console.log(palikka.list());
 
-    /** Module data id should always be an array. */
+    /** Get module data before it is initiated. */
+    m1Data = palikka.list()[m1];
+
+    /** Module "id" should always be the same string it was initiated with. */
     assert.strictEqual(m1Data.id, m1);
 
-    /** Module deferred state should be "pending" before initiation. */
-    assert.strictEqual(m1Data.deferred.state(), 'pending');
+    /** Module "ready" should be false before initiation. */
+    assert.strictEqual(m1Data.ready, false);
 
-    /** Module deferred result should always be undefined before factory is processed. */
-    assert.strictEqual(m1Data.deferred.result(), undefined);
+    /** Module "value" should be undefined before initiation. */
+    assert.strictEqual(m1Data.value, undefined);
 
-    /** Module data dependencies should always be an array. */
+    /** Module "dependencies" should always be an array. */
     assert.strictEqual(m1Data.dependencies instanceof Array, true);
+
+    /** Module "dependencies" should be empty when there are no dependencies. */
+    assert.strictEqual(m1Data.dependencies.length, 0);
 
     /** Factory function should be called asynchronously. */
     assert.strictEqual(asyncTest, false);
@@ -169,25 +180,25 @@
     window.setTimeout(function () {
 
       var
-      m1Data = palikka._modules[m1],
-      m2Data = palikka._modules[m2],
-      m3Data = palikka._modules[m3],
-      m4Data = palikka._modules[m4],
-      m5Data = palikka._modules[m5];
+      m1Data = palikka.list()[m1],
+      m2Data = palikka.list()[m2],
+      m3Data = palikka.list()[m3],
+      m4Data = palikka.list()[m4],
+      m5Data = palikka.list()[m5];
 
       /** Check module deferred results. */
-      assert.strictEqual(m1Data.deferred.result(), m1Val);
-      assert.strictEqual(m2Data.deferred.result(), m2Val);
-      assert.strictEqual(m3Data.deferred.result(), m3Val);
-      assert.strictEqual(m4Data.deferred.result(), m4Val);
-      assert.strictEqual(m5Data.deferred.result(), m5Val);
+      assert.strictEqual(m1Data.value, m1Val);
+      assert.strictEqual(m2Data.value, m2Val);
+      assert.strictEqual(m3Data.value, m3Val);
+      assert.strictEqual(m4Data.value, m4Val);
+      assert.strictEqual(m5Data.value, m5Val);
 
       /** Check module deferred states. */
-      assert.strictEqual(m1Data.deferred.state(), 'fulfilled');
-      assert.strictEqual(m2Data.deferred.state(), 'fulfilled');
-      assert.strictEqual(m3Data.deferred.state(), 'fulfilled');
-      assert.strictEqual(m4Data.deferred.state(), 'fulfilled');
-      assert.strictEqual(m5Data.deferred.state(), 'fulfilled');
+      assert.strictEqual(m1Data.ready, true);
+      assert.strictEqual(m2Data.ready, true);
+      assert.strictEqual(m3Data.ready, true);
+      assert.strictEqual(m4Data.ready, true);
+      assert.strictEqual(m5Data.ready, true);
 
       done();
 

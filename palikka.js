@@ -16,25 +16,25 @@
  * Task board
  * ==========
  *
- * @idea .bind() -> Check Bluebird.
- * @idea Drop circular dependency detection.
- * @idea Drop type checks.
- * @idea Separate Promise from Deferred.
- * @idea Make private properties of Deferred truly private -> invisible to user. Needs perf tests to see the if it's worth it.
- * @idea Check memory leaks -> Perf tests -> Benchmark.js / jsperf.com
+ * @todo Separate Promise from Deferred.
+ * @todo Improve Deferred collection handling.
+ * @todo Deferred.prototype.catch().
+ * @todo Deferred.prototype.done().
  *
- * @idea .done() -> Check Q and Bluebird.
- * @todo Better handling for collections: https://github.com/petkaantonov/bluebird/blob/master/API.md#collections
- * @todo Update docs and give an example on how to promisify crippled promises -> palikka.when([crippledPromise]);
- * @todo Major test overhaul -> Isolate cases more clearly and add cover more areas.
- * @todo Streamline module system. Try to make it just a thin layer over the promise system.
- *
- * @done Deferred.prototype.spread().
- * @done Deferred.prototype.inspect().
- * @done Deferred.prototype.async().
- * @done Deferred.prototype.sync().
- * @done Better error data for when method in the case when the rejectImmediately argument is false.
- * @done Remove module listing functionality and instead just provide a direct access to to modules object.
+ * @done .eventize() restructuring.
+ * @done Make Eventizer private properties truly private.
+ * @done Make Deferred private properties truly private.
+ * @done Add Deferred.prototype.spread().
+ * @done Add Deferred.prototype.inspect().
+ * @done Add Deferred.prototype.async().
+ * @done Add Deferred.prototype.sync().
+ * @done Add Deferred.prototype.isAsync().
+ * @done Add Deferred.prototype.isLocked().
+ * @done Add .list().
+ * @done Remove Eventizer.prototype.emitAsync().
+ * @done Remove Module.prototype.info().
+ * @done .when() error handling improvements.
+ * @done Restructure module listing functionality.
  * @done Remove underscore prefix from typeOf, config and nextTick methods.
  * @done Remove underscore prefix from module instance props.
  */
@@ -50,6 +50,9 @@
 
   /** Public API interface. */
   lib = {},
+
+  /** Private key for accessing private properties of a class. */
+  privateKey = {},
 
   /** Main configuration object. */
   config = {
@@ -126,7 +129,24 @@
      * @protected
      * @type {object}
      */
-    this._listeners = listeners || {};
+    listeners = typeOf(listeners, typeObject) ? listeners : {};
+
+    /**
+     * Method for getting instance's listeners data. Nothing will be returned unless a correct "key" is provided.
+     *
+     * @protected
+     * @param {object} key
+     * @type {boolean}
+     */
+    this._ = function (key) {
+
+      if (key === privateKey) {
+
+        return listeners;
+
+      }
+
+    };
 
   }
 
@@ -141,7 +161,7 @@
   eventizerProto.on = function (type, callback) {
 
     var
-    listeners = this._listeners;
+    listeners = this._(privateKey);
 
     if (typeOf(callback, typeFunction)) {
 
@@ -159,7 +179,7 @@
   };
 
   /**
-   * Bind an event listener.
+   * Bind an event listener that is called only once.
    *
    * @memberof Eventizer
    * @param {string} type
@@ -193,7 +213,7 @@
   eventizerProto.off = function (type, target) {
 
     var
-    listeners = this._listeners,
+    listeners = this._(privateKey),
     targetType = typeOf(target),
     targetId = targetType === typeNumber,
     targetFn = targetType === typeFunction,
@@ -242,7 +262,7 @@
 
     var
     instance = this,
-    eventObjects = instance._listeners[type],
+    eventObjects = instance._(privateKey)[type],
     cbArgs;
 
     if (eventObjects) {
@@ -290,11 +310,25 @@
 
     if (typeOf(obj, typeObject)) {
 
-      obj._listeners = eventizer._listeners;
-      obj.on = eventizer.on;
-      obj.one = eventizer.one;
-      obj.off = eventizer.off;
-      obj.emit = eventizer.emit;
+      arrayEach(['on', 'one', 'off'], function (val) {
+
+        obj[val] = function (a, b) {
+
+          eventizer[val](a, b);
+
+          return obj;
+
+        };
+
+      });
+
+      obj.emit = function (a, b, c) {
+
+        eventizer.emit(a, b, c === undefined ? obj : c);
+
+        return obj;
+
+      };
 
       return obj;
 
@@ -322,47 +356,67 @@
   function Deferred(executor) {
 
     var
-    instance = this;
+    instance = this,
+    data = {
+
+      /**
+       * Instance id.
+       *
+       * @protected
+       * @type {string}
+       */
+      id: ++uid,
+
+      /**
+       * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
+       *
+       * @protected
+       * @type {boolean}
+       */
+      locked: false,
+
+      /**
+       * The instance's result value is stored here.
+       *
+       * @protected
+       * @type {*}
+       */
+      result: undefined,
+
+      /**
+       * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
+       *
+       * @protected
+       * @type {string}
+       */
+      state: statePending,
+
+      /**
+       * Indicates if the deferred instance is asynchronous.
+       *
+       * @protected
+       * @type {boolean}
+       */
+      async: config.asyncDeferreds
+
+    };
 
     /**
-     * Instance id.
+     * Method for getting instance's private data. Nothing will be returned unless a correct "key" is provided.
      *
      * @protected
-     * @type {string}
-     */
-    instance._id = ++uid;
-
-    /**
-     * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
-     *
-     * @protected
+     * @param {object} key
      * @type {boolean}
      */
-    instance._locked = false;
+    instance._ = function (key) {
 
-    /**
-     * The instance's result value is stored here.
-     *
-     * @protected
-     * @type {*}
-     */
-    instance._result = undefined;
+      if (key === privateKey) {
 
-    /**
-     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
-     *
-     * @protected
-     * @type {string}
-     */
-    instance._state = statePending;
+        return data;
 
-    /**
-     * Indicates if the deferred instance is asynchronous.
-     *
-     * @protected
-     * @type {boolean}
-     */
-    instance._async = config.asyncDeferreds;
+      }
+
+    };
 
     /** Call executor function if provided. */
     if (typeOf(executor, typeFunction)) {
@@ -392,7 +446,7 @@
    */
   deferredProto.state = function () {
 
-    return this._state;
+    return this._(privateKey).state;
 
   };
 
@@ -404,7 +458,31 @@
    */
   deferredProto.result = function () {
 
-    return this._result;
+    return this._(privateKey).result;
+
+  };
+
+  /**
+   * Check if the current instance is set to run asynchronously.
+   *
+   * @memberof Deferred.prototype
+   * @returns {boolean}
+   */
+  deferredProto.isAsync = function () {
+
+    return this._(privateKey).async;
+
+  };
+
+  /**
+   * Check if the current instance is locked.
+   *
+   * @memberof Deferred.prototype
+   * @returns {boolean}
+   */
+  deferredProto.isLocked = function () {
+
+    return this._(privateKey).locked;
 
   };
 
@@ -417,13 +495,13 @@
   deferredProto.inspect = function () {
 
     var
-    instance = this;
+    data = this._(privateKey);
 
     return {
-      state: instance._state,
-      result: instance._result,
-      locked: instance._locked,
-      async: instance._async
+      state: data.state,
+      result: data.result,
+      locked: data.locked,
+      async: data.async
     };
 
   };
@@ -436,7 +514,7 @@
    */
   deferredProto.sync = function () {
 
-    this._async = false;
+    this._(privateKey).async = false;
 
     return this;
 
@@ -450,7 +528,7 @@
    */
   deferredProto.async = function () {
 
-    this._async = true;
+    this._(privateKey).async = true;
 
     return this;
 
@@ -466,11 +544,12 @@
   deferredProto.resolve = function (val) {
 
     var
-    instance = this;
+    instance = this,
+    data = instance._(privateKey);
 
-    if (instance._state === statePending && !instance._locked) {
+    if (data.state === statePending && !data.locked) {
 
-      instance._locked = true;
+      data.locked = true;
       processResolve(instance, val);
 
     }
@@ -488,11 +567,12 @@
   deferredProto.reject = function (reason) {
 
     var
-    instance = this;
+    instance = this,
+    data = instance._(privateKey);
 
-    if (instance._state === statePending && !instance._locked) {
+    if (data.state === statePending && !data.locked) {
 
-      instance._locked = true;
+      data.locked = true;
       finalizeReject(instance, reason);
 
     }
@@ -724,12 +804,15 @@
    */
   function finalizeResolve(instance, val) {
 
-    instance._result = val;
-    instance._state = stateFulfilled;
+    var
+    data = instance._(privateKey);
+
+    data.result = val;
+    data.state = stateFulfilled;
 
     evHub
-    .emit(evResolve + instance._id, [val])
-    .off(evReject + instance._id);
+    .emit(evResolve + data.id, [val])
+    .off(evReject + data.id);
 
   }
 
@@ -742,12 +825,15 @@
    */
   function finalizeReject(instance, reason) {
 
-    instance._result = reason;
-    instance._state = stateRejected;
+    var
+    data = instance._(privateKey);
+
+    data.result = reason;
+    data.state = stateRejected;
 
     evHub
-    .emit(evReject + instance._id, [reason])
-    .off(evResolve + instance._id);
+    .emit(evReject + data.id, [reason])
+    .off(evResolve + data.id);
 
   }
 
@@ -763,19 +849,22 @@
    */
   function bindDeferredCallback(instance, callback, refState, refEvent) {
 
+    var
+    data = instance._(privateKey);
+
     if (typeOf(callback, typeFunction)) {
 
-      if (instance._state === refState) {
+      if (data.state === refState) {
 
-        executeDeferredCallback(instance, callback);
+        executeDeferredCallback(data, callback);
 
       }
 
-      if (instance._state === statePending) {
+      if (data.state === statePending) {
 
-        evHub.one(refEvent + instance._id, function () {
+        evHub.one(refEvent + data.id, function () {
 
-          executeDeferredCallback(instance, callback);
+          executeDeferredCallback(data, callback);
 
         });
 
@@ -791,16 +880,16 @@
    * Finish up what bindDeferredCallback started.
    *
    * @private
-   * @param {Deferred} instance
+   * @param {object} instanceData
    * @param {function} callback
    */
-  function executeDeferredCallback(instance, callback) {
+  function executeDeferredCallback(instanceData, callback) {
 
     execFn(function () {
 
-      callback(instance._result);
+      callback(instanceData.result);
 
-    }, instance._async);
+    }, instanceData.async);
 
   }
 
@@ -823,7 +912,7 @@
 
     instance.onSettled(function (instanceVal) {
 
-      isFulfilled = instance._state === stateFulfilled;
+      isFulfilled = instance.state() === stateFulfilled;
       onFulfilled = isFulfilled && typeOf(onFulfilled, typeFunction) ? onFulfilled : 0;
       onRejected = !isFulfilled && typeOf(onRejected, typeFunction) ? onRejected : 0;
       fateCallback = onFulfilled || onRejected || 0;
@@ -876,7 +965,7 @@
     var
     master = defer(),
     results = [],
-    snapshots = [],
+    inspects = [],
     counter = deferreds.length,
     firstRejection;
 
@@ -884,20 +973,20 @@
 
       arrayEach(deferreds, function (deferred, i) {
 
-        var d = deferred instanceof Deferred ? deferred : defer().resolve(deferred);
+        deferred = deferred instanceof Deferred ? deferred : defer().resolve(deferred);
 
-        d.onSettled(function () {
+        deferred.onSettled(function () {
 
-          if (master._state === statePending && !master._locked) {
+          if (master.state() === statePending && !master.isLocked()) {
 
             --counter;
-            firstRejection = firstRejection || (d._state === stateRejected && d);
-            results[i] = d._result;
-            snapshots[i] = d.inspect();
+            firstRejection = firstRejection || (deferred.state() === stateRejected && deferred);
+            results[i] = deferred.result();
+            inspects[i] = deferred.inspect();
 
             if (firstRejection && (rejectImmediately || !counter)) {
 
-              master.reject(rejectImmediately ? firstRejection._result : snapshots);
+              master.reject(rejectImmediately ? firstRejection.result() : inspects);
 
             }
 
@@ -1096,7 +1185,7 @@
 
         evHub.one(evInitiate + depId, function (ev, module) {
 
-          resolve(module.deferred._result);
+          resolve(module.deferred.result());
 
         });
 
@@ -1161,6 +1250,36 @@
       }
 
     });
+
+    return ret;
+
+  }
+
+  /**
+   * List modules. Returns an object containing information about all the modules in their current state.
+   *
+   * @private
+   * @returns {object}
+   */
+  function listModules() {
+
+    var
+    ret = {},
+    m,
+    id;
+
+    for (id in modules) {
+
+      m = modules[id];
+
+      ret[id] = {
+        id: id,
+        dependencies: cloneArray(m.dependencies),
+        ready: m.deferred.state() === stateFulfilled ? true : false,
+        value: m.deferred.result()
+      };
+
+    }
 
     return ret;
 
@@ -1454,6 +1573,12 @@
 
   /**
    * @public
+   * @see listModules
+   */
+  lib.list = listModules;
+
+  /**
+   * @public
    * @see typeOf
    */
   lib.typeOf = typeOf;
@@ -1469,12 +1594,6 @@
    * @see config
    */
   lib.config = config;
-
-  /**
-   * @public
-   * @see modules
-   */
-  lib._modules = modules;
 
   /**
    * Initiate
