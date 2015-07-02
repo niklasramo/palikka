@@ -1,6 +1,6 @@
 {
   "name": "Palikka",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "A tiny module/event/promise system for the browser and Node.",
   "keywords": [
     "module",
@@ -24,7 +24,6 @@
     "test": "gulp"
   },
   "devDependencies": {
-    "chai": "^3.0.0",
     "gulp": "^3.8.10",
     "gulp-jscs": "^1.4.0",
     "gulp-karma": "0.0.4",
