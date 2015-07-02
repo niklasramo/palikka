@@ -3,27 +3,16 @@
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v0.4.0)](https://travis-ci.org/niklasramo/palikka)
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v0.4.0)](https://coveralls.io/r/niklasramo/palikka?branch=v0.4.0)
 
-Palikka is a lightweight and performant module/event/promise system that works in the browser (all the way down to IE7) and Node.js.
+[<img src="http://promises-aplus.github.com/promises-spec/assets/logo-small.png" alt="Promises/A+ logo" title="Promises/A+ 1.1 compliant" align="right"/>](http://promises-aplus.github.com/promises-spec)
+The aim of this project is to provide a robust set of tools for creating reusable modules. Palikka consists of three core components: module system, event system and promise system (Promises/A+ 1.1 compliant). All components are highly optimized leveraging each other internally. All this goodness is dependency free, well tested/documented, and works in the browser (IE7+) as well as Node.js. Considering the set of features the size of the library is amazingly tiny, only 6.13kB minified and 2.66kB gzipped.
 
 * **[Website](http://niklasramo.github.io/palikka)**
 * **[Docs](https://github.com/niklasramo/palikka/wiki/v0.4.0-Docs)**
 * **[Download](https://raw.githubusercontent.com/niklasramo/palikka/v0.4.0/palikka.js)**
 
-##Why Palikka?
-
-[<img src="http://promises-aplus.github.com/promises-spec/assets/logo-small.png" alt="Promises/A+ logo" title="Promises/A+ 1.1 compliant" align="right"/>](http://promises-aplus.github.com/promises-spec)
-Originally this project was intended just to provide a simple synchronous module system, but it has now expanded to also provide a solid event system and promises too. A case of feature creep? Perhaps. However, the original goal still remains. The module system has always used the event system internally so I thought why not expose it to the public API, right? After thinking about the architecture of the module system I realized that modules are actually pretty much like promises, but with names (or ids). So *then* came promises. In the end it makes a lot of sense to bundle these three different components together: the event system powers promises which in turn power the module system.
-
-* Lightweight: 6.25kb minified and 2.6kb minified and gzipped.
-* Works both in the browser (IE7+) and in Node.js.
-* Promises/A+ 1.1 compliant.
-* Well documented codebase.
-* Comprehensive unit tests.
-* No dependencies.
-
 ##Getting started
 
-Include [palikka.js](https://raw.githubusercontent.com/niklasramo/palikka/v0.3.2/palikka.js) somewhere on your site (before any code that requires Palikka).
+Include [palikka.js](https://raw.githubusercontent.com/niklasramo/palikka/v0.4.0/palikka.js) somewhere on your site (before any code that requires Palikka).
 
 ```javascript
 // Define module "foo" which requires module "bar"
@@ -35,7 +24,7 @@ palikka.define('foo', ['bar'], function (bar) {
 palikka.define('bar', function () {
 
   // Let's use a deferred to delay the initiation
-  return new palikka.Deferred(function (resolve, reject) {
+  return palikka.defer(function (resolve, reject) {
     window.setTimeout(function () {
       resolve('bar');
     }, 1000);

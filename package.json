@@ -24,7 +24,6 @@
     "test": "gulp"
   },
   "devDependencies": {
-    "chai": "^3.0.0",
     "gulp": "^3.8.10",
     "gulp-jscs": "^1.4.0",
     "gulp-karma": "0.0.4",

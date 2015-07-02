@@ -6,39 +6,6 @@
  * Released under the MIT license
  */
 
-/*
- * Release goals
- * =============
- *
- * - Streamline codebase and API.
- * - Prepare for 1.0.0 release after 0.4.x branch.
- *
- * Task board
- * ==========
- *
- * @todo Separate Promise from Deferred.
- * @todo Improve Deferred collection handling.
- * @todo Deferred.prototype.catch().
- * @todo Deferred.prototype.done().
- *
- * @done .eventize() restructuring.
- * @done Make Eventizer private properties truly private.
- * @done Make Deferred private properties truly private.
- * @done Add Deferred.prototype.spread().
- * @done Add Deferred.prototype.inspect().
- * @done Add Deferred.prototype.async().
- * @done Add Deferred.prototype.sync().
- * @done Add Deferred.prototype.isAsync().
- * @done Add Deferred.prototype.isLocked().
- * @done Add .list().
- * @done Remove Eventizer.prototype.emitAsync().
- * @done Remove Module.prototype.info().
- * @done .when() error handling improvements.
- * @done Restructure module listing functionality.
- * @done Remove underscore prefix from typeOf, config and nextTick methods.
- * @done Remove underscore prefix from module instance props.
- */
-
 (function (undefined) {
 
   'use strict';
@@ -958,6 +925,8 @@
    * @returns {Deferred} A new deferred.
    */
   function when(deferreds, resolveImmediately, rejectImmediately) {
+
+    typeCheck(deferreds, typeArray);
 
     resolveImmediately = resolveImmediately === true;
     rejectImmediately = rejectImmediately === undefined || rejectImmediately === true;

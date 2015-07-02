@@ -880,31 +880,131 @@
 
   });
 
-  Q.test('Deferred - .when() / .and()', function (assert) {
+  Q.test('Deferred - .spread()', function (assert) {
 
     var done = assert.async();
-    assert.expect(44);
+    assert.expect(8);
+
+    palikka
+    .defer()
+    .resolve([1, 2])
+    .spread(function (a, b) {
+
+      assert.strictEqual(arguments.length, 2);
+      assert.strictEqual(a, 1);
+      assert.strictEqual(b, 2);
+
+      throw [1, 2];
+
+    })
+    .spread(null, function (a, b) {
+
+      assert.strictEqual(arguments.length, 2);
+      assert.strictEqual(a, 1);
+      assert.strictEqual(b, 2);
+
+    })
+    .spread(function (a) {
+
+      assert.strictEqual(arguments.length, 1);
+      assert.strictEqual(a, undefined);
+      done();
+
+    });
+
+  });
+
+  Q.test('Deferred - .isLocked()', function (assert) {
+
+    assert.expect(4);
+
+    var d1 = palikka.defer();
+    var d2 = palikka.defer();
+
+    assert.strictEqual(d1.isLocked(), false);
+    d1.resolve();
+    assert.strictEqual(d1.isLocked(), true);
+
+    assert.strictEqual(d2.isLocked(), false);
+    d2.reject();
+    assert.strictEqual(d2.isLocked(), true);
+
+  });
+
+  Q.test('Deferred - .async() / .sync() / .isAsync()', function (assert) {
+
+    assert.expect(3);
+
+    var d1 = palikka.defer();
+
+    assert.strictEqual(d1.isAsync(), true);
+    d1.sync();
+    assert.strictEqual(d1.isAsync(), false);
+    d1.async();
+    assert.strictEqual(d1.isAsync(), true);
+
+  });
+
+  Q.test('Deferred - .when()', function (assert) {
+
+    var done = assert.async();
+    assert.expect(8);
+
+    /** .when() should always return Deferred instance.  */
+    assert.strictEqual(palikka.when([]) instanceof palikka.Deferred, true);
+
+    /** .when() should throw an error if the first argument is not an array. */
+    assert.throws(function() {
+      palikka.when();
+    });
+
+    /** .when() deferred's result should be an empty array when an empty array is provided as the first argument. */
+    palikka.when([]).onFulfilled(function (val) {
+      assert.strictEqual(val.length, 0);
+    });
+
+    /** .when() method's first argument should accept an array with any type of values within it and promisify all non-Deferred values. */
+    palikka
+    .when([1, '2', {'a': 'a'}, ['a', 'b'], palikka.defer().resolve(null)])
+    .onFulfilled(function (val) {
+
+      assert.strictEqual(val[0], 1);
+      assert.strictEqual(val[1], '2');
+      assert.deepEqual(val[2], {'a': 'a'});
+      assert.deepEqual(val[3], ['a', 'b']);
+      assert.strictEqual(val[4], null);
+
+    });
+
+    setTimeout(function () {
+      done();
+    }, 1000);
+
+  });
+
+  Q.test('Deferred - .and()', function (assert) {
+
+    var done = assert.async();
+    assert.expect(28);
 
     var
     d1 = new palikka.Deferred(function (resolve, reject) {
       setTimeout(function () {
         resolve('a');
-      }, 500);
+      }, 1500);
     }),
     d2 = new palikka.Deferred(function (resolve, reject) {
-      setTimeout(function () {
-        resolve('b');
-      }, 100);
+      resolve('b');
     }),
     d3 = new palikka.Deferred(function (resolve, reject) {
       setTimeout(function () {
         reject('fail-1');
-      }, 300);
+      }, 500);
     }),
     d4 = new palikka.Deferred(function (resolve, reject) {
       setTimeout(function () {
         reject('fail-2');
-      }, 400);
+      }, 1000);
     }),
     m1 = d1.and([d2]),
     m2 = d1.and([d2, d3]),
@@ -912,37 +1012,8 @@
     m4 = d1.and([d2, d3, d4], true, true),
     m5 = d1.and([d2, d3, d4], false, false);
 
-    /** Make sure master's returns deferred instance. */
-    assert.strictEqual(m1 instanceof palikka.Deferred, true);
-    assert.strictEqual(m2 instanceof palikka.Deferred, true);
-    assert.strictEqual(m3 instanceof palikka.Deferred, true);
-    assert.strictEqual(m4 instanceof palikka.Deferred, true);
-    assert.strictEqual(m5 instanceof palikka.Deferred, true);
-
-    palikka
-    .when([])
-    .onFulfilled(function (val) {
-
-      assert.strictEqual(val.length, 0);
-
-    });
-
-    palikka
-    .when([1, '2', {'a': 'a'}, ['a', 'b']])
-    .onFulfilled(function (val) {
-
-      assert.strictEqual(arguments.length, 1);
-      assert.strictEqual(val[0], 1);
-      assert.strictEqual(val[1], '2');
-      assert.strictEqual(val[2]['a'], 'a');
-      assert.strictEqual(val[3][0], 'a');
-      assert.strictEqual(val[3][1], 'b');
-
-    });
-
     m1.onFulfilled(function (val) {
 
-      assert.strictEqual(arguments.length, 1);
       assert.strictEqual(d1.state(), 'fulfilled');
       assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(val[0], 'a');
@@ -952,7 +1023,6 @@
 
     m2.onRejected(function (reason) {
 
-      assert.strictEqual(arguments.length, 1);
       assert.strictEqual(d1.state(), 'pending');
       assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'rejected');
@@ -962,7 +1032,6 @@
 
     m3.onRejected(function (reason) {
 
-      assert.strictEqual(arguments.length, 1);
       assert.strictEqual(d1.state(), 'pending');
       assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'rejected');
@@ -973,7 +1042,6 @@
 
     m4.onFulfilled(function (val) {
 
-      assert.strictEqual(arguments.length, 1);
       assert.strictEqual(d1.state(), 'pending');
       assert.strictEqual(d2.state(), 'fulfilled');
       assert.strictEqual(d3.state(), 'pending');
@@ -997,9 +1065,9 @@
 
     });
 
-    setTimeout(function () {
+    palikka.when([m1, m2, m3, m4, m5], false, false).onSettled(function () {
       done();
-    }, 1000);
+    });
 
   });
 
