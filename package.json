@@ -1,6 +1,6 @@
 {
   "name": "Palikka",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A tiny module/event/promise system for the browser and Node.",
   "keywords": [
     "module",
@@ -24,6 +24,8 @@
     "test": "gulp"
   },
   "devDependencies": {
+    "benchmark": "^1.0.0",
+    "bluebird": "^2.9.32",
     "gulp": "^3.8.10",
     "gulp-jscs": "^1.4.0",
     "gulp-karma": "0.0.4",
@@ -45,8 +47,10 @@
     "karma-story-reporter": "^0.3.1",
     "phantomjs": "^1.9.15",
     "promises-aplus-tests": "^2.1.0",
+    "q": "^1.4.1",
     "qunitjs": "^1.17.1",
     "rimraf": "^2.2.8",
-    "run-sequence": "^1.0.2"
+    "run-sequence": "^1.0.2",
+    "when": "^3.7.3"
   }
 }

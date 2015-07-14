@@ -1123,7 +1123,20 @@
   Q.test('Utils - .nextTick()', function (assert) {
 
     var done = assert.async();
-    assert.expect(1);
+    assert.expect(6);
+
+    /** Is chainable? */
+
+    assert.strictEqual(palikka.nextTick(function () {}), palikka);
+
+    /** Providing non-function values should fail silently. */
+
+    assert.strictEqual(palikka.nextTick(), palikka);
+    assert.strictEqual(palikka.nextTick(1), palikka);
+    assert.strictEqual(palikka.nextTick('a'), palikka);
+    assert.strictEqual(palikka.nextTick({}), palikka);
+
+    /** Are next ticks triggered in correct order? */
 
     var test = [];
 

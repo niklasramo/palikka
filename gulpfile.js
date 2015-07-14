@@ -4,6 +4,7 @@ paths = {
   palikkaMin: './palikka.min.js',
   readme: './README.md',
   tests: './tests/tests.js',
+  memTests: './tests/memtest-tests.js',
   promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
   jscsRules: './jscsrc.json',
@@ -19,7 +20,10 @@ gulpUglify = require('gulp-uglify'),
 gulpRename = require('gulp-rename'),
 gulpSize = require('gulp-size'),
 rimraf = require('rimraf'),
-runSequence = require('run-sequence');
+runSequence = require('run-sequence'),
+benchmark = require('benchmark'),
+memTests = require(paths.memTests),
+palikka = require(paths.palikka);
 
 gulp.task('validate', function () {
 
@@ -58,6 +62,12 @@ gulp.task('test-promises', function () {
 gulp.task('clean', function (cb) {
 
   rimraf(paths.coverage, cb);
+
+});
+
+gulp.task('memtest', function (cb) {
+
+  memTests(cb);
 
 });
 

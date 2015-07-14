@@ -1,10 +1,22 @@
 /*!
  * @license
- * Palikka v0.4.0
+ * Palikka v0.4.1
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
+
+/**
+
+GOALS:
+------
+
+- Performance/memory optimzations.
+- nextTick() should be chainable, make it return the library.
+- Basic memory leak tests.
+- Tests overhaul.
+
+*/
 
 (function (undefined) {
 
@@ -181,30 +193,37 @@
 
     var
     listeners = this._(privateKey),
-    targetType = typeOf(target),
-    targetId = targetType === typeNumber,
-    targetFn = targetType === typeFunction,
     eventObjects = listeners[type],
+    targetType,
+    targetId,
+    targetFn,
     eventObject,
     i;
 
     if (eventObjects) {
 
-      i = eventObjects.length;
+      if (target) {
 
-      while (i--) {
+        targetType = typeOf(target);
+        targetId = targetType === typeNumber;
+        targetFn = targetType === typeFunction;
+        i = eventObjects.length;
 
-        eventObject = eventObjects[i];
+        while (i--) {
 
-        if (!target || (targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
+          eventObject = eventObjects[i];
 
-          eventObjects.splice(i, 1);
+          if ((targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
+
+            eventObjects.splice(i, 1);
+
+          }
 
         }
 
       }
 
-      if (!eventObjects.length) {
+      if (!target || !eventObjects.length) {
 
         delete listeners[type];
 
@@ -327,14 +346,6 @@
     data = {
 
       /**
-       * Instance id.
-       *
-       * @protected
-       * @type {string}
-       */
-      id: ++uid,
-
-      /**
        * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
        *
        * @protected
@@ -364,7 +375,15 @@
        * @protected
        * @type {boolean}
        */
-      async: config.asyncDeferreds
+      async: config.asyncDeferreds,
+
+      /**
+       * Instance event hub that's used for managing the onFulfilled/onRejected callbacks.
+       *
+       * @protected
+       * @type {Eventizer}
+       */
+      e: eventize()
 
     };
 
@@ -777,9 +796,8 @@
     data.result = val;
     data.state = stateFulfilled;
 
-    evHub
-    .emit(evResolve + data.id, [val])
-    .off(evReject + data.id);
+    data.e.emit(evResolve);
+    delete data.e;
 
   }
 
@@ -798,9 +816,8 @@
     data.result = reason;
     data.state = stateRejected;
 
-    evHub
-    .emit(evReject + data.id, [reason])
-    .off(evResolve + data.id);
+    data.e.emit(evReject);
+    delete data.e;
 
   }
 
@@ -829,7 +846,7 @@
 
       if (data.state === statePending) {
 
-        evHub.one(refEvent + data.id, function () {
+        data.e.on(refEvent, function () {
 
           executeDeferredCallback(data, callback);
 
@@ -1367,8 +1384,6 @@
   /**
    * Create cross-browser next tick implementation. Returns a function that accepts a function as a parameter.
    *
-   * @todo Add some faster fallbacks such onreadystatechange for IE7-IE10. setImmediate is broken unfortunately.
-   *
    * @private
    * @returns {function}
    */
@@ -1381,15 +1396,16 @@
     processQueue,
     tryFireTick,
     fireTick,
-    observerTarget;
+    observerTarget,
+    nextTickFn;
 
     /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
     if (NativePromise) {
 
       NativePromise = NativePromise.resolve();
 
-      /** Return next tick function. */
-      return function (cb) {
+      /** Define next tick function. */
+      nextTickFn = function (cb) {
 
         NativePromise.then(cb);
 
@@ -1399,7 +1415,7 @@
     /** Node.js has good existing next tick implementations, so let's use them. */
     else if (isNode) {
 
-      return glob.setImmediate || process.nextTick;
+      nextTickFn = glob.setImmediate || process.nextTick;
 
     }
     /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
@@ -1455,8 +1471,8 @@
 
       }
 
-      /** Return next tick function. */
-      return function (cb) {
+      /** Define next tick function. */
+      nextTickFn = function (cb) {
 
         evHub.one(evTick, cb);
         tryFireTick();
@@ -1464,6 +1480,19 @@
       };
 
     }
+
+    // Return next tick function
+    return function (cb) {
+
+      if (typeOf(cb, typeFunction)) {
+
+        nextTickFn(cb);
+
+      }
+
+      return lib;
+
+    };
 
   }
 
