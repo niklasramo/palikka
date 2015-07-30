@@ -5,6 +5,7 @@ paths = {
   readme: './README.md',
   tests: './tests/tests.js',
   memTests: './tests/memtest-tests.js',
+  benchmarks: './tests/benchmarks.js',
   promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
   jscsRules: './jscsrc.json',
@@ -23,6 +24,7 @@ rimraf = require('rimraf'),
 runSequence = require('run-sequence'),
 benchmark = require('benchmark'),
 memTests = require(paths.memTests),
+benchmarks = require(paths.benchmarks),
 palikka = require(paths.palikka);
 
 gulp.task('validate', function () {
@@ -68,6 +70,12 @@ gulp.task('clean', function (cb) {
 gulp.task('memtest', function (cb) {
 
   memTests(cb);
+
+});
+
+gulp.task('benchmarks', function (cb) {
+
+  benchmarks(cb);
 
 });
 

@@ -8,13 +8,17 @@
 
 /**
 
-GOALS:
-------
+TODO:
+-----
 
-- Performance/memory optimzations.
-- nextTick() should be chainable, make it return the library.
-- Basic memory leak tests.
-- Tests overhaul.
+- [ ] Performance/memory optimzations.
+- [x] nextTick() should be chainable, make it return the library.
+- [x] .Eventizer.on() and .Eventizer.one() should be able to define the context which is can overriden via .Eventizer.emit()
+- [x] Basic memory leak tests.
+- [x] Clean up "dead" code.
+- [ ] Tests overhaul (use a coverage tool to check mmissing tests):
+  -> Cover all nextTIck variations.
+  -> Cover all lib initiation variations (AMD/Node/Browser).
 
 */
 
@@ -30,9 +34,6 @@ GOALS:
   /** Public API interface. */
   lib = {},
 
-  /** Private key for accessing private properties of a class. */
-  privateKey = {},
-
   /** Main configuration object. */
   config = {
     asyncDeferreds: true,
@@ -45,11 +46,12 @@ GOALS:
   /** Deferreds container. */
   deferreds = {},
 
-  /** Private event hub and event names. */
-  evHub,
+  /** Module event hub and event names. */
+  moduleEvents,
   evInitiate = 'a',
-  evResolve = 'b',
-  evReject = 'c',
+
+  /** Next tick event hub and event names. */
+  nextTickEvents,
   evTick = 'd',
 
   /** Deferred states. */
@@ -108,24 +110,7 @@ GOALS:
      * @protected
      * @type {object}
      */
-    listeners = typeOf(listeners, typeObject) ? listeners : {};
-
-    /**
-     * Method for getting instance's listeners data. Nothing will be returned unless a correct "key" is provided.
-     *
-     * @protected
-     * @param {object} key
-     * @type {boolean}
-     */
-    this._ = function (key) {
-
-      if (key === privateKey) {
-
-        return listeners;
-
-      }
-
-    };
+    this._listeners = typeOf(listeners, typeObject) ? listeners : {};
 
   }
 
@@ -135,20 +120,21 @@ GOALS:
    * @memberof Eventizer
    * @param {string} type
    * @param {function} callback
+   * @param {*} [ctx]
    * @returns {Eventizer} The instance on which this method was called.
    */
-  eventizerProto.on = function (type, callback) {
+  eventizerProto.on = function (type, callback, ctx) {
 
     var
-    listeners = this._(privateKey);
+    listeners = this._listeners;
 
     if (typeOf(callback, typeFunction)) {
 
       listeners[type] = listeners[type] || [];
       listeners[type].push({
         id: ++uid,
-        type: type,
-        fn: callback
+        fn: callback,
+        ctx: ctx
       });
 
     }
@@ -163,9 +149,10 @@ GOALS:
    * @memberof Eventizer
    * @param {string} type
    * @param {function} callback
+   * @param {*} [ctx]
    * @returns {Eventizer} The instance on which this method was called.
    */
-  eventizerProto.one = function (type, callback) {
+  eventizerProto.one = function (type, callback, ctx) {
 
     var
     instance = this;
@@ -175,7 +162,7 @@ GOALS:
       instance.off(e.type, e.id);
       callback.apply(this, arguments);
 
-    });
+    }, ctx);
 
     return instance;
 
@@ -192,38 +179,37 @@ GOALS:
   eventizerProto.off = function (type, target) {
 
     var
-    listeners = this._(privateKey),
+    listeners = this._listeners,
     eventObjects = listeners[type],
-    targetType,
-    targetId,
-    targetFn,
-    eventObject,
-    i;
+    counter = eventObjects && eventObjects.length;
 
-    if (eventObjects) {
+    /** Make sure that at least one event listener exists before unbinding. */
+    if (counter) {
 
+      /** If target is defined, let's do a "surgical" unbind. */
       if (target) {
 
-        targetType = typeOf(target);
-        targetId = targetType === typeNumber;
-        targetFn = targetType === typeFunction;
-        i = eventObjects.length;
+        var
+        targetType = typeOf(target),
+        targetId = targetType === typeNumber,
+        targetFn = targetType === typeFunction,
+        eventObject;
 
-        while (i--) {
+        while (counter--) {
 
-          eventObject = eventObjects[i];
+          eventObject = eventObjects[counter];
 
           if ((targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
 
-            eventObjects.splice(i, 1);
+            eventObjects.splice(counter, 1);
 
           }
 
         }
 
       }
-
-      if (!target || !eventObjects.length) {
+      /** If no target is defined, let's unbind all the event type's listeners. */
+      else {
 
         delete listeners[type];
 
@@ -248,23 +234,36 @@ GOALS:
 
     var
     instance = this,
-    eventObjects = instance._(privateKey)[type],
+    eventObjects = instance._listeners[type],
     cbArgs;
 
     if (eventObjects) {
 
+      /**
+       * Loop through a CLONED set of event listeners. If the listeners are not cloned before looping
+       * there is always the risk that the listeners array gets modified while the loop is being executed,
+       * which is something we don't want to happen.
+       */
       arrayEach(cloneArray(eventObjects), function (eventObject) {
 
+        /** Safety check (probably unnecessary) just to make sure that the callback function really exists. */
         if (typeOf(eventObject.fn, typeFunction)) {
 
+          /** Clone provided arguments, and add the event data object as the first item. */
           cbArgs = cloneArray(args);
           cbArgs.unshift({
+            type: type,
             id: eventObject.id,
-            type: eventObject.type,
             fn: eventObject.fn
           });
 
-          eventObject.fn.apply(ctx === undefined ? instance : ctx, cbArgs);
+          /**
+           * Event listener callback context definition:
+           * 1. If emit method's ctx argument is defined (-> is not undefined) it is used.
+           * 2. Then, if event listener's context is defined, it is used.
+           * 3. If no context is defined at all the current instance (this) is used as context.
+           */
+          eventObject.fn.apply(ctx !== undefined ? ctx : eventObject.ctx !== undefined ? eventObject.ctx : instance, cbArgs);
 
         }
 
@@ -296,25 +295,11 @@ GOALS:
 
     if (typeOf(obj, typeObject)) {
 
-      arrayEach(['on', 'one', 'off'], function (val) {
-
-        obj[val] = function (a, b) {
-
-          eventizer[val](a, b);
-
-          return obj;
-
-        };
-
-      });
-
-      obj.emit = function (a, b, c) {
-
-        eventizer.emit(a, b, c === undefined ? obj : c);
-
-        return obj;
-
-      };
+      obj.on = eventizer.on;
+      obj.one = eventizer.one;
+      obj.off = eventizer.off;
+      obj.emit = eventizer.emit;
+      obj._listeners = eventizer._listeners;
 
       return obj;
 
@@ -342,67 +327,55 @@ GOALS:
   function Deferred(executor) {
 
     var
-    instance = this,
-    data = {
-
-      /**
-       * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
-       *
-       * @protected
-       * @type {boolean}
-       */
-      locked: false,
-
-      /**
-       * The instance's result value is stored here.
-       *
-       * @protected
-       * @type {*}
-       */
-      result: undefined,
-
-      /**
-       * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
-       *
-       * @protected
-       * @type {string}
-       */
-      state: statePending,
-
-      /**
-       * Indicates if the deferred instance is asynchronous.
-       *
-       * @protected
-       * @type {boolean}
-       */
-      async: config.asyncDeferreds,
-
-      /**
-       * Instance event hub that's used for managing the onFulfilled/onRejected callbacks.
-       *
-       * @protected
-       * @type {Eventizer}
-       */
-      e: eventize()
-
-    };
+    instance = this;
 
     /**
-     * Method for getting instance's private data. Nothing will be returned unless a correct "key" is provided.
+     * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
      *
-     * @protected
-     * @param {object} key
+     * @private
      * @type {boolean}
      */
-    instance._ = function (key) {
+    instance._locked = false;
 
-      if (key === privateKey) {
+    /**
+     * The instance's result value is stored here.
+     *
+     * @private
+     * @type {*}
+     */
+    instance._result = undefined;
 
-        return data;
+    /**
+     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
+     *
+     * @private
+     * @type {string}
+     */
+    instance._state = statePending;
 
-      }
+    /**
+     * Indicates if the deferred instance is asynchronous.
+     *
+     * @private
+     * @type {boolean}
+     */
+    instance._async = config.asyncDeferreds;
 
-    };
+    /**
+     * Fulfilled callback queue.
+     *
+     * @private
+     * @type {array}
+     */
+    instance._fulfilled = [];
+
+    /**
+     * Rejected callback queue.
+     *
+     * @private
+     * @type {array}
+     */
+    instance._rejected = [];
 
     /** Call executor function if provided. */
     if (typeOf(executor, typeFunction)) {
@@ -432,7 +405,7 @@ GOALS:
    */
   deferredProto.state = function () {
 
-    return this._(privateKey).state;
+    return this._state;
 
   };
 
@@ -444,7 +417,7 @@ GOALS:
    */
   deferredProto.result = function () {
 
-    return this._(privateKey).result;
+    return this._result;
 
   };
 
@@ -456,7 +429,7 @@ GOALS:
    */
   deferredProto.isAsync = function () {
 
-    return this._(privateKey).async;
+    return this._async;
 
   };
 
@@ -468,7 +441,7 @@ GOALS:
    */
   deferredProto.isLocked = function () {
 
-    return this._(privateKey).locked;
+    return this._locked;
 
   };
 
@@ -481,13 +454,13 @@ GOALS:
   deferredProto.inspect = function () {
 
     var
-    data = this._(privateKey);
+    instance = this;
 
     return {
-      state: data.state,
-      result: data.result,
-      locked: data.locked,
-      async: data.async
+      state: instance._state,
+      result: instance._result,
+      locked: instance._locked,
+      async: instance._async
     };
 
   };
@@ -500,7 +473,7 @@ GOALS:
    */
   deferredProto.sync = function () {
 
-    this._(privateKey).async = false;
+    this._async = false;
 
     return this;
 
@@ -514,7 +487,7 @@ GOALS:
    */
   deferredProto.async = function () {
 
-    this._(privateKey).async = true;
+    this._async = true;
 
     return this;
 
@@ -530,12 +503,11 @@ GOALS:
   deferredProto.resolve = function (val) {
 
     var
-    instance = this,
-    data = instance._(privateKey);
+    instance = this;
 
-    if (data.state === statePending && !data.locked) {
+    if (instance._state === statePending && !instance._locked) {
 
-      data.locked = true;
+      instance._locked = true;
       processResolve(instance, val);
 
     }
@@ -553,12 +525,11 @@ GOALS:
   deferredProto.reject = function (reason) {
 
     var
-    instance = this,
-    data = instance._(privateKey);
+    instance = this;
 
-    if (data.state === statePending && !data.locked) {
+    if (instance._state === statePending && !instance._locked) {
 
-      data.locked = true;
+      instance._locked = true;
       finalizeReject(instance, reason);
 
     }
@@ -576,7 +547,7 @@ GOALS:
    */
   deferredProto.onFulfilled = function (callback) {
 
-    return bindDeferredCallback(this, callback, stateFulfilled, evResolve);
+    return bindDeferredCallback(this, callback, stateFulfilled);
 
   };
 
@@ -589,7 +560,7 @@ GOALS:
    */
   deferredProto.onRejected = function (callback) {
 
-    return bindDeferredCallback(this, callback, stateRejected, evReject);
+    return bindDeferredCallback(this, callback, stateRejected);
 
   };
 
@@ -790,14 +761,10 @@ GOALS:
    */
   function finalizeResolve(instance, val) {
 
-    var
-    data = instance._(privateKey);
+    instance._result = val;
+    instance._state = stateFulfilled;
 
-    data.result = val;
-    data.state = stateFulfilled;
-
-    data.e.emit(evResolve);
-    delete data.e;
+    executeDeferredQueue(instance, '_' + stateFulfilled);
 
   }
 
@@ -810,14 +777,34 @@ GOALS:
    */
   function finalizeReject(instance, reason) {
 
-    var
-    data = instance._(privateKey);
+    instance._result = reason;
+    instance._state = stateRejected;
 
-    data.result = reason;
-    data.state = stateRejected;
+    executeDeferredQueue(instance, '_' + stateRejected);
 
-    data.e.emit(evReject);
-    delete data.e;
+  }
+
+  /**
+   * Handler for triggering the callback handlers in a Deferred instance's callback queue.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {string} queue
+   */
+  function executeDeferredQueue(instance, queue) {
+
+    if (instance[queue].length) {
+
+      arrayEach(cloneArray(instance[queue]), function (cb) {
+
+        cb();
+
+      });
+
+      instance._fulfilled = [];
+      instance._rejected = [];
+
+    }
 
   }
 
@@ -828,27 +815,23 @@ GOALS:
    * @param {Deferred} instance
    * @param {function} callback
    * @param {string} refState
-   * @param {string} refEvent
    * @returns {Deferred}
    */
-  function bindDeferredCallback(instance, callback, refState, refEvent) {
-
-    var
-    data = instance._(privateKey);
+  function bindDeferredCallback(instance, callback, refState) {
 
     if (typeOf(callback, typeFunction)) {
 
-      if (data.state === refState) {
+      if (instance._state === refState) {
 
-        executeDeferredCallback(data, callback);
+        executeDeferredCallback(instance, callback);
 
       }
 
-      if (data.state === statePending) {
+      if (instance._state === statePending) {
 
-        data.e.on(refEvent, function () {
+        instance['_' + refState].push(function () {
 
-          executeDeferredCallback(data, callback);
+          executeDeferredCallback(instance, callback);
 
         });
 
@@ -864,16 +847,16 @@ GOALS:
    * Finish up what bindDeferredCallback started.
    *
    * @private
-   * @param {object} instanceData
+   * @param {Deferred} instance
    * @param {function} callback
    */
-  function executeDeferredCallback(instanceData, callback) {
+  function executeDeferredCallback(instance, callback) {
 
     execFn(function () {
 
-      callback(instanceData.result);
+      callback(instance._result);
 
-    }, instanceData.async);
+    }, instance._async);
 
   }
 
@@ -896,7 +879,7 @@ GOALS:
 
     instance.onSettled(function (instanceVal) {
 
-      isFulfilled = instance.state() === stateFulfilled;
+      isFulfilled = instance._state === stateFulfilled;
       onFulfilled = isFulfilled && typeOf(onFulfilled, typeFunction) ? onFulfilled : 0;
       onRejected = !isFulfilled && typeOf(onRejected, typeFunction) ? onRejected : 0;
       fateCallback = onFulfilled || onRejected || 0;
@@ -907,16 +890,18 @@ GOALS:
        */
       if (fateCallback || isFulfilled) {
 
-        try {
+        tryCatch(
+          function () {
 
-          next.resolve(fateCallback ? (spread && typeOf(instanceVal, typeArray) ? fateCallback.apply(this, instanceVal) : fateCallback(instanceVal)) : instanceVal);
+            next.resolve(fateCallback ? (spread && typeOf(instanceVal, typeArray) ? fateCallback.apply(spread, instanceVal) : fateCallback(instanceVal)) : instanceVal);
 
-        }
-        catch (e) {
+          },
+          function (e) {
 
-          next.reject(e);
+            next.reject(e);
 
-        }
+          }
+        );
 
       }
       /** In other cases, let's sink the error down the then chain until it's caught. */
@@ -1031,7 +1016,7 @@ GOALS:
     deferred
     .onFulfilled(function () {
 
-      evHub.emit(evInitiate + id, [instance]);
+      moduleEvents.emit(evInitiate + id, [instance]);
 
     });
 
@@ -1099,7 +1084,7 @@ GOALS:
       }
 
       /** Make sure id is not reserved. */
-      if (modules[id] instanceof Module) {
+      if (modules[id]) {
 
         throw Error('Module ' + id + ' is already defined.');
 
@@ -1169,7 +1154,7 @@ GOALS:
 
       defers.push(modules[depId] ? modules[depId].deferred : defer(function (resolve) {
 
-        evHub.one(evInitiate + depId, function (ev, module) {
+        moduleEvents.one(evInitiate + depId, function (ev, module) {
 
           resolve(module.deferred.result());
 
@@ -1431,7 +1416,7 @@ GOALS:
       processQueue = function () {
 
         queueEmpty = 1;
-        evHub.emit(evTick);
+        nextTickEvents.emit(evTick);
 
       };
 
@@ -1474,7 +1459,7 @@ GOALS:
       /** Define next tick function. */
       nextTickFn = function (cb) {
 
-        evHub.one(evTick, cb);
+        nextTickEvents.one(evTick, cb);
         tryFireTick();
 
       };
@@ -1519,6 +1504,27 @@ GOALS:
   function isNative(fn) {
 
     return typeOf(fn, typeFunction) && fn.toString().indexOf('[native') > -1 && fn;
+
+  }
+
+  /**
+   * A generic helper to optimize the use of try-catch.
+   *
+   * @param {function} done
+   * @param {function} fail
+   */
+  function tryCatch(done, fail) {
+
+    try {
+
+      done();
+
+    }
+    catch (e) {
+
+      fail(e);
+
+    }
 
   }
 
@@ -1598,8 +1604,9 @@ GOALS:
    * ********
    */
 
-  /** Initialize private event hub. */
-  evHub = eventize();
+  /** Initializeprivate event hubs. */
+  moduleEvents = eventize();
+  nextTickEvents = eventize();
 
   /**
    * Publish library using an adapted UMD pattern.

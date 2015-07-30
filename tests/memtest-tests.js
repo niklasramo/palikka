@@ -3,7 +3,7 @@ module.exports = function (done) {
   var
   memtest = require('../tests/memtest.js'),
   palikka = require('../palikka.js'),
-  samples = 100000,
+  samples = 1000000,
   tests = [];
 
   tests.push(function () {
@@ -63,6 +63,10 @@ module.exports = function (done) {
 
   });
 
+  palikka.config.asyncDeferreds = false;
+  palikka.config.asyncModules = false;
   memtest(tests, done);
+  palikka.config.asyncDeferreds = true;
+  palikka.config.asyncModules = true;
 
 };
