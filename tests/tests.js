@@ -65,8 +65,6 @@
 
     });
 
-    console.log(palikka.list());
-
     /** Get module data before it is initiated. */
     m1Data = palikka.list()[m1];
 
@@ -265,87 +263,202 @@
 
   });
 
-  Q.test('Eventizer', function (assert) {
+  Q.test('Eventizer - Instance', function (assert) {
 
-    var done = assert.async();
-    assert.expect(17);
+    assert.expect(3);
 
-    var
-    obj = {},
-    evA = palikka.eventize(obj),
-    evB = new palikka.Eventizer();
+    assert.strictEqual((new palikka.Eventizer()) instanceof palikka.Eventizer, true);
+    assert.strictEqual(palikka.eventize() instanceof palikka.Eventizer, true);
+    assert.strictEqual(palikka.eventize({}) instanceof palikka.Eventizer, false);
+
+  });
+
+  Q.test('Eventizer - Eventized object', function (assert) {
+
+    assert.expect(1);
 
     /** Eventizing an object should return the same object that was eventized. */
-    assert.strictEqual(evA instanceof palikka.Eventizer, false);
-    assert.strictEqual(evA, obj);
-    assert.strictEqual(palikka.eventize() instanceof palikka.Eventizer, true);
+    var obj = {};
+    assert.strictEqual(palikka.eventize(obj), obj);
 
-    /** Creating a new Eventizer instance should return an Eventizer instance. */
-    assert.strictEqual(evB instanceof palikka.Eventizer, true);
+  });
 
-    /** Eventizer instance methods should be chainable. */
-    assert.strictEqual(evA.on('chainable'), evA);
-    assert.strictEqual(evA.one('chainable'), evA);
-    assert.strictEqual(evA.off('chainable'), evA);
-    assert.strictEqual(evA.emit('chainable'), evA);
+  Q.test('Eventizer - Listeners collection', function (assert) {
 
-    /** on/off/emit should be synchronous. */
-    evA
-    .on('ev-1', function (e, a, b, c) {
+    assert.expect(6);
 
-      /** The first agument should always be an event object which contains the event's name and reference to the callback function. */
-      assert.strictEqual(typeof e.type, 'string');
-      assert.strictEqual(typeof e.fn, 'function');
+    /** By default every eventizer instance and eventized object should have "_listeners" property which is an object. */
+    assert.strictEqual(typeof (new palikka.Eventizer())._listeners, 'object');
+    assert.strictEqual(typeof palikka.eventize()._listeners, 'object');
+    assert.strictEqual(typeof palikka.eventize({})._listeners, 'object');
 
-      /** Test the arguments. */
+    /** Custom listeners object should be added to the created instance as "_listeners" property. */
+    var obj = {};
+    assert.strictEqual((new palikka.Eventizer(obj))._listeners, obj);
+    assert.strictEqual(palikka.eventize(null, obj)._listeners, obj);
+    assert.strictEqual(palikka.eventize({}, obj)._listeners, obj);
+
+  });
+
+  Q.test('Eventizer - Chainability', function (assert) {
+
+    assert.expect(12);
+
+    /** Eventizer methods should be chainable. */
+    var tests = function (hub) {
+      assert.strictEqual(hub.on('a'), hub);
+      assert.strictEqual(hub.one('a'), hub);
+      assert.strictEqual(hub.off('a'), hub);
+      assert.strictEqual(hub.emit('a'), hub);
+    };
+
+    tests(palikka.eventize());
+    tests(palikka.eventize({}));
+    tests(new palikka.Eventizer());
+
+  });
+
+  Q.test('Eventizer - Synchronous execution', function (assert) {
+
+    assert.expect(2);
+
+    /** .on(), .one(), .off() and .emit() methods should execute synchronously. */
+    palikka.eventize()
+    .on('a', function () {
+      assert.strictEqual(1, 1);
+    })
+    .one('a', function () {
+      assert.strictEqual(1, 1);
+    })
+    .emit('a')
+    .on('a', function () {
+      assert.strictEqual(0, 1);
+    })
+    .one('a', function () {
+      assert.strictEqual(0, 1);
+    });
+
+  });
+
+  Q.test('Eventizer - Cloned handlers', function (assert) {
+
+    assert.expect(1);
+
+    var array = [];
+
+    /** Emit method should clone the handlers before looping and executing them. */
+    palikka.eventize()
+    .on('a', function (e) {
+      array.push(1);
+      this.off('a', e.id).on('a', function () {
+        array.push(4);
+      });
+    })
+    .on('a', function (e) {
+      array.push(2);
+      this.off('a', e.id).on('a', function () {
+        array.push(5);
+      });
+    })
+    .on('a', function (e) {
+      array.push(3);
+      this.off('a', e.id).on('a', function () {
+        array.push(6);
+      });
+    })
+    .emit('a')
+    .emit('a');
+
+    assert.deepEqual(array, [1,2,3,4,5,6]);
+
+  });
+
+  Q.test('Eventizer - Callback arguments', function (assert) {
+
+    assert.expect(14);
+
+    var cb = function (e, a, b, c) {
+
+      /** There should be four arugments in total. */
       assert.strictEqual(arguments.length, 4);
+
+      /** The first agument should always be an event object which contains the event's name, id and reference to the callback function. */
+      assert.strictEqual(e.type, 'a');
+      assert.strictEqual(e.fn, cb);
+      assert.strictEqual(typeof e.id, 'number');
+
+      /** Test following arguments should be the ones provided via .emit() method. */
       assert.strictEqual(a, 1);
       assert.strictEqual(b, 2);
       assert.strictEqual(c, 3);
 
-      /** "this" should always refer to the object where to method is attached to, unless specifically set otherwise in emit method. */
-      assert.strictEqual(this, evA);
+    };
 
-      /** Unbind the event and emit again. */
-      this.off(e.type, e.fn).emit('ev-1');
+    palikka.eventize()
+    .on('a', cb)
+    .one('a', cb)
+    .emit('a', [1, 2, 3]);
 
-    })
-    .emit('ev-1', [1, 2, 3])
-    .on('ev-1', function () {
-      assert.strictEqual(0, 1);
-    });
+  });
 
-    /** Callback context should be customizable via emit method. */
-    evA
-    .on('ev-2', function () {
+  Q.test('Eventizer - Function context', function (assert) {
 
-      assert.strictEqual(arguments.length, 1);
-      assert.equal(this, 'ev-2-context');
+    assert.expect(24);
 
-    })
-    .emit('ev-2', [], 'ev-2-context');
+    var
+    ctxA = {},
+    ctxB = {},
+    tests = function (hub) {
 
-    /** Unbind all events for a specified type at once when using off method without specifying a callback function. */
-    evA
-    .on('ev-3', function () {
+      /* By default the context (this) should be the object that called the method. */
+      hub
+      .on('a', function () {
+        assert.strictEqual(this, hub);
+      })
+      .one('a', function () {
+        assert.strictEqual(this, hub);
+      })
+      .emit('a')
+      .off('a');
 
-      assert.strictEqual(1, 0);
+      /* .on() and .one() methods should be able to change the context. */
+      hub
+      .on('a', function () {
+        assert.strictEqual(this, ctxA);
+      }, ctxA)
+      .one('a', function () {
+        assert.strictEqual(this, ctxA);
+      }, ctxA)
+      .emit('a')
+      .off('a');
 
-    })
-    .on('ev-3', function () {
+      /* .emit() method should be able to change the context. */
+      hub
+      .on('a', function () {
+        assert.strictEqual(this, ctxA);
+      })
+      .one('a', function () {
+        assert.strictEqual(this, ctxA);
+      })
+      .emit('a', [], ctxA)
+      .off('a');
 
-      assert.strictEqual(1, 0);
+      /* .emit() method should be able to override .on() and .one() methods' bound context. */
+      hub
+      .on('a', function () {
+        assert.strictEqual(this, ctxB);
+      }, ctxA)
+      .one('a', function () {
+        assert.strictEqual(this, ctxB);
+      }, ctxA)
+      .emit('a', [], ctxB)
+      .off('a');
 
-    })
-    .on('ev-3', function () {
+    };
 
-      assert.strictEqual(1, 0);
-
-    })
-    .off('ev-3')
-    .emit('ev-3');
-
-    window.setTimeout(done, 1000);
+    tests(new palikka.Eventizer());
+    tests(palikka.eventize());
+    tests(palikka.eventize({}));
 
   });
 
@@ -365,7 +478,26 @@
 
   });
 
-  Q.test('Eventizer - Bind/unbind multiple identical listeners (callback based unbind)', function (assert) {
+  Q.test('Eventizer - Unbind all event listeners (event type based unbind)', function (assert) {
+
+    assert.expect(0);
+
+    palikka.eventize()
+    .on('a', function () {
+      assert.strictEqual(1, 0);
+    })
+    .on('a', function () {
+      assert.strictEqual(1, 0);
+    })
+    .on('a', function () {
+      assert.strictEqual(1, 0);
+    })
+    .off('a')
+    .emit('a');
+
+  });
+
+  Q.test('Eventizer - Unbind multiple identical listeners (callback based unbind)', function (assert) {
 
     assert.expect(6);
 

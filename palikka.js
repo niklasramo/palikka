@@ -11,14 +11,21 @@
 TODO:
 -----
 
-- [ ] Performance/memory optimzations.
-- [x] nextTick() should be chainable, make it return the library.
-- [x] .Eventizer.on() and .Eventizer.one() should be able to define the context which is can overriden via .Eventizer.emit()
+- [x] Performance/memory optimzations.
 - [x] Basic memory leak tests.
+- [X] nextTick leaks memory (native Promise being the blame here).
+- [x] nextTick() should be chainable, make it return the library.
+- [x] .Eventizer.on() and .Eventizer.one() should be able to define the context which can be overriden via .Eventizer.emit()
+- [x] BUG: Promises/A+ tests pass tests relating to clause 2.3.3.3.4.2 accidentally and there is always the chance that they fail.
 - [x] Clean up "dead" code.
-- [ ] Tests overhaul (use a coverage tool to check mmissing tests):
-  -> Cover all nextTIck variations.
-  -> Cover all lib initiation variations (AMD/Node/Browser).
+- [ ] Restructure module system for optimal performance.
+- [ ] Make tests test all nextTick variations.
+- [ ] Make tests cover all library initiation variations (AMD/Node/Browser).
+- [x] Restructure Eventizer tests.
+- [ ] Restructure Module tests.
+- [ ] Restructure Deferred tests.
+- [ ] Long resolved/rejected then chain leaks memory badly.
+      -> The problem is evidently the next deferred which is used within the inner function.
 
 */
 
@@ -43,16 +50,9 @@ TODO:
   /** Modules container. */
   modules = {},
 
-  /** Deferreds container. */
-  deferreds = {},
-
   /** Module event hub and event names. */
   moduleEvents,
   evInitiate = 'a',
-
-  /** Next tick event hub and event names. */
-  nextTickEvents,
-  evTick = 'd',
 
   /** Deferred states. */
   statePending = 'pending',
@@ -159,8 +159,17 @@ TODO:
 
     instance.on(type, function (e) {
 
+      var
+      args = cloneArray(arguments);
+
+      /** Propagate the original callback function to the callback's event object. */
+      args[0].fn = callback;
+
+      /** Unbind the event listener after execution. */
       instance.off(e.type, e.id);
-      callback.apply(this, arguments);
+
+      /** Call the original callback. */
+      callback.apply(this, args);
 
     }, ctx);
 
@@ -362,20 +371,12 @@ TODO:
     instance._async = config.asyncDeferreds;
 
     /**
-     * Fulfilled callback queue.
+     * Callback queue.
      *
      * @private
      * @type {array}
      */
-    instance._fulfilled = [];
-
-    /**
-     * Rejected callback queue.
-     *
-     * @private
-     * @type {array}
-     */
-    instance._rejected = [];
+    instance._handlers = [];
 
     /** Call executor function if provided. */
     if (typeOf(executor, typeFunction)) {
@@ -530,7 +531,7 @@ TODO:
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
-      finalizeReject(instance, reason);
+      finalizeDeferred(instance, reason, stateRejected);
 
     }
 
@@ -573,7 +574,7 @@ TODO:
    */
   deferredProto.onSettled = function (callback) {
 
-    return this.onFulfilled(callback).onRejected(callback);
+    return bindDeferredCallback(this, callback);
 
   };
 
@@ -651,7 +652,7 @@ TODO:
 
     if (val === instance) {
 
-      finalizeReject(instance, TypeError('A promise can not be resolved with itself.'));
+      finalizeDeferred(instance, TypeError('A promise can not be resolved with itself.'), stateRejected);
 
     }
     else if (val instanceof Deferred) {
@@ -659,12 +660,12 @@ TODO:
       val
       .onFulfilled(function (value) {
 
-        finalizeResolve(instance, value);
+        finalizeDeferred(instance, value, stateFulfilled);
 
       })
       .onRejected(function (reason) {
 
-        finalizeReject(instance, reason);
+        finalizeDeferred(instance, reason, stateRejected);
 
       });
 
@@ -676,7 +677,7 @@ TODO:
     }
     else {
 
-      finalizeResolve(instance, val);
+      finalizeDeferred(instance, val, stateFulfilled);
 
     }
 
@@ -718,7 +719,7 @@ TODO:
               if (!thenHandled) {
 
                 thenHandled = 1;
-                finalizeReject(instance, reason);
+                finalizeDeferred(instance, reason, stateRejected);
 
               }
 
@@ -730,7 +731,8 @@ TODO:
 
           if (!thenHandled) {
 
-            finalizeReject(instance, e);
+            thenHandled = 1;
+            finalizeDeferred(instance, e, stateRejected);
 
           }
 
@@ -739,101 +741,72 @@ TODO:
       }
       else {
 
-        finalizeResolve(instance, val);
+        finalizeDeferred(instance, val, stateFulfilled);
 
       }
 
     }
     catch (e) {
 
-      finalizeReject(instance, e);
+      finalizeDeferred(instance, e, stateRejected);
 
     }
 
   }
 
   /**
-   * Finalize deferred instance's resolve method.
+   * Finalize deferred instance's resolve/reject process.
    *
    * @private
    * @param {Deferred} instance
    * @param {*} val
+   * @param {string} state
    */
-  function finalizeResolve(instance, val) {
+  function finalizeDeferred(instance, val, state) {
 
     instance._result = val;
-    instance._state = stateFulfilled;
+    instance._state = state;
 
-    executeDeferredQueue(instance, '_' + stateFulfilled);
+    var
+    handlersLength = instance._handlers.length;
 
-  }
+    if (handlersLength) {
 
-  /**
-   * Finalize deferred instance's reject method.
-   *
-   * @private
-   * @param {Deferred} instance
-   * @param {*} reason
-   */
-  function finalizeReject(instance, reason) {
+      arrayEach(instance._handlers.splice(0, handlersLength), function (handler) {
 
-    instance._result = reason;
-    instance._state = stateRejected;
+        if (!handler.type || handler.type === state) {
 
-    executeDeferredQueue(instance, '_' + stateRejected);
+          executeDeferredCallback(instance, handler.fn);
 
-  }
-
-  /**
-   * Handler for triggering the callback handlers in a Deferred instance's callback queue.
-   *
-   * @private
-   * @param {Deferred} instance
-   * @param {string} queue
-   */
-  function executeDeferredQueue(instance, queue) {
-
-    if (instance[queue].length) {
-
-      arrayEach(cloneArray(instance[queue]), function (cb) {
-
-        cb();
+        }
 
       });
-
-      instance._fulfilled = [];
-      instance._rejected = [];
 
     }
 
   }
 
   /**
-   * Handler for onResolved and onRejected methods.
+   * Handler for onResolved, onRejected and onSettled methods.
    *
    * @private
    * @param {Deferred} instance
    * @param {function} callback
-   * @param {string} refState
+   * @param {string} state
    * @returns {Deferred}
    */
-  function bindDeferredCallback(instance, callback, refState) {
+  function bindDeferredCallback(instance, callback, state) {
 
     if (typeOf(callback, typeFunction)) {
 
-      if (instance._state === refState) {
-
-        executeDeferredCallback(instance, callback);
-
-      }
-
       if (instance._state === statePending) {
 
-        instance['_' + refState].push(function () {
+        instance._handlers.push({type: state, fn: callback});
 
-          executeDeferredCallback(instance, callback);
+      }
+      else if (!state || instance._state === state) {
 
-        });
+        executeDeferredCallback(instance, callback);
 
       }
 
@@ -844,7 +817,7 @@ TODO:
   }
 
   /**
-   * Finish up what bindDeferredCallback started.
+   * Execute a deferred callback function, sync or async.
    *
    * @private
    * @param {Deferred} instance
@@ -852,11 +825,7 @@ TODO:
    */
   function executeDeferredCallback(instance, callback) {
 
-    execFn(function () {
-
-      callback(instance._result);
-
-    }, instance._async);
+    instance._async ? nextTick(function () { callback(instance._result); }) : callback(instance._result);
 
   }
 
@@ -884,10 +853,6 @@ TODO:
       onRejected = !isFulfilled && typeOf(onRejected, typeFunction) ? onRejected : 0;
       fateCallback = onFulfilled || onRejected || 0;
 
-      /**
-       * If we have a callback that matches the instance's fate (fulfilled -> onFulfilled, rejected -> onRejected)
-       * or if the instance was fulfilled, let's do the default try catch procedure.
-       */
       if (fateCallback || isFulfilled) {
 
         tryCatch(
@@ -904,7 +869,6 @@ TODO:
         );
 
       }
-      /** In other cases, let's sink the error down the then chain until it's caught. */
       else {
 
         next.reject(instanceVal);
@@ -1012,18 +976,16 @@ TODO:
     /** Add module to modules object. */
     modules[id] = instance;
 
-    /** Emit initiation event when module is loaded. */
-    deferred
-    .onFulfilled(function () {
-
-      moduleEvents.emit(evInitiate + id, [instance]);
-
-    });
-
     /** Load dependencies and resolve factory value. */
     loadDependencies(dependencies, function (depModules, depHash) {
 
-      deferred.resolve(typeOf(factory, typeFunction) ? factory.apply({id: id, dependencies: depHash}, depModules) : factory);
+      deferred
+      .resolve(typeOf(factory, typeFunction) ? factory.apply({id: id, dependencies: depHash}, depModules) : factory)
+      .onFulfilled(function () {
+
+        moduleEvents.emit(evInitiate + id, [instance]);
+
+      });
 
     });
 
@@ -1375,122 +1337,83 @@ TODO:
   function getNextTick() {
 
     var
-    NativePromise = isNative(glob.Promise),
-    NativeMT,
-    queueEmpty,
-    processQueue,
-    tryFireTick,
+    resolvedPromise = isNative(glob.Promise) && glob.Promise.resolve(),
+    nodeTick = isNode && (process.nextTick || glob.setImmediate),
+    MobServer = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver),
+    MobServerTarget,
+    queue = [],
+    queueActive = 0,
     fireTick,
-    observerTarget,
-    nextTickFn;
-
-    /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
-    if (NativePromise) {
-
-      NativePromise = NativePromise.resolve();
-
-      /** Define next tick function. */
-      nextTickFn = function (cb) {
-
-        NativePromise.then(cb);
-
-      };
-
-    }
-    /** Node.js has good existing next tick implementations, so let's use them. */
-    else if (isNode) {
-
-      nextTickFn = glob.setImmediate || process.nextTick;
-
-    }
-    /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
-    else {
-
-      /** Let's check if mutation observer is supported. */
-      NativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
-
-      /** Flag for checking the state of the queue. */
-      queueEmpty = 1;
-
-      /** Function to process the queue (fire the callbacks). */
-      processQueue = function () {
-
-        queueEmpty = 1;
-        nextTickEvents.emit(evTick);
-
-      };
-
-      /** Function to try trigger next tick.  */
-      tryFireTick = function () {
-
-        if (queueEmpty) {
-
-          queueEmpty = 0;
-          fireTick();
-
-        }
-
-      };
-
-      /** MutationObserver fallback. */
-      if (NativeMT) {
-
-        observerTarget = document.createElement('i');
-        (new NativeMT(processQueue)).observe(observerTarget, {attributes: true});
-
-        fireTick = function () {
-
-          observerTarget.id = '';
-
-        };
-
-      }
-      /** setTimeout fallback. */
-      else {
-
-        fireTick = function () {
-
-          glob.setTimeout(processQueue, 0);
-
-        };
-
-      }
-
-      /** Define next tick function. */
-      nextTickFn = function (cb) {
-
-        nextTickEvents.one(evTick, cb);
-        tryFireTick();
-
-      };
-
-    }
-
-    // Return next tick function
-    return function (cb) {
+    nextTickFn = function (cb) {
 
       if (typeOf(cb, typeFunction)) {
 
-        nextTickFn(cb);
+        queue.push(cb);
+
+        if (!queueActive) {
+
+          queueActive = 1;
+          fireTick();
+
+        }
 
       }
 
       return lib;
 
+    },
+    processQueue = function () {
+
+      queueActive = 0;
+      arrayEach(queue.splice(0, queue.length), function (cb) {
+
+        cb();
+
+      });
+
     };
 
-  }
+    if (resolvedPromise) {
 
-  /**
-   * Execute a function, sync or async, it's up to you.
-   *
-   * @private
-   * @param {function} fn
-   * @param {boolean} [async]
-   */
-  function execFn(fn, async) {
+      fireTick = function () {
 
-    async ? nextTick(fn) : fn();
+        resolvedPromise.then(processQueue);
+
+      };
+
+    }
+    else if (nodeTick) {
+
+      fireTick = function () {
+
+        nodeTick(processQueue);
+
+      };
+
+    }
+    else if (MobServer) {
+
+      MobServerTarget = document.createElement('i');
+      (new MobServer(processQueue)).observe(MobServerTarget, {attributes: true});
+
+      fireTick = function () {
+
+        MobServerTarget.id = '';
+
+      };
+
+    }
+    else {
+
+      fireTick = function () {
+
+        glob.setTimeout(processQueue, 0);
+
+      };
+
+    }
+
+    return nextTickFn;
 
   }
 
@@ -1604,9 +1527,8 @@ TODO:
    * ********
    */
 
-  /** Initializeprivate event hubs. */
+  /** Initialize module event hub. */
   moduleEvents = eventize();
-  nextTickEvents = eventize();
 
   /**
    * Publish library using an adapted UMD pattern.

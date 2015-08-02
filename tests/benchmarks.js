@@ -3,26 +3,22 @@ module.exports = function (done) {
   var
   Benchmark = require('benchmark'),
   palikka = require('../palikka.js'),
-  bluebird = require('bluebird'),
-  fee = require('eventemitter3'),
+  when = require('when'),
+  ee = require('eventemitter3'),
   eventizerA = new palikka.Eventizer(),
   eventizerB = new palikka.Eventizer(),
   eventizerC = new palikka.Eventizer(),
   eventizerD = new palikka.Eventizer(),
-  feeA = new fee(),
-  feeB = new fee(),
-  feeC = new fee(),
-  feeD = new fee(),
+  eeA = new ee(),
+  eeB = new ee(),
+  eeC = new ee(),
+  eeD = new ee(),
   counter = 0,
   suite = new Benchmark.Suite('palikka', {
 
     onStart: function () {
 
       console.log('Benchmark started');
-      /*
-      palikka.config.asyncDeferreds = false;
-      palikka.config.asyncModules = false;
-      */
 
     },
 
@@ -41,10 +37,6 @@ module.exports = function (done) {
     onComplete: function () {
 
       console.log('Benchmark finished');
-      /*
-      palikka.config.asyncDeferreds = true;
-      palikka.config.asyncModules = true;
-      */
 
       if (typeof done === 'function') {
 
@@ -55,6 +47,102 @@ module.exports = function (done) {
     }
 
   });
+
+  //
+  // Next tick
+  //
+
+  suite.add('nextTick - Palikka', function() {
+
+    palikka.nextTick(function () {});
+
+  });
+
+  suite.add('nextTick - Promise', function() {
+
+    Promise.resolve().then(function () {});
+
+  });
+
+  if (process.nextTick) {
+
+    suite.add('nextTick - process.nextTick', function() {
+
+      process.nextTick(function () {});
+
+    });
+
+  }
+
+  if (global.setImmediate) {
+
+    suite.add('nextTick - setImmediate', function() {
+
+      global.setImmediate(function () {});
+
+    });
+
+  }
+
+  //
+  // Promises
+  //
+
+  suite.add('Create promise - When', function() {
+
+   new when.promise(function() {});
+
+  });
+
+  suite.add('Create promise - Palikka', function() {
+
+    palikka.defer();
+
+  });
+
+  suite.add('Resolve promise - When', function() {
+
+    new when.promise(function (resolve) {
+      resolve();
+    });
+
+  });
+
+  suite.add('Resolve promise - Palikka', function() {
+
+    palikka.defer().resolve();
+
+  });
+
+  suite.add('Reject promise - When', function() {
+
+    new when.promise(function (resolve, reject) {
+      reject();
+    });
+
+  });
+
+  suite.add('Reject promise - Palikka', function() {
+
+    palikka.defer().reject();
+
+  });
+
+  suite.add('Thenify - When', function() {
+
+    new when.promise(function () {}).then(function () {}, function () {});
+
+  });
+
+  suite.add('Thenify - Palikka', function() {
+
+    palikka.defer().then(function () {}, function () {});
+
+  });
+
+  //
+  // Events
+  //
 
   suite.add('Emit one event - Palikka', function() {
 
@@ -67,13 +155,13 @@ module.exports = function (done) {
 
   });
 
-  suite.add('Emit one event - FEE', function() {
+  suite.add('Emit one event - EE', function() {
 
     ++counter;
 
-    feeC.on('ev' + counter, function () {});
-    feeC.on('ev' + counter, function () {});
-    feeC.emit('ev' + counter, 1,2,3,4,5,6,7,8,9,10);
+    eeC.on('ev' + counter, function () {});
+    eeC.on('ev' + counter, function () {});
+    eeC.emit('ev' + counter, 1,2,3,4,5,6,7,8,9,10);
 
   });
 
@@ -83,9 +171,9 @@ module.exports = function (done) {
 
   });
 
-  suite.add('Create emitter - FEE', function() {
+  suite.add('Create emitter - EE', function() {
 
-    new fee();
+    new ee();
 
   });
 
@@ -98,11 +186,11 @@ module.exports = function (done) {
 
   });
 
-  suite.add('Bind an event listener - FEE', function() {
+  suite.add('Bind an event listener - EE', function() {
 
     ++counter;
 
-    feeA.on('ev' + counter, function () {});
+    eeA.on('ev' + counter, function () {});
 
   });
 
@@ -116,18 +204,16 @@ module.exports = function (done) {
 
   });
 
-  suite.add('Unbind an event listener (no target) - FEE', function() {
+  suite.add('Unbind an event listener (no target) - EE', function() {
 
     ++counter;
 
-    feeB.on('ev' + counter, function () {});
-    feeB.off('ev' + counter);
+    eeB.on('ev' + counter, function () {});
+    eeB.off('ev' + counter);
 
   });
 
-  /*
-
-  suite.add('Real world - Palikka', function() {
+  suite.add('Event system generic - Palikka', function() {
 
     ++counter;
 
@@ -153,7 +239,7 @@ module.exports = function (done) {
 
   });
 
-  suite.add('Real world - FEE', function() {
+  suite.add('Event system generic - EE', function() {
 
     ++counter;
 
@@ -161,72 +247,20 @@ module.exports = function (done) {
 
     }
 
-    feeD.on('ev' + counter, test);
-    feeD.once('ev' + counter, function () {});
-    feeD.on('ev' + counter, function () {});
-    feeD.once('ev' + counter, function () {});
-    feeD.on('ev' + counter, function () {});
-    feeD.once('ev' + counter, function () {});
-    feeD.on('ev' + counter, function () {});
-    feeD.once('ev' + counter, function () {});
-    feeD.on('ev' + counter, function () {});
-    feeD.once('ev' + counter, function () {});
-    feeD.emit('ev' + counter);
-    feeD.emit('ev' + counter, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-    feeD.off('ev' + counter, test);
-    feeD.off('ev' + counter);
-
-  });
-
-  suite.add('Create promise - Bluebird', function() {
-
-   new bluebird.Promise(function() {});
-
-  });
-
-  suite.add('Create promise - Palikka', function() {
-
-    palikka.defer();
-
-  });
-
-  suite.add('Resolve promise - Bluebird', function() {
-
-    new bluebird.Promise(function (resolve) {
-      resolve();
-    });
-
-  });
-
-  suite.add('Resolve promise - Palikka', function() {
-
-    palikka.defer().resolve();
-
-  });
-
-  suite.add('Reject promise - Bluebird', function() {
-
-    new bluebird.Promise(function (resolve, reject) {
-      reject();
-    });
-
-  });
-
-  suite.add('Reject promise - Palikka', function() {
-
-    palikka.defer().reject();
-
-  });
-
-  suite.add('Thenify - Bluebird', function() {
-
-    new bluebird.Promise(function () {}).then(function () {}, function () {});
-
-  });
-
-  suite.add('Thenify - Palikka', function() {
-
-    palikka.defer().then(function () {}, function () {});
+    eeD.on('ev' + counter, test);
+    eeD.once('ev' + counter, function () {});
+    eeD.on('ev' + counter, function () {});
+    eeD.once('ev' + counter, function () {});
+    eeD.on('ev' + counter, function () {});
+    eeD.once('ev' + counter, function () {});
+    eeD.on('ev' + counter, function () {});
+    eeD.once('ev' + counter, function () {});
+    eeD.on('ev' + counter, function () {});
+    eeD.once('ev' + counter, function () {});
+    eeD.emit('ev' + counter);
+    eeD.emit('ev' + counter, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    eeD.off('ev' + counter, test);
+    eeD.off('ev' + counter);
 
   });
 
@@ -234,12 +268,12 @@ module.exports = function (done) {
 
     ++counter;
 
-    palikka.define('m' + counter, function () {});
+    palikka.define('a' + counter, ['b' + counter, 'c' + counter], function () {});
+    palikka.define('b' + counter, ['c' + counter], function () {});
+    palikka.define('c' + counter, function () {});
 
   });
 
-  */
-
-  suite.run({ 'async': true });
+  suite.run({ 'async': false });
 
 };

@@ -56,7 +56,7 @@ gulp.task('test-promises', function () {
   .pipe(gulpMocha({
     reporter: 'nyan',
     timeout: 400,
-    bail: true
+    bail: false
   }));
 
 });
