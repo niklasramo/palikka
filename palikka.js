@@ -657,15 +657,9 @@ TODO:
     }
     else if (val instanceof Deferred) {
 
-      val
-      .onFulfilled(function (value) {
+      val.onSettled(function (value) {
 
-        finalizeDeferred(instance, value, stateFulfilled);
-
-      })
-      .onRejected(function (reason) {
-
-        finalizeDeferred(instance, reason, stateRejected);
+        finalizeDeferred(instance, value, val._state);
 
       });
 

@@ -462,22 +462,6 @@
 
   });
 
-  Q.test('Eventizer - Automatic unbinding with .one()', function (assert) {
-
-    assert.expect(1);
-
-    var
-    eHub = palikka.eventize();
-
-    eHub
-    .one('a', function () {
-      assert.strictEqual(1, 1);
-    })
-    .emit('a')
-    .emit('a');
-
-  });
-
   Q.test('Eventizer - Unbind all event listeners (event type based unbind)', function (assert) {
 
     assert.expect(0);
@@ -541,6 +525,22 @@
     .off('a', id)
     .emit('a')
     .off('a', id)
+    .emit('a');
+
+  });
+
+  Q.test('Eventizer - Automatic unbinding with .one()', function (assert) {
+
+    assert.expect(1);
+
+    var
+    eHub = palikka.eventize();
+
+    eHub
+    .one('a', function () {
+      assert.strictEqual(1, 1);
+    })
+    .emit('a')
     .emit('a');
 
   });
@@ -1203,7 +1203,7 @@
 
   });
 
-  Q.test('Utils - .typeOf()', function (assert) {
+  Q.test('Type checker', function (assert) {
 
     assert.expect(24);
 
@@ -1252,23 +1252,31 @@
 
   });
 
-  Q.test('Utils - .nextTick()', function (assert) {
+  Q.test('Next tick - Chainability', function (assert) {
 
-    var done = assert.async();
-    assert.expect(6);
+    assert.expect(1);
 
-    /** Is chainable? */
-
+    /** .nextTick() should return palikka object. */
     assert.strictEqual(palikka.nextTick(function () {}), palikka);
 
-    /** Providing non-function values should fail silently. */
+  });
 
+  Q.test('Next tick - Arguments', function (assert) {
+
+    assert.expect(4);
+
+    /** Providing non-function values should fail silently. */
     assert.strictEqual(palikka.nextTick(), palikka);
     assert.strictEqual(palikka.nextTick(1), palikka);
     assert.strictEqual(palikka.nextTick('a'), palikka);
     assert.strictEqual(palikka.nextTick({}), palikka);
 
-    /** Are next ticks triggered in correct order? */
+  });
+
+  Q.test('Next tick - Execution order', function (assert) {
+
+    var done = assert.async();
+    assert.expect(1);
 
     var test = [];
 

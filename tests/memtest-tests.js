@@ -22,7 +22,7 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('nextTick - Promise');
+    console.log('nextTick - Native promise');
     for (var i = 0; i < samples; i++) {
       Promise.resolve().then(function () {});
     }
@@ -61,7 +61,7 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Unresolved deferreds');
+    console.log('Unresolved deferreds - Palikka');
     for (var i = 0; i < samples; i++) {
       palikka.defer();
     }
@@ -70,7 +70,16 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Resolved deferreds');
+    console.log('Unresolved deferreds - When');
+    for (var i = 0; i < samples; i++) {
+      when.promise(function () {});
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Resolved deferreds - Palikka');
     for (var i = 0; i < samples; i++) {
       palikka.defer().resolve();
     }
@@ -79,7 +88,16 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Rejected deferreds');
+    console.log('Resolved deferreds - When');
+    for (var i = 0; i < samples; i++) {
+      when.promise(function (res, rej) { res(); });
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Rejected deferreds - Palikka');
     for (var i = 0; i < samples; i++) {
       palikka.defer().reject();
     }
@@ -88,7 +106,16 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Long unresolved .then() chain - Palikka');
+    console.log('Rejected deferreds - When');
+    for (var i = 0; i < samples; i++) {
+      when.promise(function (res, rej) { rej(); });
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Unresolved .then() chain - Palikka');
     var d = palikka.defer();
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
@@ -98,27 +125,7 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Long resolved .then() chain - Palikka');
-    var d = palikka.defer().resolve();
-    for (var i = 0; i < samples; i++) {
-      d = d.then(function () {}, function () {});
-    }
-
-  });
-
-  tests.push(function () {
-
-    console.log('Long rejected .then() chain - Palikka');
-    var d = palikka.defer().reject();
-    for (var i = 0; i < samples; i++) {
-      d = d.then(function () {}, function () {});
-    }
-
-  });
-
-  tests.push(function () {
-
-    console.log('Long unresolved .then() chain - When');
+    console.log('Unresolved .then() chain - When');
     var d = when.promise(function () {});
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
@@ -128,7 +135,17 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Long resolved .then() chain - When');
+    console.log('Resolved .then() chain - Palikka');
+    var d = palikka.defer().resolve();
+    for (var i = 0; i < samples; i++) {
+      d = d.then(function () {}, function () {});
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Resolved .then() chain - When');
     var d = when.promise(function (res) { res(); });
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
@@ -138,7 +155,17 @@ module.exports = function (done) {
 
   tests.push(function () {
 
-    console.log('Long rejected .then() chain - When');
+    console.log('Rejected .then() chain - Palikka');
+    var d = palikka.defer().reject();
+    for (var i = 0; i < samples; i++) {
+      d = d.then(function () {}, function () {});
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Rejected .then() chain - When');
     var d = when.promise(function (res, rej) { rej(); });
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
