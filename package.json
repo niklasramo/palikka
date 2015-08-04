@@ -1,6 +1,6 @@
 {
   "name": "palikka",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A tiny module/event/promise system for the browser and Node.",
   "keywords": [
     "module",

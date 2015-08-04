@@ -134,7 +134,7 @@
   /**
    * @typedef {Object} Eventizer~listenerData
    * @property {Number} id - The event listener's id.
-   * @property {Function} fn - The event listener's callback function.
+   * @property {Eventizer~listenerCallback} fn - The event listener's callback function.
    * @property {String} type - The event listener's type.
    */
 
@@ -144,7 +144,7 @@
    * @memberof Eventizer.prototype
    * @public
    * @param {String} type - Event's name.
-   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {Eventizer~listenerCallback} callback - Callback function that will be called when the event is emitted.
    * @param {*} [ctx] - Callback function's context.
    * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
@@ -174,7 +174,7 @@
    * @memberof Eventizer.prototype
    * @public
    * @param {String} type - Event's name.
-   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {Eventizer~listenerCallback} callback - Callback function that will be called when the event is emitted.
    * @param {*} [ctx] - Callback function's context.
    * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
