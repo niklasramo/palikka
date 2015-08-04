@@ -1,45 +1,93 @@
+Skip to content
+This repository  
+Pull requests
+Issues
+Gist
+ @niklasramo
+ Unwatch 1
+  Unstar 1
+  Fork 0
+niklasramo/palikka
+Branch: master  palikka/palikka.js
+Niklas Rämö an hour ago Updated inline documentation and perf/memory tests.
+1 contributor
+RawBlameHistory     1637 lines (1183 sloc)  33.367 kB
 /*!
  * @license
- * Palikka v0.3.1
+ * Palikka v0.4.1
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
 
-(function (glob, undefined) {
+(function (undefined) {
 
   'use strict';
 
   var
 
-  /** Name of the library. */
+  /**
+   * @alias Palikka
+   * @global
+   */
+  palikka = {},
+
+  /** Library namespace. */
   ns = 'palikka',
 
-  /** Public API interface. */
-  lib = {},
+  /** Generic unique identifier. */
+  uid = 0,
 
-  /** Main configuration object. */
-  config = {
-    asyncDeferreds: true,
-    asyncModules: true
-  },
-
-  /** Modules container. */
-  modules = {},
-
-  /** Private event hub and event names. */
-  evHub,
-  evInitiate = 'initiate',
-  evResolve = 'resolve',
-  evReject = 'reject',
-
-  /** Deferred states. */
+  /**
+   * @constant {String}
+   * @default
+   */
   statePending = 'pending',
+
+  /**
+   * @constant {String}
+   * @default
+   */
   stateFulfilled = 'fulfilled',
+
+  /**
+   * @constant {String}
+   * @default
+   */
   stateRejected = 'rejected',
 
-  /** Deferred id counter. */
-  uuid = 0,
+  /**
+   * @alias Configuration
+   * @public
+   */
+  config = {
+
+    /**
+     * @public
+     * @type {Boolean}
+     */
+    asyncDeferreds: true,
+
+    /**
+     * @public
+     * @type {Boolean}
+     */
+    asyncModules: true
+
+  },
+
+  /** Modules stuff: container object, event hub and event names. */
+  modules = {},
+  moduleEvents,
+  evInitiate = 'a',
+
+  /** Cache string representations of object types. */
+  typeFunction = 'function',
+  typeObject = 'object',
+  typeArray = 'array',
+  typeArguments = 'arguments',
+  typeNumber = 'number',
+  typeString = 'string',
 
   /** Cache native toString and slice methods. */
   toString = {}.toString,
@@ -49,10 +97,23 @@
   isStrict = !this === true,
 
   /** Check if we are in Node.js environment. */
-  isNode = typeOf(glob.process, 'process'),
+  isNode = typeof process === typeObject && typeOf(process, 'process'),
 
-  /** Get next tick method. */
-  nextTick = getNextTick();
+  /** Determine global object. */
+  glob = isNode ? global : window,
+
+  /**
+   * Execute a function in the next turn of event loop.
+   *
+   * @alias nextTick
+   * @public
+   * @param {Function} function
+   */
+  nextTick = getNextTick(),
+
+  /** Cache class prototypes. */
+  eventizerProto = Eventizer.prototype,
+  deferredProto = Deferred.prototype;
 
   /**
    * Eventizer - Constructor
@@ -60,44 +121,59 @@
    */
 
   /**
-   * Creates a new Eventizer instance that allows you to bind, unbind and emit events.
+   * Eventizer instance constructor.
    *
    * @class
-   * @private
-   * @param {object} [listeners]
+   * @public
+   * @param {Object} [listeners] - An object where the instance's event listeners will be stored.
    */
   function Eventizer(listeners) {
 
     /**
-     * An object where all the instance's callbacks (listeners) are stored in.
+     * The object where all the instance's event listeners are stored in.
      *
      * @protected
-     * @type {object}
+     * @type {Object}
      */
-    this._listeners = listeners || {};
+    this._listeners = typeOf(listeners, typeObject) ? listeners : {};
 
   }
 
   /**
+   * @callback Eventizer~listenerCallback
+   * @param {Eventizer~listenerData} ev
+   * @param {...*} arg
+   */
+
+  /**
+   * @typedef {Object} Eventizer~listenerData
+   * @property {Number} id - The event listener's id.
+   * @property {Function} fn - The event listener's callback function.
+   * @property {String} type - The event listener's type.
+   */
+
+  /**
    * Bind an event listener.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function} callback
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {*} [ctx] - Callback function's context.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
-  Eventizer.prototype.on = function (type, callback) {
+  eventizerProto.on = function (type, callback, ctx) {
 
     var
     listeners = this._listeners;
 
-    if (typeOf(callback, 'function')) {
+    if (typeOf(callback, typeFunction)) {
 
       listeners[type] = listeners[type] || [];
       listeners[type].push({
-        id: ++uuid,
-        type: type,
-        fn: callback
+        id: ++uid,
+        fn: callback,
+        ctx: ctx
       });
 
     }
@@ -107,65 +183,83 @@
   };
 
   /**
-   * Bind an event listener.
+   * Bind an event listener that is called only once.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function} callback
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {*} [ctx] - Callback function's context.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
-  Eventizer.prototype.one = function (type, callback) {
+  eventizerProto.one = function (type, callback, ctx) {
 
     var
     instance = this;
 
     instance.on(type, function (e) {
 
-      instance.off(e.type, e.id);
-      callback.apply(this, arguments);
+      var
+      args = cloneArray(arguments);
 
-    });
+      /** Propagate the original callback function to the callback's event object. */
+      args[0].fn = callback;
+
+      /** Unbind the event listener after execution. */
+      instance.off(e.type, e.id);
+
+      /** Call the original callback. */
+      callback.apply(this, args);
+
+    }, ctx);
 
     return instance;
 
   };
 
   /**
-   * Unbind event listeners based on event's type. Optionally one can provide a target that can be a callback function or an id that will be matched used to target specific events. If no target is provided all listeners for the specified type will be removed.
+   * Unbind event listeners. If no target is provided all listeners for the specified event will be removed.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function|number} [target]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Function|Number} [target] - Filter the event listener's to be removed by callback function or id.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
-  Eventizer.prototype.off = function (type, target) {
+  eventizerProto.off = function (type, target) {
 
     var
     listeners = this._listeners,
-    targetType = typeOf(target),
-    targetId = targetType === 'number',
-    targetFn = targetType === 'function',
     eventObjects = listeners[type],
-    eventObject,
-    i;
+    counter = eventObjects && eventObjects.length;
 
-    if (eventObjects) {
+    /** Make sure that at least one event listener exists before unbinding. */
+    if (counter) {
 
-      i = eventObjects.length;
+      /** If target is defined, let's do a "surgical" unbind. */
+      if (target) {
 
-      while (i--) {
+        var
+        targetType = typeOf(target),
+        targetId = targetType === typeNumber,
+        targetFn = targetType === typeFunction,
+        eventObject;
 
-        eventObject = eventObjects[i];
+        while (counter--) {
 
-        if (!target || (targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
+          eventObject = eventObjects[counter];
 
-          eventObjects.splice(i, 1);
+          if ((targetFn && target === eventObject.fn) || (targetId && target === eventObject.id)) {
+
+            eventObjects.splice(counter, 1);
+
+          }
 
         }
 
       }
-
-      if (!eventObjects.length) {
+      /** If no target is defined, let's unbind all the event type's listeners. */
+      else {
 
         delete listeners[type];
 
@@ -178,37 +272,50 @@
   };
 
   /**
-   * Emit event. Optionally one can provide context and additional arguments for the callback functions.
+   * Emit event.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {array} [args]
-   * @param {*} [ctx]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Array} [args] - Arguments that will be applied to the event listener callbacks.
+   * @param {*} [ctx] - Custom context that will be applied to the event listener callbacks. Overrides custom context
+   *                    defined by .on() and .one() methods.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
-  Eventizer.prototype.emit = function (type, args, ctx) {
+  eventizerProto.emit = function (type, args, ctx) {
 
     var
     instance = this,
-    eventObjects = instance._listeners[type];
+    eventObjects = instance._listeners[type],
+    cbArgs;
 
     if (eventObjects) {
 
-      arrayEach(copyArray(eventObjects), function (eventObject) {
+      /**
+       * Loop through a cloned set of event listeners. If the listeners are not cloned before looping there is always
+       * the risk that the listeners array gets modified while the loop is being executed, which is something we don't
+       * want to happen.
+       */
+      arrayEach(cloneArray(eventObjects), function (eventObject) {
 
-        if (typeOf(eventObject.fn, 'function')) {
+        /** Safety check (probably unnecessary) just to make sure that the callback function really exists. */
+        if (typeOf(eventObject.fn, typeFunction)) {
 
-          var
-          cbArgs = copyArray(args),
-          cbCtx = ctx === undefined ? instance : ctx;
-
+          /** Clone provided arguments, and add the event data object as the first item. */
+          cbArgs = cloneArray(args);
           cbArgs.unshift({
+            type: type,
             id: eventObject.id,
-            type: eventObject.type,
             fn: eventObject.fn
           });
 
-          eventObject.fn.apply(cbCtx, cbArgs);
+          /**
+           * Event listener callback context definition:
+           * 1. If emit method's ctx argument is defined (-> is not undefined) it is used.
+           * 2. Then, if event listener's context is defined, it is used.
+           * 3. If no context is defined at all the current instance (this) is used as context.
+           */
+          eventObject.fn.apply(ctx !== undefined ? ctx : eventObject.ctx !== undefined ? eventObject.ctx : instance, cbArgs);
 
         }
 
@@ -220,56 +327,34 @@
 
   };
 
-  /**
-   * Emit event asynchronously. Optionally one can provide context and additional arguments for the callback functions.
-   *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {array} [args]
-   * @param {*} [ctx]
-   * @returns {Eventizer} The instance on which this method was called.
-   */
-  Eventizer.prototype.emitAsync = function (type, args, ctx) {
-
-    var
-    instance = this;
-
-    execFn(function () {
-
-      instance.emit(type, args, ctx);
-
-    }, 1);
-
-    return instance;
-
-  };
-
   /*
    * Eventizer - Helpers
    * *******************
    */
 
   /**
-   * Eventize an object (if provided) or return a new Eventizer instance.
+   * Creates a new Eventizer instance that will be returned directly if no object is provided as the first argument. If
+   * an object is provided as the first argument the created Eventizer instance's properties and methods will be
+   * propagated to the provided object and the provided object will be returned instead.
    *
    * @public
-   * @param {object} [obj]
-   * @param {object} [listeners]
-   * @returns {object|Eventizer}
+   * @constructs Eventizer
+   * @param {Object} [obj]
+   * @param {Object} [listeners]
+   * @returns {Object|Eventizer}
    */
   function eventize(obj, listeners) {
 
     var
     eventizer = new Eventizer(listeners);
 
-    if (typeOf(obj, 'object')) {
+    if (typeOf(obj, typeObject)) {
 
-      obj._listeners = eventizer._listeners;
       obj.on = eventizer.on;
       obj.one = eventizer.one;
       obj.off = eventizer.off;
       obj.emit = eventizer.emit;
-      obj.emitAsync = eventizer.emitAsync;
+      obj._listeners = eventizer._listeners;
 
       return obj;
 
@@ -288,11 +373,11 @@
    */
 
   /**
-   * Create a deferred object. Promises A/+ compatible.
+   * Deferred instance constructor.
    *
    * @class
-   * @private
-   * @param {function} executor
+   * @public
+   * @param {Function} executor
    */
   function Deferred(executor) {
 
@@ -300,23 +385,16 @@
     instance = this;
 
     /**
-     * Instance's resolve event name.
+     * Indicates if the instance can be resolved or rejected currently. The instance cannot be resolved or rejected
+     * after it's once locked.
      *
      * @protected
-     * @type {string}
-     */
-    instance._id = ++uuid;
-
-    /**
-     * Indicates if the instance can be resolved/rejected while in pending state. This property will be set to true on the first resolve/reject call.
-     *
-     * @protected
-     * @type {boolean}
+     * @type {Boolean}
      */
     instance._locked = false;
 
     /**
-     * The instance's result value is stored here.
+     * The instance's result value.
      *
      * @protected
      * @type {*}
@@ -324,23 +402,31 @@
     instance._result = undefined;
 
     /**
-     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
+     * Holds the instance's current state: 'pending', 'fulfilled' or 'rejected'.
      *
      * @protected
-     * @type {string}
+     * @type {String}
      */
     instance._state = statePending;
 
     /**
-     * Indicates if the deferred instance is asynchronous (Promises A/+ compatible).
+     * Indicates if the instance is currently in asynchronous mode.
      *
      * @protected
-     * @type {boolean}
+     * @type {Boolean}
      */
-    instance._asynchronous = config.asyncDeferreds;
+    instance._async = config.asyncDeferreds;
+
+    /**
+     * Callback queue.
+     *
+     * @protected
+     * @type {Deferred~handler[]}
+     */
+    instance._handlers = [];
 
     /** Call executor function if provided. */
-    if (typeOf(executor, 'function')) {
+    if (typeOf(executor, typeFunction)) {
 
       executor(
         function (val) {
@@ -360,85 +446,446 @@
   }
 
   /**
-   * Control instances asynchronity. Providing true as the value will set the instance to be asynchronous. Providing false will set the instance synchronous.
-   *
-   * @protected
-   * @memberof Deferred.prototype
-   * @param {boolean} isAsync
-   * @returns {Deferred} The instance on which this method was called.
+   * @callback Deferred~handlerCallback
+   * @param {*|...*} result - Deferred instance's result.
    */
-  Deferred.prototype._async = function (isAsync) {
 
-    this._asynchronous = isAsync ? true : false;
+  /**
+   * @typedef {Object} Deferred~handler
+   * @property {Deferred~handlerCallback} fn - The handler's callback function.
+   * @property {String|Undefined} type - The handler's type: fulfilled', 'rejected' or undefined.
+   */
 
-    return this;
-
-  };
+  /**
+   * @typedef {Object} Deferred~inspection
+   * @property {String} state - Inspected instance's state: 'pending', 'fulfilled' or 'rejected'.
+   * @property {*} result - Inspected instance's result.
+   * @property {Boolean} locked - Is inspected instance locked?
+   * @property {Boolean} async - Is inspected instance in asynchronous mode?
+   */
 
   /**
    * Get current state of the instance.
    *
    * @memberof Deferred.prototype
-   * @returns {string} 'pending', 'fulfilled' or 'rejected'.
+   * @public
+   * @returns {String} 'pending', 'fulfilled' or 'rejected'.
    */
-  Deferred.prototype.state = function () {
+  deferredProto.state = function () {
 
     return this._state;
 
   };
 
   /**
-   * Get instance's result value.
+   * Get instance's result.
    *
    * @memberof Deferred.prototype
+   * @public
    * @returns {*}
    */
-  Deferred.prototype.result = function () {
+  deferredProto.result = function () {
 
     return this._result;
 
   };
 
   /**
-   * Resolve deferred. All provided arguments will be passed directly to 'onFulfilled' and 'onSettled' callback functions.
+   * Check if the current instance is set to work asynchronously.
    *
    * @memberof Deferred.prototype
-   * @param {*} [val]
-   * @returns {Deferred} The instance on which this method was called.
+   * @public
+   * @returns {Boolean}
    */
-  Deferred.prototype.resolve = function (val) {
+  deferredProto.isAsync = function () {
+
+    return this._async;
+
+  };
+
+  /**
+   * Check if the current instance is locked.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @returns {Boolean}
+   */
+  deferredProto.isLocked = function () {
+
+    return this._locked;
+
+  };
+
+  /**
+   * Get a snapshot of the instances current status.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @returns {Deferred~inspection}
+   */
+  deferredProto.inspect = function () {
 
     var
     instance = this;
 
-    if (val === this) {
+    return {
+      state: instance._state,
+      result: instance._result,
+      locked: instance._locked,
+      async: instance._async
+    };
 
-      this.reject(TypeError('A promise can not be resolved with itself.'));
+  };
 
-    }
+  /**
+   * Set current instance to work synchronously.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.sync = function () {
+
+    this._async = false;
+
+    return this;
+
+  };
+
+  /**
+   * Set current instance to work asynchronously.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.async = function () {
+
+    this._async = true;
+
+    return this;
+
+  };
+
+  /**
+   * Resolve deferred.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {*} [value]
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.resolve = function (value) {
+
+    var
+    instance = this;
 
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
+      processResolve(instance, value);
 
-      if (val instanceof Deferred) {
+    }
 
-        val
-        .onFulfilled(function (value) {
+    return instance;
 
-          resolveHandler(instance, value);
+  };
 
-        })
-        .onRejected(function (reason) {
+  /**
+   * Reject Deferred instance.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {*} [reason]
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.reject = function (reason) {
 
-          rejectHandler(instance, reason);
+    var
+    instance = this;
 
-        });
+    if (instance._state === statePending && !instance._locked) {
+
+      instance._locked = true;
+      finalizeDeferred(instance, reason, stateRejected);
+
+    }
+
+    return instance;
+
+  };
+
+  /**
+   * Execute a callback function when the Deferred instance is resolved.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} callback
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.onFulfilled = function (callback) {
+
+    return bindDeferredCallback(this, callback, stateFulfilled);
+
+  };
+
+  /**
+   * Execute a callback function when the Deferred instance is rejected.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} callback
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.onRejected = function (callback) {
+
+    return bindDeferredCallback(this, callback, stateRejected);
+
+  };
+
+  /**
+   * Execute a callback function when the Deferred instance is either resolved or rejected.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} callback
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.onSettled = function (callback) {
+
+    return bindDeferredCallback(this, callback);
+
+  };
+
+  /**
+   * Returns a new Deferred instance which is settled when the calling instance is settled.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.then = function (onFulfilled, onRejected) {
+
+    return then(this, onFulfilled, onRejected);
+
+  };
+
+  /**
+   * The same as Eventizer.prototype.then() with the exception that if the result of the calling instance is an array
+   * it's result is spread over the arguments of the returned instance's callback functions.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.spread = function (onFulfilled, onRejected) {
+
+    return then(this, onFulfilled, onRejected, 1);
+
+  };
+
+  /**
+   * Same as when() with the exception that the calling instance is automatically added as the first value of the values
+   * array.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Array} values
+   * @param {Boolean} [resolveImmediately=false]
+   * @param {Boolean} [rejectImmediately=true]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.and = function (values, resolveImmediately, rejectImmediately) {
+
+    values.unshift(this);
+
+    return when(values, resolveImmediately, rejectImmediately);
+
+  };
+
+  /**
+   * Deferred - Helpers
+   * ******************
+   */
+
+  /**
+   * Return a new Deferred instance.
+   *
+   * @public
+   * @constructs Deferred
+   * @param {Function} [executor]
+   * @returns {Deferred}
+   */
+  function defer(executor) {
+
+    return new Deferred(executor);
+
+  }
+
+  /**
+   * Process Deferred instance's resolve method.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} value
+   */
+  function processResolve(instance, value) {
+
+    if (value === instance) {
+
+      finalizeDeferred(instance, TypeError('A promise can not be resolved with itself.'), stateRejected);
+
+    }
+    else if (value instanceof Deferred) {
+
+      value.onSettled(function (result) {
+
+        finalizeDeferred(instance, result, value._state);
+
+      });
+
+    }
+    else if (typeOf(value, typeFunction) || typeOf(value, typeObject)) {
+
+      processThenable(instance, value);
+
+    }
+    else {
+
+      finalizeDeferred(instance, value, stateFulfilled);
+
+    }
+
+  }
+
+  /**
+   * Process a thenable object or function.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {Function|Object} thenable
+   */
+  function processThenable(instance, thenable) {
+
+    try {
+
+      var
+      then = thenable.then,
+      thenHandled;
+
+      if (typeOf(then, typeFunction)) {
+
+        try {
+
+          then.call(
+            thenable,
+            function (value) {
+
+              if (!thenHandled) {
+
+                thenHandled = 1;
+                processResolve(instance, value);
+
+              }
+
+            },
+            function (reason) {
+
+              if (!thenHandled) {
+
+                thenHandled = 1;
+                finalizeDeferred(instance, reason, stateRejected);
+
+              }
+
+            }
+          );
+
+        }
+        catch (e) {
+
+          if (!thenHandled) {
+
+            thenHandled = 1;
+            finalizeDeferred(instance, e, stateRejected);
+
+          }
+
+        }
 
       }
       else {
 
-        resolveHandler(instance, val);
+        finalizeDeferred(instance, thenable, stateFulfilled);
+
+      }
+
+    }
+    catch (e) {
+
+      finalizeDeferred(instance, e, stateRejected);
+
+    }
+
+  }
+
+  /**
+   * Finalize Deferred instance's resolve/reject process.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {*} result
+   * @param {String} state
+   */
+  function finalizeDeferred(instance, result, state) {
+
+    instance._result = result;
+    instance._state = state;
+
+    var
+    handlersLength = instance._handlers.length;
+
+    if (handlersLength) {
+
+      arrayEach(instance._handlers.splice(0, handlersLength), function (handler) {
+
+        if (!handler.type || handler.type === state) {
+
+          executeDeferredCallback(instance, handler.fn);
+
+        }
+
+      });
+
+    }
+
+  }
+
+  /**
+   * Handler for onResolved, onRejected and onSettled methods.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {Deferred~handlerCallback} callback
+   * @param {String} state
+   * @returns {Deferred}
+   */
+  function bindDeferredCallback(instance, callback, state) {
+
+    if (typeOf(callback, typeFunction)) {
+
+      if (instance._state === statePending) {
+
+        instance._handlers.push({type: state, fn: callback});
+
+      }
+      else if (!state || instance._state === state) {
+
+        executeDeferredCallback(instance, callback);
 
       }
 
@@ -446,164 +893,61 @@
 
     return instance;
 
-  };
+  }
 
   /**
-   * Reject deferred. All provided arguments will be passed directly to 'onRejected' and 'onSettled' callback functions.
+   * Execute a Deferred instance callback function.
    *
-   * @memberof Deferred.prototype
-   * @returns {Deferred} The instance on which this method was called.
+   * @private
+   * @param {Deferred} instance
+   * @param {Deferred~handlerCallback} callback
    */
-  Deferred.prototype.reject = function (reason) {
+  function executeDeferredCallback(instance, callback) {
+
+    instance._async ? nextTick(function () { callback(instance._result); }) : callback(instance._result);
+
+  }
+
+  /**
+   * Returns a new Deferred instance which is settled when the calling instance is settled.
+   *
+   * @private
+   * @param {Deferred} instance
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @param {Boolean} [spread]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function then(instance, onFulfilled, onRejected, spread) {
 
     var
-    instance = this;
-
-    if (instance._state === statePending && !instance._locked) {
-
-      instance._locked = true;
-      rejectHandler(instance, reason);
-
-    }
-
-    return instance;
-
-  };
-
-  /**
-   * Execute a callback function asynchronously when the deferred is resolved.
-   *
-   * @memberof Deferred.prototype
-   * @param {function} callback
-   * @returns {Deferred} The instance on which this method was called.
-   */
-  Deferred.prototype.onFulfilled = function (callback) {
-
-    var
-    instance = this;
-
-    execFn(function () {
-
-      if (typeOf(callback, 'function')) {
-
-        if (instance._state === stateFulfilled) {
-
-          callback(instance.result());
-
-        }
-
-        if (instance._state === statePending) {
-
-          evHub.one(evResolve + instance._id, function () {
-
-            callback(instance.result());
-
-          });
-
-        }
-
-      }
-
-    }, instance._asynchronous);
-
-    return instance;
-
-  };
-
-  /**
-   * Execute a callback function asynchronously when the deferred is rejected.
-   *
-   * @memberof Deferred.prototype
-   * @param {function} callback
-   * @returns {Deferred} The instance on which this method was called.
-   */
-  Deferred.prototype.onRejected = function (callback) {
-
-    var
-    instance = this;
-
-    execFn(function () {
-
-      if (typeOf(callback, 'function')) {
-
-        if (instance._state === stateRejected) {
-
-          callback(instance.result());
-
-        }
-
-        if (instance._state === statePending) {
-
-          evHub.one(evReject + instance._id, function () {
-
-            callback(instance.result());
-
-          });
-
-        }
-
-      }
-
-    }, instance._asynchronous);
-
-    return instance;
-
-  };
-
-  /**
-   * Execute a callback function asynchronously when the deferred is resolved or rejected.
-   *
-   * @memberof Deferred.prototype
-   * @param {function} callback
-   * @returns {Deferred} The instance on which this method was called.
-   */
-  Deferred.prototype.onSettled = function (callback) {
-
-    return this.onFulfilled(callback).onRejected(callback);
-
-  };
-
-  /**
-   * Chain deferreds.
-   *
-   * @memberof Deferred.prototype
-   * @param {function} [onFulfilled]
-   * @param {function} [onRejected]
-   * @returns {Deferred} Creates a new deferred.
-   */
-  Deferred.prototype.then = function (onFulfilled, onRejected) {
-
-    var
-    instance = this,
     next = defer(),
     isFulfilled,
     fateCallback;
 
     instance.onSettled(function (instanceVal) {
 
-      isFulfilled = instance.state() === stateFulfilled;
-      onFulfilled = isFulfilled && typeOf(onFulfilled, 'function') ? onFulfilled : 0;
-      onRejected = !isFulfilled && typeOf(onRejected, 'function') ? onRejected : 0;
+      isFulfilled = instance._state === stateFulfilled;
+      onFulfilled = isFulfilled && typeOf(onFulfilled, typeFunction) ? onFulfilled : 0;
+      onRejected = !isFulfilled && typeOf(onRejected, typeFunction) ? onRejected : 0;
       fateCallback = onFulfilled || onRejected || 0;
 
-      /**
-       * If we have a callback that matches the instance's fate (fulfilled -> onFulfilled, rejected -> onRejected)
-       * or if the instance was fulfilled, let's do the default try catch procedure.
-       */
       if (fateCallback || isFulfilled) {
 
-        try {
+        tryCatch(
+          function () {
 
-          next.resolve(fateCallback ? fateCallback(instanceVal) : instanceVal);
+            next.resolve(fateCallback ? (spread && typeOf(instanceVal, typeArray) ? fateCallback.apply(spread, instanceVal) : fateCallback(instanceVal)) : instanceVal);
 
-        } catch (e) {
+          },
+          function (e) {
 
-          next.reject(e);
+            next.reject(e);
 
-        }
+          }
+        );
 
       }
-      /** In other cases, let's sink the error down the then chain until it's caught. */
       else {
 
         next.reject(instanceVal);
@@ -614,116 +958,56 @@
 
     return next;
 
-  };
+  }
 
   /**
-   * Returns a "master" deferred that resolves when all of the arguments and the instance itself have resolved. The master deferred is rejected instantly if one of the sub-deferreds is rejected.
-   *
-   * @memberof Deferred.prototype
-   * @param {array} deferreds
-   * @param {boolean} [resolveOnFirst=false]
-   * @param {boolean} [rejectOnFirst=true]
-   * @returns {Deferred} A new deferred.
-   */
-  Deferred.prototype.and = function (deferreds, resolveOnFirst, rejectOnFirst) {
-
-    deferreds.unshift(this);
-
-    return when(deferreds, resolveOnFirst, rejectOnFirst);
-
-  };
-
-  /**
-   * Deferred - Helpers
-   * ******************
-   */
-
-  /**
-   * Create a new deferred instance. Shorthand for "new Deferred()".
+   * Returns a new Deferred instance that is settled when all provided values are settled. All values which are not
+   * instances of Deferred are transformed into Deferred instances and resolved immediately.
    *
    * @public
-   * @param {function} [executor]
-   * @returns {Deferred}
+   * @param {Array} values
+   * @param {Boolean} [resolveImmediately=false]
+   * @param {Boolean} [rejectImmediately=true]
+   * @returns {Deferred} A new Deferred instance.
    */
-  function defer(executor) {
+  function when(values, resolveImmediately, rejectImmediately) {
 
-    return new Deferred(executor);
+    typeCheck(values, typeArray);
 
-  }
-
-  /**
-   * Resolve handler.
-   *
-   * @private
-   * @param {Deferred} instance
-   * @param {*} val
-   */
-  function resolveHandler(instance, val) {
-
-    instance._result = val;
-    instance._state = stateFulfilled;
-    evHub.emit(evResolve + instance._id, [val]);
-
-  }
-
-  /**
-   * Reject handler.
-   *
-   * @private
-   * @param {Deferred} instance
-   * @param {*} reason
-   */
-  function rejectHandler(instance, reason) {
-
-    instance._result = reason;
-    instance._state = stateRejected;
-    evHub.emit(evReject + instance._id, [reason]);
-
-  }
-
-  /**
-   * Returns a "master" deferred that resolves when all of the deferred arguments have resolved. The master deferred is rejected instantly if any of the sub-deferreds is rejected.
-   *
-   * @private
-   * @param {arguments|array} deferreds
-   * @param {boolean|undefined} [resolveOnFirst=false]
-   * @param {boolean|undefined} [rejectOnFirst=true]
-   * @returns {Deferred} A new deferred.
-   */
-  function when(deferreds, resolveOnFirst, rejectOnFirst) {
-
-    resolveOnFirst = resolveOnFirst === true;
-    rejectOnFirst = rejectOnFirst === undefined || rejectOnFirst === true;
+    resolveImmediately = resolveImmediately === true;
+    rejectImmediately = rejectImmediately === undefined || rejectImmediately === true;
 
     var
     master = defer(),
-    masterArgs = [],
-    counter = deferreds.length,
+    results = [],
+    inspects = [],
+    counter = values.length,
     firstRejection;
 
     if (counter) {
 
-      arrayEach(deferreds, function (deferred, i) {
+      arrayEach(values, function (deferred, i) {
 
-        deferred = deferred instanceof Deferred ? deferred : defer()._async(false).resolve(deferred);
+        deferred = deferred instanceof Deferred ? deferred : defer().resolve(deferred);
 
         deferred.onSettled(function () {
 
-          if (master.state() === 'pending' && !master._locked) {
+          if (master.state() === statePending && !master.isLocked()) {
 
             --counter;
-            firstRejection = firstRejection || (deferred.state() === 'rejected' && deferred);
-            masterArgs[i] = deferred.result();
+            firstRejection = firstRejection || (deferred.state() === stateRejected && deferred);
+            results[i] = deferred.result();
+            inspects[i] = deferred.inspect();
 
-            if (firstRejection && (rejectOnFirst || !counter)) {
+            if (firstRejection && (rejectImmediately || !counter)) {
 
-              master.reject(firstRejection.result());
+              master.reject(rejectImmediately ? firstRejection.result() : inspects);
 
             }
 
-            if (!firstRejection && (resolveOnFirst || !counter)) {
+            if (!firstRejection && (resolveImmediately || !counter)) {
 
-              master.resolve(resolveOnFirst ? masterArgs[i] : masterArgs);
+              master.resolve(resolveImmediately ? results[i] : results);
 
             }
 
@@ -736,7 +1020,7 @@
     }
     else {
 
-      master.resolve(masterArgs);
+      master.resolve(results);
 
     }
 
@@ -750,87 +1034,42 @@
    */
 
   /**
-   * Create a module object.
+   * Module instance constructor.
    *
    * @class
    * @private
-   * @param {string} id
-   * @param {array} dependencies
-   * @param {function|object} factory
+   * @param {String} id
+   * @param {Array} dependencies
+   * @param {Function|Object} factory
    */
   function Module(id, dependencies, factory) {
 
     var
     instance = this,
-    deferred = defer()._async(false),
-    factoryCtx,
-    factoryValue;
+    deferred = defer().sync();
 
-    // Module data.
-    instance._id = id;
-    instance._dependencies = dependencies;
-    instance._deferred = deferred;
+    /** Module data. */
+    instance.id = id;
+    instance.dependencies = dependencies;
+    instance.deferred = deferred;
 
-    // Add module to modules object.
+    /** Add module to modules object. */
     modules[id] = instance;
 
-    // Emit initiation event when module is loaded.
-    deferred.onFulfilled(function () {
+    /** Load dependencies and resolve factory value. */
+    loadDependencies(dependencies, function (depModules, depHash) {
 
-      evHub.emit(evInitiate + '-' + id, [instance]);
+      deferred
+      .resolve(typeOf(factory, typeFunction) ? factory.apply({id: id, dependencies: depHash}, depModules) : factory)
+      .onFulfilled(function () {
 
-    });
+        moduleEvents.emit(evInitiate + id, [instance]);
 
-    // Load dependencies and resolve factory value.
-    loadDependencies(dependencies, function (depModules) {
-
-      if (typeOf(factory, 'function')) {
-
-        factoryCtx = {
-          id: id,
-          dependencies: {}
-        };
-
-        arrayEach(dependencies, function (depId, i) {
-
-          factoryCtx.dependencies[depId] = depModules[i];
-
-        });
-
-        factoryValue = factory.apply(factoryCtx, depModules);
-
-      }
-      else {
-
-        factoryValue = factory;
-
-      }
-
-      deferred.resolve(factoryValue);
+      });
 
     });
 
   }
-
-  /**
-   * Get module instance info.
-   *
-   * @memberof Module.prototype
-   * @returns {object}
-   */
-  Module.prototype.info = function () {
-
-    var
-    instance = this;
-
-    return {
-      id: instance._id,
-      ready: instance._deferred.state() === stateFulfilled,
-      dependencies: copyArray(instance._dependencies),
-      value: instance._deferred.result()
-    };
-
-  };
 
   /**
    * Module - Helpers
@@ -840,10 +1079,11 @@
   /**
    * Define a module or multiple modules.
    *
-   * @private
-   * @param {array|string} ids
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
+   * @public
+   * @param {Array|String} ids
+   * @param {Array|String} [dependencies]
+   * @param {Function|Object} factory
+   * @returns {Palikka}
    */
   function defineModule(ids, dependencies, factory) {
 
@@ -853,14 +1093,14 @@
     circDep;
 
     /** Validate/sanitize ids. */
-    typeCheck(ids, 'array|string');
-    ids = typeOf(ids, 'array') ? ids : [ids];
+    typeCheck(ids, typeArray + '|' + typeString);
+    ids = typeOf(ids, typeArray) ? ids : [ids];
 
     /** Validate/sanitize dependencies. */
     if (hasDeps) {
 
-      typeCheck(dependencies, 'array|string');
-      deps = typeOf(dependencies, 'array') ? dependencies : [dependencies];
+      typeCheck(dependencies, typeArray + '|' + typeString);
+      deps = typeOf(dependencies, typeArray) ? dependencies : [dependencies];
 
     }
     else {
@@ -871,13 +1111,13 @@
 
     /** Validate/sanitize factory. */
     factory = hasDeps ? factory : dependencies;
-    typeCheck(factory, 'function|object');
+    typeCheck(factory, typeFunction + '|' + typeObject);
 
     /** Define modules. */
     arrayEach(ids, function (id) {
 
       /** Validate id type. */
-      typeCheck(id, 'string');
+      typeCheck(id, typeString);
 
       /** Make sure id is not empty. */
       if (!id) {
@@ -887,7 +1127,7 @@
       }
 
       /** Make sure id is not reserved. */
-      if (modules[id] instanceof Module) {
+      if (modules[id]) {
 
         throw Error('Module ' + id + ' is already defined.');
 
@@ -911,7 +1151,7 @@
 
     });
 
-    return lib;
+    return palikka;
 
   }
 
@@ -919,22 +1159,23 @@
    * Require a module.
    *
    * @public
-   * @param {array|string} dependencies
-   * @param {function} callback
+   * @param {Array|String} dependencies
+   * @param {Function} callback
+   * @returns {Palikka}
    */
   function requireModule(dependencies, callback) {
 
-    typeCheck(callback, 'function');
-    typeCheck(dependencies, 'array|string');
-    dependencies = typeOf(dependencies, 'array') ? dependencies : [dependencies];
+    typeCheck(callback, typeFunction);
+    typeCheck(dependencies, typeArray + '|' + typeString);
+    dependencies = typeOf(dependencies, typeArray) ? dependencies : [dependencies];
 
-    loadDependencies(dependencies, function (depModules) {
+    loadDependencies(dependencies, function (depModules, depHash) {
 
-      callback.apply(null, depModules);
+      callback.apply({dependencies: depHash}, depModules);
 
     });
 
-    return lib;
+    return palikka;
 
   }
 
@@ -942,34 +1183,44 @@
    * Load module dependencies asynchronously.
    *
    * @private
-   * @param {array} dependencies
-   * @param {function} callback
+   * @param {Array} dependencies
+   * @param {Function} callback
    */
   function loadDependencies(dependencies, callback) {
 
     var
-    defers = [];
+    defers = [],
+    hash = {};
 
     arrayEach(dependencies, function (depId) {
 
-      typeCheck(depId, 'string');
+      typeCheck(depId, typeString);
 
-      var
-      module = modules[depId];
+      defers.push(modules[depId] ? modules[depId].deferred : defer(function (resolve) {
 
-      defers.push(module ? module._deferred : defer(function (resolve) {
+        moduleEvents.one(evInitiate + depId, function (ev, module) {
 
-        evHub.one(evInitiate + '-' + depId, function (ev, module) {
-
-          resolve(module._deferred.result());
+          resolve(module.deferred.result());
 
         });
 
-      })._async(config.asyncModules));
+      }).sync());
 
     });
 
-    when(defers)._async(config.asyncModules).onFulfilled(callback);
+    when(defers)
+    [config.asyncModules ? 'async' : 'sync']()
+    .onFulfilled(function (depModules) {
+
+      arrayEach(dependencies, function (depId, i) {
+
+        hash[depId] = depModules[i];
+
+      });
+
+      callback(depModules, hash);
+
+    });
 
   }
 
@@ -977,9 +1228,9 @@
    * Return the first circular dependency's id or null.
    *
    * @private
-   * @param {string} id
-   * @param {array} dependencies
-   * @returns {null|string}
+   * @param {String} id
+   * @param {Array} dependencies
+   * @returns {Null|String}
    */
   function getCircDependency(id, dependencies) {
 
@@ -993,11 +1244,12 @@
 
       if (depModule) {
 
-        arrayEach(depModule._dependencies, function (depModuleDep) {
+        arrayEach(depModule.dependencies, function (depId) {
 
-          if (!ret && depModuleDep === id) {
+          if (!ret && depId === id) {
 
-            ret = depModule._id;
+            ret = depModule.id;
+
             return 1;
 
           }
@@ -1019,35 +1271,28 @@
   }
 
   /**
-   * Returns info about all modules or a single module. Returns null if no modules are found.
+   * List modules. Returns an object containing information about all the modules in their current state.
    *
-   * @private
-   * @param {number} [id]
-   * @returns {null|object}
+   * @public
+   * @returns {Object}
    */
-  function getModuleData(id) {
+  function listModules() {
 
     var
-    ret = null;
+    ret = {},
+    m,
+    id;
 
-    if (id) {
+    for (id in modules) {
 
-      if (id in modules) {
+      m = modules[id];
 
-        ret = modules[id].info();
-
-      }
-
-    }
-    else {
-
-      ret = {};
-
-      for (var prop in modules) {
-
-        ret[prop] = modules[prop].info();
-
-      }
+      ret[id] = {
+        id: id,
+        dependencies: cloneArray(m.dependencies),
+        ready: m.deferred.state() === stateFulfilled ? true : false,
+        value: m.deferred.result()
+      };
 
     }
 
@@ -1061,28 +1306,29 @@
    */
 
   /**
-   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type directly and returns a boolean.
+   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type
+   * directly and returns a boolean.
    *
-   * @private
-   * @param {object} obj
-   * @param {string} [isType]
-   * @returns {string|boolean}
+   * @public
+   * @param {Object} value
+   * @param {String} [isType]
+   * @returns {String|Boolean}
    */
-  function typeOf(obj, isType) {
+  function typeOf(value, isType) {
 
     var
     type = (
-      obj === null ? 'null' : // IE 7/8 fix -> null check
-      obj === undefined ? 'undefined' : // IE 7/8 fix -> undefined check
-      typeof obj
+      value === null ? 'null' : /** IE 7/8 -> Null check. */
+      value === undefined ? 'undefined' : /** IE 7/8 -> Undefined check. */
+      typeof value
     );
 
-    type = type !== 'object' ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
+    type = type !== typeObject ? type : toString.call(value).split(' ')[1].replace(']', '').toLowerCase();
 
-    // IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed)
-    if (!isStrict && type === 'object') {
+    /** IE 7/8 -> Arguments check. */
+    if (!isStrict && type === typeObject) {
 
-      type = typeof obj.callee === 'function' && obj === obj.callee.arguments ? 'arguments' : type;
+      type = typeof value.callee === typeFunction && value === value.callee.arguments ? typeArguments : type;
 
     }
 
@@ -1091,13 +1337,15 @@
   }
 
   /**
-   * Throw a type error if a value is not of the expected type(s). Check against multiple types using '|' as the delimiter.
+   * Throw a type error if a value is not of the expected type(s). Check against multiple types by using '|' as a
+   * delimiter.
    *
    * @private
-   * @param {*} val
-   * @param {string} types
+   * @param {*} value
+   * @param {String} types
+   * @throws {TypeError}
    */
-  function typeCheck(val, types) {
+  function typeCheck(value, types) {
 
     var
     ok = false,
@@ -1105,17 +1353,13 @@
 
     arrayEach(typesArray, function (type) {
 
-      if (!ok) {
-
-        ok = type === 'deferred' ? val instanceof Deferred : typeOf(val, type);
-
-      }
+      ok = !ok ? typeOf(value, type) : ok;
 
     });
 
     if (!ok) {
 
-      throw TypeError(val + ' is not ' + types);
+      throw TypeError(value + ' is not ' + types);
 
     }
 
@@ -1125,17 +1369,17 @@
    * Clone array or arguments object.
    *
    * @private
-   * @param {array} array
-   * @returns {array}
+   * @param {Array} array
+   * @returns {Array}
    */
-  function copyArray(array) {
+  function cloneArray(array) {
 
     var
     arrayType = typeOf(array);
 
     return (
-      arrayType === 'array' ? array.slice(0) :
-      arrayType === 'arguments' ? slice.call(array) :
+      arrayType === typeArray ? array.slice(0) :
+      arrayType === typeArguments ? slice.call(array) :
       []
     );
 
@@ -1145,18 +1389,20 @@
    * Loop array items.
    *
    * @private
-   * @param {array} array
-   * @param {function} callback
-   * @returns {array}
+   * @param {Array} array
+   * @param {Function} callback
+   * @returns {Array}
    */
   function arrayEach(array, callback) {
 
-    if (typeOf(callback, 'function')) {
+    if (typeOf(callback, typeFunction)) {
 
       for (var i = 0, len = array.length; i < len; i++) {
 
         if (callback(array[i], i)) {
+
           break;
+
         }
 
       }
@@ -1170,116 +1416,89 @@
   /**
    * Create cross-browser next tick implementation. Returns a function that accepts a function as a parameter.
    *
-   * @todo Add some faster fallbacks such onreadystatechange for IE7-IE10. setImmediate is broken unfortunately.
-   *
    * @private
-   * @returns {function}
+   * @returns {Function}
    */
   function getNextTick() {
 
     var
-    nativePromise = isNative(glob.Promise),
-    nativeMT,
-    queueEmpty,
-    processQueue,
-    tryFireTick,
+    resolvedPromise = isNative(glob.Promise) && glob.Promise.resolve(),
+    nodeTick = isNode && (process.nextTick || glob.setImmediate),
+    MobServer = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver),
+    MobServerTarget,
+    queue = [],
+    queueActive = 0,
     fireTick,
-    observerTarget;
+    nextTickFn = function (cb) {
 
-    /** First let's try to take advantage of native ES6 Promises. Callback queue is handled automatically by the browser. */
-    if (nativePromise) {
+      if (typeOf(cb, typeFunction)) {
 
-      nativePromise = nativePromise.resolve();
+        queue.push(cb);
 
-      /** Return next tick function. */
-      return function (cb) {
+        if (!queueActive) {
 
-        nativePromise.then(cb);
-
-      };
-
-    }
-    /** Node.js has good existing next tick implementations, so let's use them. */
-    else if (isNode) {
-
-      return glob.setImmediate || glob.process.nextTick;
-
-    }
-    /** In unfortunate cases we have to create hacks and manually manage the callback queue. */
-    else {
-
-      /** Let's check if mutation observer is supported. */
-      nativeMT = isNative(glob.MutationObserver) || isNative(glob.WebKitMutationObserver);
-
-      /** Flag for checking the state of the queue. */
-      queueEmpty = 1;
-
-      /** Function to process the queue (fire the callbacks). */
-      processQueue = function () {
-
-        queueEmpty = 1;
-        evHub.emit('tick');
-
-      };
-
-      /** Function to try trigger next tick.  */
-      tryFireTick = function () {
-
-        if (queueEmpty) {
-
-          queueEmpty = 0;
+          queueActive = 1;
           fireTick();
 
         }
 
+      }
+
+      return palikka;
+
+    },
+    processQueue = function () {
+
+      queueActive = 0;
+      arrayEach(queue.splice(0, queue.length), function (cb) {
+
+        cb();
+
+      });
+
+    };
+
+    if (resolvedPromise) {
+
+      fireTick = function () {
+
+        resolvedPromise.then(processQueue);
+
       };
 
-      /** MutationObserver fallback. */
-      if (nativeMT) {
+    }
+    else if (nodeTick) {
 
-        observerTarget = document.createElement('i');
-        (new nativeMT(processQueue)).observe(observerTarget, {attributes: true});
+      fireTick = function () {
 
-        fireTick = function () {
+        nodeTick(processQueue);
 
-          observerTarget.id = '';
+      };
 
-        };
+    }
+    else if (MobServer) {
 
-      }
-      /** setTimeout fallback. */
-      else {
+      MobServerTarget = document.createElement('i');
+      (new MobServer(processQueue)).observe(MobServerTarget, {attributes: true});
 
-        fireTick = function () {
+      fireTick = function () {
 
-          glob.setTimeout(processQueue, 0);
+        MobServerTarget.id = '';
 
-        };
+      };
 
-      }
+    }
+    else {
 
-      /** Return next tick function. */
-      return function (cb) {
+      fireTick = function () {
 
-        evHub.one('tick', cb);
-        tryFireTick();
+        glob.setTimeout(processQueue, 0);
 
       };
 
     }
 
-  }
-
-  /**
-   * Execute a function, sync or async, it's up to you.
-   *
-   * @private
-   * @param {function} fn
-   * @param {boolean} [async]
-   */
-  function execFn(fn, async) {
-
-    async ? nextTick(fn) : fn();
+    return nextTickFn;
 
   }
 
@@ -1287,12 +1506,34 @@
    * Check if a function is native code. Returns the passed function if it is native code and otherwise returns false.
    *
    * @private
-   * @param {function} fn
-   * @returns {function|false}
+   * @param {Function} fn
+   * @returns {Function|false}
    */
   function isNative(fn) {
 
-    return typeOf(fn, 'function') && fn.toString().indexOf('[native') > -1 && fn;
+    return typeOf(fn, typeFunction) && fn.toString().indexOf('[native') > -1 && fn;
+
+  }
+
+  /**
+   * A generic helper to optimize the use of try-catch.
+   *
+   * @private
+   * @param {Function} done
+   * @param {Function} fail
+   */
+  function tryCatch(done, fail) {
+
+    try {
+
+      done();
+
+    }
+    catch (e) {
+
+      fail(e);
+
+    }
 
   }
 
@@ -1303,95 +1544,109 @@
 
   /**
    * @public
+   * @memberof Palikka
    * @see Eventizer
    */
-  lib.Eventizer = Eventizer;
+  palikka.Eventizer = Eventizer;
 
   /**
    * @public
+   * @memberof Palikka
    * @see eventize
    */
-  lib.eventize = eventize;
+  palikka.eventize = eventize;
 
   /**
    * @public
+   * @memberof Palikka
    * @see Deferred
    */
-  lib.Deferred = Deferred;
+  palikka.Deferred = Deferred;
 
   /**
    * @public
+   * @memberof Palikka
    * @see defer
    */
-  lib.defer = defer;
+  palikka.defer = defer;
 
   /**
    * @public
+   * @memberof Palikka
    * @see when
    */
-  lib.when = when;
+  palikka.when = when;
 
   /**
    * @public
+   * @memberof Palikka
    * @see defineModule
    */
-  lib.define = defineModule;
+  palikka.define = defineModule;
 
   /**
    * @public
+   * @memberof Palikka
    * @see requireModule
    */
-  lib.require = requireModule;
+  palikka.require = requireModule;
 
   /**
    * @public
-   * @see getModuleData
+   * @memberof Palikka
+   * @see listModules
    */
-  lib._getModules = getModuleData;
+  palikka.list = listModules;
 
   /**
    * @public
+   * @memberof Palikka
    * @see typeOf
    */
-  lib._typeOf = typeOf;
+  palikka.typeOf = typeOf;
 
   /**
    * @public
+   * @memberof Palikka
    * @see nextTick
    */
-  lib._nextTick = nextTick;
+  palikka.nextTick = nextTick;
 
   /**
    * @public
-   * @see config
+   * @memberof Palikka
+   * @see Configuration
    */
-  lib._config = config;
+  palikka.config = config;
 
   /**
    * Initiate
    * ********
    */
 
-  /** Initialize private event hub. */
-  evHub = eventize();
+  /** Create module event hub. */
+  moduleEvents = eventize();
 
   /**
-   * Publish library using an adapted UMD pattern.
+   * Initiate library using returnExports UMD pattern.
+   * https://github.com/umdjs/umd/blob/master/returnExports.js
    */
-  if (typeOf(glob.define, 'function') && glob.define.amd) {
+  if (typeof define === typeFunction && define.amd) {
 
-    glob.define([], lib);
+    define([], palikka);
 
   }
-  else if (typeOf(glob.exports, 'object')) {
+  else if (typeof module === typeObject && module.exports) {
 
-    glob.module.exports = lib;
+    module.exports = palikka;
 
   }
   else {
 
-    glob[ns] = lib;
+    glob[ns] = palikka;
 
   }
 
-})(this);
+})();
+Status API Training Shop Blog About Help
+© 2015 GitHub, Inc. Terms Privacy Security Contact
