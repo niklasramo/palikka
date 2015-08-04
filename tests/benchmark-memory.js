@@ -1,10 +1,10 @@
 module.exports = function (done) {
 
   var
-  memtest = require('../tests/memtest.js'),
+  memtest = require('../tests/memory-tester.js'),
   palikka = require('../palikka.js'),
   when = require('when'),
-  samples = 100000,
+  samples = 10000,
   tests = [];
 
   //
@@ -90,7 +90,25 @@ module.exports = function (done) {
 
     console.log('Resolved deferreds - When');
     for (var i = 0; i < samples; i++) {
-      when.promise(function (res, rej) { res(); });
+      new when.promise(function (res, rej) { res(); });
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Resolved deferreds (with another promise) - Palikka');
+    for (var i = 0; i < samples; i++) {
+      palikka.defer().resolve( palikka.defer().resolve() );
+    }
+
+  });
+
+  tests.push(function () {
+
+    console.log('Resolved deferreds (with another promise) - When');
+    for (var i = 0; i < samples; i++) {
+      new when.promise(function (resolve) { resolve( new when.promise(function (res) { res(); }) ); });
     }
 
   });
@@ -108,7 +126,7 @@ module.exports = function (done) {
 
     console.log('Rejected deferreds - When');
     for (var i = 0; i < samples; i++) {
-      when.promise(function (res, rej) { rej(); });
+      new when.promise(function (res, rej) { rej(); });
     }
 
   });
@@ -126,7 +144,7 @@ module.exports = function (done) {
   tests.push(function () {
 
     console.log('Unresolved .then() chain - When');
-    var d = when.promise(function () {});
+    var d = new when.promise(function () {});
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
     }
@@ -146,7 +164,7 @@ module.exports = function (done) {
   tests.push(function () {
 
     console.log('Resolved .then() chain - When');
-    var d = when.promise(function (res) { res(); });
+    var d = new when.promise(function (res) { res(); });
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
     }
@@ -166,7 +184,7 @@ module.exports = function (done) {
   tests.push(function () {
 
     console.log('Rejected .then() chain - When');
-    var d = when.promise(function (res, rej) { rej(); });
+    var d = new when.promise(function (res, rej) { rej(); });
     for (var i = 0; i < samples; i++) {
       d = d.then(function () {}, function () {});
     }

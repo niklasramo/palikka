@@ -4,8 +4,8 @@ paths = {
   palikkaMin: './palikka.min.js',
   readme: './README.md',
   tests: './tests/tests.js',
-  memTests: './tests/memtest-tests.js',
-  benchmarks: './tests/benchmarks.js',
+  benchMemory: './tests/benchmark-memory.js',
+  benchPerf: './tests/benchmark-performance.js',
   promisesaplus: './tests/promises-aplus.js',
   coverage: './coverage',
   jscsRules: './jscsrc.json',
@@ -23,8 +23,8 @@ gulpSize = require('gulp-size'),
 rimraf = require('rimraf'),
 runSequence = require('run-sequence'),
 benchmark = require('benchmark'),
-memTests = require(paths.memTests),
-benchmarks = require(paths.benchmarks),
+benchMemory = require(paths.benchMemory),
+benchPerf = require(paths.benchPerf),
 palikka = require(paths.palikka);
 
 gulp.task('validate', function () {
@@ -67,15 +67,15 @@ gulp.task('clean', function (cb) {
 
 });
 
-gulp.task('memtest', function (cb) {
+gulp.task('bench-memory', function (cb) {
 
-  memTests(cb);
+  benchMemory(cb);
 
 });
 
-gulp.task('benchmarks', function (cb) {
+gulp.task('bench-perf', function (cb) {
 
-  benchmarks(cb);
+  benchPerf(cb);
 
 });
 

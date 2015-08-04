@@ -6,69 +6,74 @@
  * Released under the MIT license
  */
 
-/**
-
-TODO:
------
-
-- [x] Performance/memory optimzations.
-- [x] Basic memory leak tests.
-- [X] nextTick leaks memory (native Promise being the blame here).
-- [x] nextTick() should be chainable, make it return the library.
-- [x] .Eventizer.on() and .Eventizer.one() should be able to define the context which can be overriden via .Eventizer.emit()
-- [x] BUG: Promises/A+ tests pass tests relating to clause 2.3.3.3.4.2 accidentally and there is always the chance that they fail.
-- [x] Clean up "dead" code.
-- [ ] Restructure module system for optimal performance.
-- [ ] Make tests test all nextTick variations.
-- [ ] Make tests cover all library initiation variations (AMD/Node/Browser).
-- [x] Restructure Eventizer tests.
-- [ ] Restructure Module tests.
-- [ ] Restructure Deferred tests.
-- [ ] Long resolved/rejected then chain leaks memory badly.
-      -> The problem is evidently the next deferred which is used within the inner function.
-
-*/
-
 (function (undefined) {
 
   'use strict';
 
   var
 
-  /** Name of the library. */
+  /**
+   * @alias Palikka
+   * @global
+   */
+  palikka = {},
+
+  /** Library namespace. */
   ns = 'palikka',
 
-  /** Public API interface. */
-  lib = {},
+  /** Generic unique identifier. */
+  uid = 0,
 
-  /** Main configuration object. */
+  /**
+   * @constant {String}
+   * @default
+   */
+  statePending = 'pending',
+
+  /**
+   * @constant {String}
+   * @default
+   */
+  stateFulfilled = 'fulfilled',
+
+  /**
+   * @constant {String}
+   * @default
+   */
+  stateRejected = 'rejected',
+
+  /**
+   * @alias Configuration
+   * @public
+   */
   config = {
+
+    /**
+     * @public
+     * @type {Boolean}
+     */
     asyncDeferreds: true,
+
+    /**
+     * @public
+     * @type {Boolean}
+     */
     asyncModules: true
+
   },
 
-  /** Modules container. */
+  /** Modules stuff: container object, event hub and event names. */
   modules = {},
-
-  /** Module event hub and event names. */
   moduleEvents,
   evInitiate = 'a',
 
-  /** Deferred states. */
-  statePending = 'pending',
-  stateFulfilled = 'fulfilled',
-  stateRejected = 'rejected',
-
-  /** Object types. */
+  /** Cache string representations of object types. */
   typeFunction = 'function',
   typeObject = 'object',
   typeArray = 'array',
   typeArguments = 'arguments',
   typeNumber = 'number',
   typeString = 'string',
-
-  /** Generic unique identifier that's shared with events, deferreds and modules. */
-  uid = 0,
 
   /** Cache native toString and slice methods. */
   toString = {}.toString,
@@ -77,16 +82,22 @@ TODO:
   /** Check if strict mode is supported. */
   isStrict = !this === true,
 
-  /** Environment check. */
+  /** Check if we are in Node.js environment. */
   isNode = typeof process === typeObject && typeOf(process, 'process'),
 
-  /** Global object. */
+  /** Determine global object. */
   glob = isNode ? global : window,
 
-  /** Get next tick method. */
+  /**
+   * Execute a function in the next turn of event loop.
+   *
+   * @alias nextTick
+   * @public
+   * @param {Function} function
+   */
   nextTick = getNextTick(),
 
-  /** Cache Class prototypes. */
+  /** Cache class prototypes. */
   eventizerProto = Eventizer.prototype,
   deferredProto = Deferred.prototype;
 
@@ -99,29 +110,43 @@ TODO:
    * Eventizer instance constructor.
    *
    * @class
-   * @private
-   * @param {object} [listeners]
+   * @public
+   * @param {Object} [listeners] - An object where the instance's event listeners will be stored.
    */
   function Eventizer(listeners) {
 
     /**
-     * An object where all the instance's callbacks (listeners) are stored in.
+     * The object where all the instance's event listeners are stored in.
      *
      * @protected
-     * @type {object}
+     * @type {Object}
      */
     this._listeners = typeOf(listeners, typeObject) ? listeners : {};
 
   }
 
   /**
+   * @callback Eventizer~listenerCallback
+   * @param {Eventizer~listenerData} ev
+   * @param {...*} arg
+   */
+
+  /**
+   * @typedef {Object} Eventizer~listenerData
+   * @property {Number} id - The event listener's id.
+   * @property {Function} fn - The event listener's callback function.
+   * @property {String} type - The event listener's type.
+   */
+
+  /**
    * Bind an event listener.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function} callback
-   * @param {*} [ctx]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {*} [ctx] - Callback function's context.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
   eventizerProto.on = function (type, callback, ctx) {
 
@@ -146,11 +171,12 @@ TODO:
   /**
    * Bind an event listener that is called only once.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function} callback
-   * @param {*} [ctx]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
+   * @param {*} [ctx] - Callback function's context.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
   eventizerProto.one = function (type, callback, ctx) {
 
@@ -178,12 +204,13 @@ TODO:
   };
 
   /**
-   * Unbind event listeners based on event's type. Optionally one can provide a target that can be a callback function or an id that will be matched used to target specific events. If no target is provided all listeners for the specified type will be removed.
+   * Unbind event listeners. If no target is provided all listeners for the specified event will be removed.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {function|number} [target]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Function|Number} [target] - Filter the event listener's to be removed by callback function or id.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
   eventizerProto.off = function (type, target) {
 
@@ -231,13 +258,15 @@ TODO:
   };
 
   /**
-   * Emit event. Optionally one can provide context and additional arguments for the callback functions.
+   * Emit event.
    *
-   * @memberof Eventizer
-   * @param {string} type
-   * @param {array} [args]
-   * @param {*} [ctx]
-   * @returns {Eventizer} The instance on which this method was called.
+   * @memberof Eventizer.prototype
+   * @public
+   * @param {String} type - Event's name.
+   * @param {Array} [args] - Arguments that will be applied to the event listener callbacks.
+   * @param {*} [ctx] - Custom context that will be applied to the event listener callbacks. Overrides custom context
+   *                    defined by .on() and .one() methods.
+   * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
   eventizerProto.emit = function (type, args, ctx) {
 
@@ -249,9 +278,9 @@ TODO:
     if (eventObjects) {
 
       /**
-       * Loop through a CLONED set of event listeners. If the listeners are not cloned before looping
-       * there is always the risk that the listeners array gets modified while the loop is being executed,
-       * which is something we don't want to happen.
+       * Loop through a cloned set of event listeners. If the listeners are not cloned before looping there is always
+       * the risk that the listeners array gets modified while the loop is being executed, which is something we don't
+       * want to happen.
        */
       arrayEach(cloneArray(eventObjects), function (eventObject) {
 
@@ -290,12 +319,15 @@ TODO:
    */
 
   /**
-   * Eventize an object (if provided) or return a new Eventizer instance.
+   * Creates a new Eventizer instance that will be returned directly if no object is provided as the first argument. If
+   * an object is provided as the first argument the created Eventizer instance's properties and methods will be
+   * propagated to the provided object and the provided object will be returned instead.
    *
    * @public
-   * @param {object} [obj]
-   * @param {object} [listeners]
-   * @returns {object|Eventizer}
+   * @constructs Eventizer
+   * @param {Object} [obj]
+   * @param {Object} [listeners]
+   * @returns {Object|Eventizer}
    */
   function eventize(obj, listeners) {
 
@@ -330,8 +362,8 @@ TODO:
    * Deferred instance constructor.
    *
    * @class
-   * @private
-   * @param {function} executor
+   * @public
+   * @param {Function} executor
    */
   function Deferred(executor) {
 
@@ -339,42 +371,43 @@ TODO:
     instance = this;
 
     /**
-     * Indicates if the instance is being resolved or rejected. The instance cannot be resolved or rejected anymore after it's locked.
+     * Indicates if the instance can be resolved or rejected currently. The instance cannot be resolved or rejected
+     * after it's once locked.
      *
-     * @private
-     * @type {boolean}
+     * @protected
+     * @type {Boolean}
      */
     instance._locked = false;
 
     /**
-     * The instance's result value is stored here.
+     * The instance's result value.
      *
-     * @private
+     * @protected
      * @type {*}
      */
     instance._result = undefined;
 
     /**
-     * Holds information about the state of the deferred. A deferred can have three different states: 'pending', 'fulfilled' or 'rejected'.
+     * Holds the instance's current state: 'pending', 'fulfilled' or 'rejected'.
      *
-     * @private
-     * @type {string}
+     * @protected
+     * @type {String}
      */
     instance._state = statePending;
 
     /**
-     * Indicates if the deferred instance is asynchronous.
+     * Indicates if the instance is currently in asynchronous mode.
      *
-     * @private
-     * @type {boolean}
+     * @protected
+     * @type {Boolean}
      */
     instance._async = config.asyncDeferreds;
 
     /**
      * Callback queue.
      *
-     * @private
-     * @type {array}
+     * @protected
+     * @type {Deferred~handler[]}
      */
     instance._handlers = [];
 
@@ -399,10 +432,30 @@ TODO:
   }
 
   /**
+   * @callback Deferred~handlerCallback
+   * @param {*|...*} result - Deferred instance's result.
+   */
+
+  /**
+   * @typedef {Object} Deferred~handler
+   * @property {Deferred~handlerCallback} fn - The handler's callback function.
+   * @property {String|Undefined} type - The handler's type: fulfilled', 'rejected' or undefined.
+   */
+
+  /**
+   * @typedef {Object} Deferred~inspection
+   * @property {String} state - Inspected instance's state: 'pending', 'fulfilled' or 'rejected'.
+   * @property {*} result - Inspected instance's result.
+   * @property {Boolean} locked - Is inspected instance locked?
+   * @property {Boolean} async - Is inspected instance in asynchronous mode?
+   */
+
+  /**
    * Get current state of the instance.
    *
    * @memberof Deferred.prototype
-   * @returns {string} 'pending', 'fulfilled' or 'rejected'.
+   * @public
+   * @returns {String} 'pending', 'fulfilled' or 'rejected'.
    */
   deferredProto.state = function () {
 
@@ -411,9 +464,10 @@ TODO:
   };
 
   /**
-   * Get instance's result value.
+   * Get instance's result.
    *
    * @memberof Deferred.prototype
+   * @public
    * @returns {*}
    */
   deferredProto.result = function () {
@@ -423,10 +477,11 @@ TODO:
   };
 
   /**
-   * Check if the current instance is set to run asynchronously.
+   * Check if the current instance is set to work asynchronously.
    *
    * @memberof Deferred.prototype
-   * @returns {boolean}
+   * @public
+   * @returns {Boolean}
    */
   deferredProto.isAsync = function () {
 
@@ -438,7 +493,8 @@ TODO:
    * Check if the current instance is locked.
    *
    * @memberof Deferred.prototype
-   * @returns {boolean}
+   * @public
+   * @returns {Boolean}
    */
   deferredProto.isLocked = function () {
 
@@ -450,7 +506,8 @@ TODO:
    * Get a snapshot of the instances current status.
    *
    * @memberof Deferred.prototype
-   * @returns {object}
+   * @public
+   * @returns {Deferred~inspection}
    */
   deferredProto.inspect = function () {
 
@@ -467,9 +524,10 @@ TODO:
   };
 
   /**
-   * Set current instance to run synchronously.
+   * Set current instance to work synchronously.
    *
    * @memberof Deferred.prototype
+   * @public
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.sync = function () {
@@ -481,9 +539,10 @@ TODO:
   };
 
   /**
-   * Set current instance to run asynchronously.
+   * Set current instance to work asynchronously.
    *
    * @memberof Deferred.prototype
+   * @public
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.async = function () {
@@ -495,13 +554,14 @@ TODO:
   };
 
   /**
-   * Resolve deferred. All provided arguments will be passed directly to 'onFulfilled' and 'onSettled' callback functions.
+   * Resolve deferred.
    *
    * @memberof Deferred.prototype
-   * @param {*} [val]
+   * @public
+   * @param {*} [value]
    * @returns {Deferred} The instance on which this method was called.
    */
-  deferredProto.resolve = function (val) {
+  deferredProto.resolve = function (value) {
 
     var
     instance = this;
@@ -509,7 +569,7 @@ TODO:
     if (instance._state === statePending && !instance._locked) {
 
       instance._locked = true;
-      processResolve(instance, val);
+      processResolve(instance, value);
 
     }
 
@@ -518,9 +578,11 @@ TODO:
   };
 
   /**
-   * Reject deferred. All provided arguments will be passed directly to 'onRejected' and 'onSettled' callback functions.
+   * Reject Deferred instance.
    *
    * @memberof Deferred.prototype
+   * @public
+   * @param {*} [reason]
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.reject = function (reason) {
@@ -540,10 +602,11 @@ TODO:
   };
 
   /**
-   * Execute a callback function asynchronously when the deferred is resolved.
+   * Execute a callback function when the Deferred instance is resolved.
    *
    * @memberof Deferred.prototype
-   * @param {function} callback
+   * @public
+   * @param {Deferred~handlerCallback} callback
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.onFulfilled = function (callback) {
@@ -553,10 +616,11 @@ TODO:
   };
 
   /**
-   * Execute a callback function asynchronously when the deferred is rejected.
+   * Execute a callback function when the Deferred instance is rejected.
    *
    * @memberof Deferred.prototype
-   * @param {function} callback
+   * @public
+   * @param {Deferred~handlerCallback} callback
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.onRejected = function (callback) {
@@ -566,10 +630,11 @@ TODO:
   };
 
   /**
-   * Execute a callback function asynchronously when the deferred is resolved or rejected.
+   * Execute a callback function when the Deferred instance is either resolved or rejected.
    *
    * @memberof Deferred.prototype
-   * @param {function} callback
+   * @public
+   * @param {Deferred~handlerCallback} callback
    * @returns {Deferred} The instance on which this method was called.
    */
   deferredProto.onSettled = function (callback) {
@@ -579,12 +644,13 @@ TODO:
   };
 
   /**
-   * Returns a new deferred that is resolved when previous deferred is resolved.
+   * Returns a new Deferred instance which is settled when the calling instance is settled.
    *
    * @memberof Deferred.prototype
-   * @param {function} [onFulfilled]
-   * @param {function} [onRejected]
-   * @returns {Deferred} Creates a new deferred.
+   * @public
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} A new Deferred instance.
    */
   deferredProto.then = function (onFulfilled, onRejected) {
 
@@ -593,12 +659,14 @@ TODO:
   };
 
   /**
-   * The same as .then() with the exception that if the result of the instance is an array the result is spread over the arguments of the callback handlers.
+   * The same as Eventizer.prototype.then() with the exception that if the result of the calling instance is an array
+   * it's result is spread over the arguments of the returned instance's callback functions.
    *
    * @memberof Deferred.prototype
-   * @param {function} [onFulfilled]
-   * @param {function} [onRejected]
-   * @returns {Deferred} Creates a new deferred.
+   * @public
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} A new Deferred instance.
    */
   deferredProto.spread = function (onFulfilled, onRejected) {
 
@@ -607,19 +675,21 @@ TODO:
   };
 
   /**
-   * Alias for when() to be used within the deferred chain. The calling instance is automatically added as the first value of the deferreds array.
+   * Same as when() with the exception that the calling instance is automatically added as the first value of the values
+   * array.
    *
    * @memberof Deferred.prototype
-   * @param {array} deferreds
-   * @param {boolean} [resolveImmediately=false]
-   * @param {boolean} [rejectImmediately=true]
-   * @returns {Deferred} A new deferred.
+   * @public
+   * @param {Array} values
+   * @param {Boolean} [resolveImmediately=false]
+   * @param {Boolean} [rejectImmediately=true]
+   * @returns {Deferred} A new Deferred instance.
    */
-  deferredProto.and = function (deferreds, resolveImmediately, rejectImmediately) {
+  deferredProto.and = function (values, resolveImmediately, rejectImmediately) {
 
-    deferreds.unshift(this);
+    values.unshift(this);
 
-    return when(deferreds, resolveImmediately, rejectImmediately);
+    return when(values, resolveImmediately, rejectImmediately);
 
   };
 
@@ -629,10 +699,11 @@ TODO:
    */
 
   /**
-   * Create a new deferred instance. Shorthand for "new Deferred()".
+   * Return a new Deferred instance.
    *
    * @public
-   * @param {function} [executor]
+   * @constructs Deferred
+   * @param {Function} [executor]
    * @returns {Deferred}
    */
   function defer(executor) {
@@ -642,54 +713,54 @@ TODO:
   }
 
   /**
-   * Process deferred instance's resolve method.
+   * Process Deferred instance's resolve method.
    *
    * @private
    * @param {Deferred} instance
-   * @param {*} val
+   * @param {*} value
    */
-  function processResolve(instance, val) {
+  function processResolve(instance, value) {
 
-    if (val === instance) {
+    if (value === instance) {
 
       finalizeDeferred(instance, TypeError('A promise can not be resolved with itself.'), stateRejected);
 
     }
-    else if (val instanceof Deferred) {
+    else if (value instanceof Deferred) {
 
-      val.onSettled(function (value) {
+      value.onSettled(function (result) {
 
-        finalizeDeferred(instance, value, val._state);
+        finalizeDeferred(instance, result, value._state);
 
       });
 
     }
-    else if (typeOf(val, typeFunction) || typeOf(val, typeObject)) {
+    else if (typeOf(value, typeFunction) || typeOf(value, typeObject)) {
 
-      processThenable(instance, val);
+      processThenable(instance, value);
 
     }
     else {
 
-      finalizeDeferred(instance, val, stateFulfilled);
+      finalizeDeferred(instance, value, stateFulfilled);
 
     }
 
   }
 
   /**
-   * Process a thenable value within a deferred's resolve process.
+   * Process a thenable object or function.
    *
    * @private
    * @param {Deferred} instance
-   * @param {*} val
+   * @param {Function|Object} thenable
    */
-  function processThenable(instance, val) {
+  function processThenable(instance, thenable) {
 
     try {
 
       var
-      then = val.then,
+      then = thenable.then,
       thenHandled;
 
       if (typeOf(then, typeFunction)) {
@@ -697,7 +768,7 @@ TODO:
         try {
 
           then.call(
-            val,
+            thenable,
             function (value) {
 
               if (!thenHandled) {
@@ -735,7 +806,7 @@ TODO:
       }
       else {
 
-        finalizeDeferred(instance, val, stateFulfilled);
+        finalizeDeferred(instance, thenable, stateFulfilled);
 
       }
 
@@ -749,16 +820,16 @@ TODO:
   }
 
   /**
-   * Finalize deferred instance's resolve/reject process.
+   * Finalize Deferred instance's resolve/reject process.
    *
    * @private
    * @param {Deferred} instance
-   * @param {*} val
-   * @param {string} state
+   * @param {*} result
+   * @param {String} state
    */
-  function finalizeDeferred(instance, val, state) {
+  function finalizeDeferred(instance, result, state) {
 
-    instance._result = val;
+    instance._result = result;
     instance._state = state;
 
     var
@@ -785,8 +856,8 @@ TODO:
    *
    * @private
    * @param {Deferred} instance
-   * @param {function} callback
-   * @param {string} state
+   * @param {Deferred~handlerCallback} callback
+   * @param {String} state
    * @returns {Deferred}
    */
   function bindDeferredCallback(instance, callback, state) {
@@ -811,11 +882,11 @@ TODO:
   }
 
   /**
-   * Execute a deferred callback function, sync or async.
+   * Execute a Deferred instance callback function.
    *
    * @private
    * @param {Deferred} instance
-   * @param {function} callback
+   * @param {Deferred~handlerCallback} callback
    */
   function executeDeferredCallback(instance, callback) {
 
@@ -824,14 +895,14 @@ TODO:
   }
 
   /**
-   * Returns a new deferred that is resolved when the current deferred is resolved.
+   * Returns a new Deferred instance which is settled when the calling instance is settled.
    *
-   * @memberof Deferred.prototype
+   * @private
    * @param {Deferred} instance
-   * @param {function} [onFulfilled]
-   * @param {function} [onRejected]
-   * @param {boolean} [spread]
-   * @returns {Deferred}
+   * @param {Deferred~handlerCallback} [onFulfilled]
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @param {Boolean} [spread]
+   * @returns {Deferred} A new Deferred instance.
    */
   function then(instance, onFulfilled, onRejected, spread) {
 
@@ -876,17 +947,18 @@ TODO:
   }
 
   /**
-   * Returns a new deferred that resolves when all provided values and are resolved. Non-thenable values are "promisified" and resolved immediately.
+   * Returns a new Deferred instance that is settled when all provided values are settled. All values which are not
+   * instances of Deferred are transformed into Deferred instances and resolved immediately.
    *
-   * @private
-   * @param {array} deferreds
-   * @param {boolean} [resolveImmediately=false]
-   * @param {boolean} [rejectImmediately=true]
-   * @returns {Deferred} A new deferred.
+   * @public
+   * @param {Array} values
+   * @param {Boolean} [resolveImmediately=false]
+   * @param {Boolean} [rejectImmediately=true]
+   * @returns {Deferred} A new Deferred instance.
    */
-  function when(deferreds, resolveImmediately, rejectImmediately) {
+  function when(values, resolveImmediately, rejectImmediately) {
 
-    typeCheck(deferreds, typeArray);
+    typeCheck(values, typeArray);
 
     resolveImmediately = resolveImmediately === true;
     rejectImmediately = rejectImmediately === undefined || rejectImmediately === true;
@@ -895,12 +967,12 @@ TODO:
     master = defer(),
     results = [],
     inspects = [],
-    counter = deferreds.length,
+    counter = values.length,
     firstRejection;
 
     if (counter) {
 
-      arrayEach(deferreds, function (deferred, i) {
+      arrayEach(values, function (deferred, i) {
 
         deferred = deferred instanceof Deferred ? deferred : defer().resolve(deferred);
 
@@ -952,9 +1024,9 @@ TODO:
    *
    * @class
    * @private
-   * @param {string} id
-   * @param {array} dependencies
-   * @param {function|object} factory
+   * @param {String} id
+   * @param {Array} dependencies
+   * @param {Function|Object} factory
    */
   function Module(id, dependencies, factory) {
 
@@ -993,10 +1065,11 @@ TODO:
   /**
    * Define a module or multiple modules.
    *
-   * @private
-   * @param {array|string} ids
-   * @param {array|string} [dependencies]
-   * @param {function|object} factory
+   * @public
+   * @param {Array|String} ids
+   * @param {Array|String} [dependencies]
+   * @param {Function|Object} factory
+   * @returns {Palikka}
    */
   function defineModule(ids, dependencies, factory) {
 
@@ -1064,16 +1137,17 @@ TODO:
 
     });
 
-    return lib;
+    return palikka;
 
   }
 
   /**
    * Require a module.
    *
-   * @private
-   * @param {array|string} dependencies
-   * @param {function} callback
+   * @public
+   * @param {Array|String} dependencies
+   * @param {Function} callback
+   * @returns {Palikka}
    */
   function requireModule(dependencies, callback) {
 
@@ -1087,7 +1161,7 @@ TODO:
 
     });
 
-    return lib;
+    return palikka;
 
   }
 
@@ -1095,8 +1169,8 @@ TODO:
    * Load module dependencies asynchronously.
    *
    * @private
-   * @param {array} dependencies
-   * @param {function} callback
+   * @param {Array} dependencies
+   * @param {Function} callback
    */
   function loadDependencies(dependencies, callback) {
 
@@ -1140,9 +1214,9 @@ TODO:
    * Return the first circular dependency's id or null.
    *
    * @private
-   * @param {string} id
-   * @param {array} dependencies
-   * @returns {null|string}
+   * @param {String} id
+   * @param {Array} dependencies
+   * @returns {Null|String}
    */
   function getCircDependency(id, dependencies) {
 
@@ -1185,8 +1259,8 @@ TODO:
   /**
    * List modules. Returns an object containing information about all the modules in their current state.
    *
-   * @private
-   * @returns {object}
+   * @public
+   * @returns {Object}
    */
   function listModules() {
 
@@ -1218,28 +1292,29 @@ TODO:
    */
 
   /**
-   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type directly and returns a boolean.
+   * Returns type of any object in lowercase letters. If "isType" is provided the function will compare the type
+   * directly and returns a boolean.
    *
-   * @private
-   * @param {object} obj
-   * @param {string} [isType]
-   * @returns {string|boolean}
+   * @public
+   * @param {Object} value
+   * @param {String} [isType]
+   * @returns {String|Boolean}
    */
-  function typeOf(obj, isType) {
+  function typeOf(value, isType) {
 
     var
     type = (
-      obj === null ? 'null' : /** IE 7/8 fix -> null check. */
-      obj === undefined ? 'undefined' : /** IE 7/8 fix -> undefined check. */
-      typeof obj
+      value === null ? 'null' : /** IE 7/8 -> Null check. */
+      value === undefined ? 'undefined' : /** IE 7/8 -> Undefined check. */
+      typeof value
     );
 
-    type = type !== typeObject ? type : toString.call(obj).split(' ')[1].replace(']', '').toLowerCase();
+    type = type !== typeObject ? type : toString.call(value).split(' ')[1].replace(']', '').toLowerCase();
 
-    /** IE 7/8 fix -> arguments check (the try block is needed because in strict mode arguments.callee can not be accessed). */
+    /** IE 7/8 -> Arguments check. */
     if (!isStrict && type === typeObject) {
 
-      type = typeof obj.callee === typeFunction && obj === obj.callee.arguments ? typeArguments : type;
+      type = typeof value.callee === typeFunction && value === value.callee.arguments ? typeArguments : type;
 
     }
 
@@ -1248,13 +1323,15 @@ TODO:
   }
 
   /**
-   * Throw a type error if a value is not of the expected type(s). Check against multiple types using '|' as the delimiter.
+   * Throw a type error if a value is not of the expected type(s). Check against multiple types by using '|' as a
+   * delimiter.
    *
    * @private
-   * @param {*} val
-   * @param {string} types
+   * @param {*} value
+   * @param {String} types
+   * @throws {TypeError}
    */
-  function typeCheck(val, types) {
+  function typeCheck(value, types) {
 
     var
     ok = false,
@@ -1262,13 +1339,13 @@ TODO:
 
     arrayEach(typesArray, function (type) {
 
-      ok = !ok ? typeOf(val, type) : ok;
+      ok = !ok ? typeOf(value, type) : ok;
 
     });
 
     if (!ok) {
 
-      throw TypeError(val + ' is not ' + types);
+      throw TypeError(value + ' is not ' + types);
 
     }
 
@@ -1278,8 +1355,8 @@ TODO:
    * Clone array or arguments object.
    *
    * @private
-   * @param {array} array
-   * @returns {array}
+   * @param {Array} array
+   * @returns {Array}
    */
   function cloneArray(array) {
 
@@ -1298,9 +1375,9 @@ TODO:
    * Loop array items.
    *
    * @private
-   * @param {array} array
-   * @param {function} callback
-   * @returns {array}
+   * @param {Array} array
+   * @param {Function} callback
+   * @returns {Array}
    */
   function arrayEach(array, callback) {
 
@@ -1326,7 +1403,7 @@ TODO:
    * Create cross-browser next tick implementation. Returns a function that accepts a function as a parameter.
    *
    * @private
-   * @returns {function}
+   * @returns {Function}
    */
   function getNextTick() {
 
@@ -1353,7 +1430,7 @@ TODO:
 
       }
 
-      return lib;
+      return palikka;
 
     },
     processQueue = function () {
@@ -1415,8 +1492,8 @@ TODO:
    * Check if a function is native code. Returns the passed function if it is native code and otherwise returns false.
    *
    * @private
-   * @param {function} fn
-   * @returns {function|false}
+   * @param {Function} fn
+   * @returns {Function|false}
    */
   function isNative(fn) {
 
@@ -1427,8 +1504,9 @@ TODO:
   /**
    * A generic helper to optimize the use of try-catch.
    *
-   * @param {function} done
-   * @param {function} fail
+   * @private
+   * @param {Function} done
+   * @param {Function} fail
    */
   function tryCatch(done, fail) {
 
@@ -1452,94 +1530,106 @@ TODO:
 
   /**
    * @public
+   * @memberof Palikka
    * @see Eventizer
    */
-  lib.Eventizer = Eventizer;
+  palikka.Eventizer = Eventizer;
 
   /**
    * @public
+   * @memberof Palikka
    * @see eventize
    */
-  lib.eventize = eventize;
+  palikka.eventize = eventize;
 
   /**
    * @public
+   * @memberof Palikka
    * @see Deferred
    */
-  lib.Deferred = Deferred;
+  palikka.Deferred = Deferred;
 
   /**
    * @public
+   * @memberof Palikka
    * @see defer
    */
-  lib.defer = defer;
+  palikka.defer = defer;
 
   /**
    * @public
+   * @memberof Palikka
    * @see when
    */
-  lib.when = when;
+  palikka.when = when;
 
   /**
    * @public
+   * @memberof Palikka
    * @see defineModule
    */
-  lib.define = defineModule;
+  palikka.define = defineModule;
 
   /**
    * @public
+   * @memberof Palikka
    * @see requireModule
    */
-  lib.require = requireModule;
+  palikka.require = requireModule;
 
   /**
    * @public
+   * @memberof Palikka
    * @see listModules
    */
-  lib.list = listModules;
+  palikka.list = listModules;
 
   /**
    * @public
+   * @memberof Palikka
    * @see typeOf
    */
-  lib.typeOf = typeOf;
+  palikka.typeOf = typeOf;
 
   /**
    * @public
+   * @memberof Palikka
    * @see nextTick
    */
-  lib.nextTick = nextTick;
+  palikka.nextTick = nextTick;
 
   /**
    * @public
-   * @see config
+   * @memberof Palikka
+   * @see Configuration
    */
-  lib.config = config;
+  palikka.config = config;
 
   /**
    * Initiate
    * ********
    */
 
-  /** Initialize module event hub. */
+  /** Create module event hub. */
   moduleEvents = eventize();
 
   /**
-   * Publish library using an adapted UMD pattern.
+   * Initiate library using returnExports UMD pattern.
+   * https://github.com/umdjs/umd/blob/master/returnExports.js
    */
   if (typeof define === typeFunction && define.amd) {
 
-    define([], lib);
+    define([], palikka);
 
   }
-  else if (typeof exports === typeObject) {
+  else if (typeof module === typeObject && module.exports) {
 
-    module.exports = lib;
+    module.exports = palikka;
 
   }
   else {
 
-    glob[ns] = lib;
+    glob[ns] = palikka;
 
   }
 

@@ -3,16 +3,23 @@ module.exports = function (tests, cb) {
   var
   palikka = require('../palikka.js'),
   testsLen = tests.length,
+  sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'],
   rss = 0,
   heapTotal = 0,
   heapUsed = 0;
 
   function bytesToSize(bytes) {
 
-    var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes == 0) return 'n/a';
+    if (bytes == 0) {
+      return 0;
+    }
+
     var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    if (i == 0) return bytes + ' ' + sizes[i];
+
+    if (i == 0) {
+      return bytes + ' ' + sizes[i];
+    }
+
     return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 
   }
@@ -37,24 +44,44 @@ module.exports = function (tests, cb) {
 
   }
 
-  console.log('---');
-  console.log('START');
-  logMemChange();
-  console.log('---');
+  function start() {
 
-  if (testsLen) {
+    console.log('---');
+    console.log('START');
+    logMemChange();
+    console.log('---');
+
+  }
+
+  function end() {
+
+    console.log('END');
+    console.log('---');
+
+    if (typeof cb === 'function') {
+      cb();
+    }
+
+  }
+
+  if (!testsLen) {
+
+    console.log('No tests provided');
+    cb();
+
+  }
+  else {
+
+    start();
+
     for (var i = 0; i < testsLen; i++) {
       tests[i]();
       logMemChange(true);
       console.log('---');
     }
-  }
 
-  console.log('END');
-  console.log('---');
+    end();
 
-  if (typeof cb === 'function') {
-    cb();
   }
 
 };

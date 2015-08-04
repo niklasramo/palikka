@@ -13,6 +13,12 @@ module.exports = function (done) {
   eeB = new ee(),
   eeC = new ee(),
   eeD = new ee(),
+  thenableResolved = {then: function (res, rej) {
+    res(1);
+  }},
+  thenableRejected = {then: function (res, rej) {
+    rej(1);
+  }},
   counter = 0,
   suite = new Benchmark.Suite('palikka', {
 
@@ -97,6 +103,31 @@ module.exports = function (done) {
   suite.add('Create promise - Palikka', function() {
 
     palikka.defer();
+
+  });
+
+  suite.add('Resolve promise with an internal promise - When', function() {
+
+    new when.promise(function (resolve) { resolve( new when.promise(function (res) { res(); }) ); });
+
+  });
+
+  suite.add('Resolve promise with an internal promise - Palikka', function() {
+
+    palikka.defer().resolve( palikka.defer().resolve() );
+
+  });
+
+
+  suite.add('Resolve promise with an external promise - Palikka', function() {
+
+    palikka.defer().resolve( thenableResolved );
+
+  });
+
+  suite.add('Resolve promise with an external promise - When', function() {
+
+    new when.promise(function (resolve) { resolve( thenableResolved ); });
 
   });
 
@@ -263,6 +294,10 @@ module.exports = function (done) {
     eeD.off('ev' + counter);
 
   });
+
+  //
+  // Modules
+  //
 
   suite.add('Create a module', function() {
 
