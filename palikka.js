@@ -1,10 +1,39 @@
 /*!
  * @license
- * Palikka v0.4.1
+ * Palikka v0.5.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
+
+/*
+Done updates:
+ - Added Deferred.prototype.end()
+ - Added Deferred.prototype.fail()
+ - Added Deferred.prototype.race()
+ - Added Deferred.prototype.all()
+ - Added Deferred.prototype.any()
+ - Added Deferred.prototype.settle()
+ - Added palikka.race()
+ - Added palikka.all()
+ - Added palikka.any()
+ - Added palikka.settle()
+ - Removed Deferred.prototype.and()
+ - Remove palikka.when()
+ - Internal module resolve event simplified
+ - Internal documentation updates
+ - Removed type checks.
+*/
+
+/*
+TODO:
+ - Circular dependencies review
+   -> Should there only be a warning for these instead of error throwing?
+   -> Or should these be tried to resolve somehow like require.js does?
+ - Module system overview and optimization.
+ - Drop eventizer dependency from modules..?
+ - What to do when module deferred fails..?
+*/
 
 (function (undefined) {
 
@@ -134,7 +163,7 @@
   /**
    * @typedef {Object} Eventizer~listenerData
    * @property {Number} id - The event listener's id.
-   * @property {Eventizer~listenerCallback} fn - The event listener's callback function.
+   * @property {Function} fn - The event listener's callback function.
    * @property {String} type - The event listener's type.
    */
 
@@ -144,7 +173,7 @@
    * @memberof Eventizer.prototype
    * @public
    * @param {String} type - Event's name.
-   * @param {Eventizer~listenerCallback} callback - Callback function that will be called when the event is emitted.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
    * @param {*} [ctx] - Callback function's context.
    * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
@@ -174,7 +203,7 @@
    * @memberof Eventizer.prototype
    * @public
    * @param {String} type - Event's name.
-   * @param {Eventizer~listenerCallback} callback - Callback function that will be called when the event is emitted.
+   * @param {Eventizer~callback} callback - Callback function that will be called when the event is emitted.
    * @param {*} [ctx] - Callback function's context.
    * @returns {Eventizer|Object} The instance or object on which this method was called.
    */
@@ -659,6 +688,20 @@
   };
 
   /**
+   * Sugar method for Eventizer.prototype.then() which only accepts onRejected callback.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.fail = function (onRejected) {
+
+    return then(this, null, onRejected);
+
+  };
+
+  /**
    * The same as Eventizer.prototype.then() with the exception that if the result of the calling instance is an array
    * it's result is spread over the arguments of the returned instance's callback functions.
    *
@@ -675,21 +718,88 @@
   };
 
   /**
-   * Same as when() with the exception that the calling instance is automatically added as the first value of the values
+   * Same as race() with the exception that the calling instance is automatically added as the first value of the values
    * array.
    *
    * @memberof Deferred.prototype
    * @public
    * @param {Array} values
-   * @param {Boolean} [resolveImmediately=false]
-   * @param {Boolean} [rejectImmediately=true]
    * @returns {Deferred} A new Deferred instance.
    */
-  deferredProto.and = function (values, resolveImmediately, rejectImmediately) {
+  deferredProto.race = function (values) {
 
     values.unshift(this);
 
-    return when(values, resolveImmediately, rejectImmediately);
+    return race(values);
+
+  };
+
+  /**
+   * Same as all() with the exception that the calling instance is automatically added as the first value of the values
+   * array.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.all = function (values) {
+
+    values.unshift(this);
+
+    return all(values);
+
+  };
+
+  /**
+   * Same as any() with the exception that the calling instance is automatically added as the first value of the values
+   * array.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.any = function (values) {
+
+    values.unshift(this);
+
+    return any(values);
+
+  };
+
+  /**
+   * Same as settle() with the exception that the calling instance is automatically added as the first value of the values
+   * array.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  deferredProto.settle = function (values) {
+
+    values.unshift(this);
+
+    return settle(values);
+
+  };
+
+  /**
+   * Sugar method for throwing an uncaught error in the deferred chain.
+   *
+   * @memberof Deferred.prototype
+   * @public
+   * @param {Deferred~handlerCallback} [onRejected]
+   * @returns {Deferred} The instance on which this method was called.
+   */
+  deferredProto.end = function () {
+
+    return this.onRejected(function (e) {
+
+      throw e;
+
+    });
 
   };
 
@@ -951,57 +1061,52 @@
    * instances of Deferred are transformed into Deferred instances and resolved immediately.
    *
    * @public
-   * @param {Array} values
+   * @param {Array|Object} values
    * @param {Boolean} [resolveImmediately=false]
-   * @param {Boolean} [rejectImmediately=true]
+   * @param {Boolean} [rejectImmediately=false]
    * @returns {Deferred} A new Deferred instance.
    */
   function when(values, resolveImmediately, rejectImmediately) {
 
-    typeCheck(values, typeArray);
-
-    resolveImmediately = resolveImmediately === true;
-    rejectImmediately = rejectImmediately === undefined || rejectImmediately === true;
-
     var
     master = defer(),
-    results = [],
-    inspects = [],
-    counter = values.length,
-    firstRejection;
+    isHashMode = typeOf(values, typeObject),
+    results = isHashMode ? {} : [],
+    counter = isHashMode ? getObjectLength(values) : values.length,
+    firstRejection,
+    resolver = function (val, i) {
 
-    if (counter) {
+      var
+      deferred = val instanceof Deferred ? val : defer().resolve(val);
 
-      arrayEach(values, function (deferred, i) {
+      deferred.onSettled(function () {
 
-        deferred = deferred instanceof Deferred ? deferred : defer().resolve(deferred);
+        if (master._state === statePending && !master._locked) {
 
-        deferred.onSettled(function () {
+          --counter;
+          firstRejection = firstRejection || (deferred._state === stateRejected && deferred);
+          results[i] = !resolveImmediately && !rejectImmediately ? deferred.inspect() : deferred._result;
 
-          if (master.state() === statePending && !master.isLocked()) {
+          if (firstRejection && (rejectImmediately || !counter)) {
 
-            --counter;
-            firstRejection = firstRejection || (deferred.state() === stateRejected && deferred);
-            results[i] = deferred.result();
-            inspects[i] = deferred.inspect();
+            master.reject(rejectImmediately ? firstRejection._result : results);
 
-            if (firstRejection && (rejectImmediately || !counter)) {
+          }
+          else if (!firstRejection && (resolveImmediately || !counter)) {
 
-              master.reject(rejectImmediately ? firstRejection.result() : inspects);
-
-            }
-
-            if (!firstRejection && (resolveImmediately || !counter)) {
-
-              master.resolve(resolveImmediately ? results[i] : results);
-
-            }
+            master.resolve(resolveImmediately ? results[i] : results);
 
           }
 
-        });
+        }
 
       });
+
+    };
+
+    if (counter) {
+
+      hashMode ? objectEach(values, resolver) : arrayEach(values, resolver);
 
     }
     else {
@@ -1011,6 +1116,69 @@
     }
 
     return master;
+
+  }
+
+  /**
+   * Returns a new Deferred that resolves or rejects as soon as one of the Deferreds in the iterable resolves or
+   * rejects, with the value or reason from that deferred. All non-Deferred values will be automatically transformed
+   * into a Deferred.
+   *
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function race(values) {
+
+    return when.call(this, values, 1, 1);
+
+  }
+
+  /**
+   * Returns a Deferred that resolves when all of the Deferreds in the iterable argument have resolved. All non-Deferred
+   * values will be automatically transformed into a Deferred. If any of the passed in Deferreds rejects, the
+   * returned Deferred immediately rejects with the value of the Deferred that rejected, discarding all the other
+   * Deferreds whether or not they have resolved.
+   *
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function all(values) {
+
+    return when.call(this, values, 0, 1);
+
+  }
+
+  /**
+   * Returns a Deferred that resolves when any of the Deferreds in the iterable argument is resolved. All non-Deferred
+   * values will be automatically transformed into a Deferred. The returned Deferred will be rejected if all of the
+   * passed in Deferreds are rejected.
+   *
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function any(values) {
+
+    return when.call(this, values, 1, 0);
+
+  }
+
+  /**
+   * Returns a Deferred that resolves when all of the Deferreds in the iterable argument have resolved or rejected. All
+   * non-Deferred values will be automatically transformed into a Deferred. The result of the returned Deferred is
+   * always an array which contains Deferred.prototype.inspect() instances reflecting the values provided in the
+   * iterable argument. The returned Deferred will never be rejected no matter how many of the provided Deferreds are
+   * rejected, it will always be either resolved or pending.
+   *
+   * @public
+   * @param {Array} values
+   * @returns {Deferred} A new Deferred instance.
+   */
+  function settle(values) {
+
+    return when.call(this, values, 0, 0);
 
   }
 
@@ -1047,9 +1215,9 @@
 
       deferred
       .resolve(typeOf(factory, typeFunction) ? factory.apply({id: id, dependencies: depHash}, depModules) : factory)
-      .onFulfilled(function () {
+      .onFulfilled(function (val) {
 
-        moduleEvents.emit(evInitiate + id, [instance]);
+        moduleEvents.emit(evInitiate + id, val);
 
       });
 
@@ -1075,51 +1243,37 @@
 
     var
     hasDeps = arguments.length > 2,
-    deps,
-    circDep;
+    deps = !hasDeps ? [] : typeOf(dependencies, typeArray) ? dependencies : [dependencies];
 
     /** Validate/sanitize ids. */
-    typeCheck(ids, typeArray + '|' + typeString);
     ids = typeOf(ids, typeArray) ? ids : [ids];
-
-    /** Validate/sanitize dependencies. */
-    if (hasDeps) {
-
-      typeCheck(dependencies, typeArray + '|' + typeString);
-      deps = typeOf(dependencies, typeArray) ? dependencies : [dependencies];
-
-    }
-    else {
-
-      deps = [];
-
-    }
 
     /** Validate/sanitize factory. */
     factory = hasDeps ? factory : dependencies;
-    typeCheck(factory, typeFunction + '|' + typeObject);
 
     /** Define modules. */
     arrayEach(ids, function (id) {
 
-      /** Validate id type. */
-      typeCheck(id, typeString);
-
       /** Make sure id is not empty. */
+      /*
       if (!id) {
 
         throw Error('Module must have an id.');
 
       }
+      */
 
       /** Make sure id is not reserved. */
+      /*
       if (modules[id]) {
 
         throw Error('Module ' + id + ' is already defined.');
 
       }
+      */
 
       /** Detect circular dependencies. */
+      /*
       if (hasDeps && deps.length) {
 
         circDep = getCircDependency(id, deps);
@@ -1131,9 +1285,14 @@
         }
 
       }
+      */
 
-      /** Define the module. */
-      new Module(id, deps, factory);
+      /** Define the module if id is not "empty" and not reserved. */
+      if (id && !modules[id]) {
+
+        new Module(id, deps, factory);
+
+      }
 
     });
 
@@ -1151,11 +1310,7 @@
    */
   function requireModule(dependencies, callback) {
 
-    typeCheck(callback, typeFunction);
-    typeCheck(dependencies, typeArray + '|' + typeString);
-    dependencies = typeOf(dependencies, typeArray) ? dependencies : [dependencies];
-
-    loadDependencies(dependencies, function (depModules, depHash) {
+    loadDependencies(typeOf(dependencies, typeArray) ? dependencies : [dependencies], function (depModules, depHash) {
 
       callback.apply({dependencies: depHash}, depModules);
 
@@ -1180,13 +1335,11 @@
 
     arrayEach(dependencies, function (depId) {
 
-      typeCheck(depId, typeString);
-
       defers.push(modules[depId] ? modules[depId].deferred : defer(function (resolve) {
 
-        moduleEvents.one(evInitiate + depId, function (ev, module) {
+        moduleEvents.one(evInitiate + depId, function (ev, val) {
 
-          resolve(module.deferred.result());
+          resolve(val);
 
         });
 
@@ -1194,7 +1347,7 @@
 
     });
 
-    when(defers)
+    all(defers)
     [config.asyncModules ? 'async' : 'sync']()
     .onFulfilled(function (depModules) {
 
@@ -1276,8 +1429,8 @@
       ret[id] = {
         id: id,
         dependencies: cloneArray(m.dependencies),
-        ready: m.deferred.state() === stateFulfilled ? true : false,
-        value: m.deferred.result()
+        ready: m.deferred._state === stateFulfilled ? true : false,
+        value: m.deferred._result
       };
 
     }
@@ -1319,35 +1472,6 @@
     }
 
     return isType ? type === isType : type;
-
-  }
-
-  /**
-   * Throw a type error if a value is not of the expected type(s). Check against multiple types by using '|' as a
-   * delimiter.
-   *
-   * @private
-   * @param {*} value
-   * @param {String} types
-   * @throws {TypeError}
-   */
-  function typeCheck(value, types) {
-
-    var
-    ok = false,
-    typesArray = types.split('|');
-
-    arrayEach(typesArray, function (type) {
-
-      ok = !ok ? typeOf(value, type) : ok;
-
-    });
-
-    if (!ok) {
-
-      throw TypeError(value + ' is not ' + types);
-
-    }
 
   }
 
@@ -1396,6 +1520,56 @@
     }
 
     return array;
+
+  }
+
+  /**
+   * Loop object properties.
+   *
+   * @private
+   * @param {Object} obj
+   * @param {Function} callback
+   * @returns {Object}
+   */
+  function objectEach(obj, callback) {
+
+    if (typeOf(callback, typeFunction)) {
+
+      for (var p in obj) {
+
+        if (obj.hasOwnProperty(p)) {
+
+          callback(obj[p], p);
+
+        }
+
+      }
+
+    }
+
+    return obj;
+
+  }
+
+  /**
+   * A generic helper to calculate an object's length.
+   *
+   * @private
+   * @param {Object} obj
+   * @returns {Number}
+   */
+  function getObjectLength(obj) {
+
+    var
+    len = 0;
+
+    objectEach(obj, function () {
+
+      ++len;
+
+    })
+
+    return len;
 
   }
 
@@ -1559,10 +1733,30 @@
   /**
    * @public
    * @memberof Palikka
-   * @see when
+   * @see race
    */
-  palikka.when = when;
+  palikka.race = race;
 
+  /**
+   * @public
+   * @memberof Palikka
+   * @see all
+   */
+  palikka.all = all;
+
+  /**
+   * @public
+   * @memberof Palikka
+   * @see any
+   */
+  palikka.any = any;
+
+  /**
+   * @public
+   * @memberof Palikka
+   * @see settle
+   */
+  palikka.settle = settle;
   /**
    * @public
    * @memberof Palikka
