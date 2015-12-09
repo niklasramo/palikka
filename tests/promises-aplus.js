@@ -1,4 +1,5 @@
-var palikka = require('../palikka');
+var
+palikka = require('../palikka');
 
 describe('Promises/A+ Tests', function () {
 

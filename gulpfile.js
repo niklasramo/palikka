@@ -1,59 +1,58 @@
 var
-paths = {
-  palikka: './palikka.js',
-  palikkaMin: './palikka.min.js',
-  readme: './README.md',
-  tests: './tests/tests.js',
-  benchMemory: './tests/benchmark-memory.js',
-  benchPerf: './tests/benchmark-performance.js',
-  promisesaplus: './tests/promises-aplus.js',
-  coverage: './coverage',
-  jscsRules: './jscsrc.json',
-  karmaConf: './karma.conf.js',
-  pkg: './package.json',
-  pkgBower: './bower.json'
-},
+fs = require('fs'),
 gulp = require('gulp'),
-gulpJscs = require('gulp-jscs'),
-gulpKarma = require('gulp-karma'),
-gulpMocha = require('gulp-mocha'),
-gulpUglify = require('gulp-uglify'),
-gulpRename = require('gulp-rename'),
-gulpSize = require('gulp-size'),
+jscs = require('gulp-jscs'),
+karma = require('karma'),
+mocha = require('gulp-mocha'),
+uglify = require('gulp-uglify'),
+rename = require('gulp-rename'),
+size = require('gulp-size'),
+argv = require('yargs').argv,
 rimraf = require('rimraf'),
-runSequence = require('run-sequence'),
-benchmark = require('benchmark'),
-benchMemory = require(paths.benchMemory),
-benchPerf = require(paths.benchPerf),
-palikka = require(paths.palikka);
+runSequence = require('run-sequence');
+
+// Load environment variables if .env file exists
+if (fs.existsSync('./.env')) {
+  require('dotenv').load();
+}
 
 gulp.task('validate', function () {
 
   return gulp
-  .src(paths.palikka)
-  .pipe(gulpJscs(paths.jscsRules));
+  .src('./palikka.js')
+  .pipe(jscs())
+  .pipe(jscs.reporter());
 
 });
 
-gulp.task('test-main', function (cb) {
+gulp.task('test-sauce', function (done) {
 
-  return gulp
-  .src([paths.palikka, paths.tests])
-  .pipe(gulpKarma({
-    configFile: paths.karmaConf,
+  var
+  sauceBrowsers = require('./karma.sauce-browsers.js'),
+  opts = {
+    configFile: __dirname + '/karma.sauce-conf.js',
     action: 'run'
-  }))
-  .on('error', function (err) {
-    throw err;
-  });
+  };
+
+  if (process.env.CI) {
+    opts.browsers = sauceBrowsers.getSupportedBrowsers();
+  }
+  else if (argv.browsers) {
+    opts.browsers = sauceBrowsers.getBrowsers(argv.browsers);
+  }
+  else {
+    opts.browsers = sauceBrowsers.getBrowsers();
+  }
+
+  (new karma.Server(opts, done)).start();
 
 });
 
 gulp.task('test-promises', function () {
 
   return gulp
-  .src(paths.promisesaplus, {read: false})
-  .pipe(gulpMocha({
+  .src('./tests/promises-aplus.js', {read: false})
+  .pipe(mocha({
     reporter: 'nyan',
     timeout: 400,
     bail: false
@@ -63,39 +62,38 @@ gulp.task('test-promises', function () {
 
 gulp.task('clean', function (cb) {
 
-  rimraf(paths.coverage, cb);
+  rimraf('./coverage', cb);
 
 });
 
-gulp.task('bench-memory', function (cb) {
+gulp.task('mem', function (cb) {
 
-  benchMemory(cb);
-
-});
-
-gulp.task('bench-perf', function (cb) {
-
-  benchPerf(cb);
+  require('./tests/benchmark-memory.js')(cb);
 
 });
 
 gulp.task('compress', function() {
 
   return gulp
-  .src(paths.palikka)
-  .pipe(gulpSize({title: 'development'}))
-  .pipe(gulpUglify({
+  .src('./palikka.js')
+  .pipe(size({title: 'development'}))
+  .pipe(uglify({
     preserveComments: 'some'
   }))
-  .pipe(gulpSize({title: 'minified'}))
-  .pipe(gulpSize({title: 'gzipped', gzip: true}))
-  .pipe(gulpRename('palikka.min.js'))
+  .pipe(size({title: 'minified'}))
+  .pipe(size({title: 'gzipped', gzip: true}))
+  .pipe(rename('palikka.min.js'))
   .pipe(gulp.dest('./'));
 
 });
 
 gulp.task('default', function (cb) {
 
-  runSequence('validate', 'test-main', 'test-promises', 'clean', cb);
+  if (process.env.CI) {
+    runSequence('validate', 'test-promises', 'test-sauce', 'clean', cb);
+  }
+  else {
+    runSequence('validate', 'test-promises', 'test-sauce', cb);
+  }
 
 });
