@@ -1,18 +1,23 @@
-var
-fs = require('fs'),
-gulp = require('gulp'),
-jscs = require('gulp-jscs'),
-karma = require('karma'),
-mocha = require('gulp-mocha'),
-uglify = require('gulp-uglify'),
-rename = require('gulp-rename'),
-size = require('gulp-size'),
-argv = require('yargs').argv,
-rimraf = require('rimraf'),
-runSequence = require('run-sequence');
+var fs = require('fs');
+var gulp = require('gulp');
+var jscs = require('gulp-jscs');
+var karma = require('karma');
+var uglify = require('gulp-uglify');
+var rename = require('gulp-rename');
+var size = require('gulp-size');
+var argv = require('yargs').argv;
+var rimraf = require('rimraf');
+var runSequence = require('run-sequence');
+var fileExists = function (filePath) {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch (err) {
+    return false;
+  }
+};
 
 // Load environment variables if .env file exists
-if (fs.existsSync('./.env')) {
+if (fileExists('./.env')) {
   require('dotenv').load();
 }
 
@@ -25,50 +30,9 @@ gulp.task('validate', function () {
 
 });
 
-gulp.task('test-sauce', function (done) {
-
-  var
-  sauceBrowsers = require('./karma.sauce-browsers.js'),
-  opts = {
-    configFile: __dirname + '/karma.sauce-conf.js',
-    action: 'run'
-  };
-
-  if (process.env.CI) {
-    opts.browsers = sauceBrowsers.getSupportedBrowsers();
-  }
-  else if (argv.browsers) {
-    opts.browsers = sauceBrowsers.getBrowsers(argv.browsers);
-  }
-  else {
-    opts.browsers = sauceBrowsers.getBrowsers();
-  }
-
-  (new karma.Server(opts, done)).start();
-
-});
-
-gulp.task('test-promises', function () {
-
-  return gulp
-  .src('./tests/promises-aplus.js', {read: false})
-  .pipe(mocha({
-    reporter: 'nyan',
-    timeout: 400,
-    bail: false
-  }));
-
-});
-
 gulp.task('clean', function (cb) {
 
   rimraf('./coverage', cb);
-
-});
-
-gulp.task('mem', function (cb) {
-
-  require('./tests/benchmark-memory.js')(cb);
 
 });
 
@@ -87,13 +51,51 @@ gulp.task('compress', function() {
 
 });
 
-gulp.task('default', function (cb) {
+gulp.task('test', function (done) {
+
+  var isLocal = !!argv.local;
+  var configPath = isLocal ? '/karma.local-conf.js' : '/karma.sauce-conf.js';
+  var browserMapper = {
+    'safari': 'Safari',
+    'ie9': 'IE9',
+    'ie10': 'IE10',
+    'ie11': 'IE11',
+    'firefox': 'Firefox',
+    'chrome': 'Chrome'
+  };
+  var opts = {
+    configFile: __dirname + configPath,
+    action: 'run'
+  };
+
+  if (argv.reporters) {
+    opts.reporters = argv.reporters.split(',');
+  }
+
+  if (argv.browsers) {
+    if (isLocal) {
+      opts.browsers = argv.browsers.split(',').map(function (browserName) {
+        return browserMapper[browserName.toLowerCase()] || '';
+      });
+    }
+    else {
+      opts.browsers = require('./karma.sauce-browsers.js').getBrowsers(argv.browsers);
+    }
+  }
+
+  (new karma.Server(opts, function (exitCode) {
+    done(exitCode);
+  })).start();
+
+});
+
+gulp.task('default', function (done) {
 
   if (process.env.CI) {
-    runSequence('validate', 'test-promises', 'test-sauce', 'clean', cb);
+    runSequence('validate', 'test', 'compress', 'clean', cb);
   }
   else {
-    runSequence('validate', 'test-promises', 'test-sauce', cb);
+    runSequence('validate', 'test', 'compress', done);
   }
 
 });
