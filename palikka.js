@@ -1,26 +1,10 @@
 /*!
  * @license
- * Palikka v2.0.0-beta
+ * Palikka v1.0.0-beta
  * https://github.com/niklasramo/palikka
- * Copyright (c) 2015 Niklas Rämö <inramo@gmail.com>
+ * Copyright (c) 2016 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
  */
-
-/*
-  TODO
-  ****
-  - Documentation.
-  - Migration guide from 0.4 to 0.5
-  - Bench against modulejs (perf / ease of use / API / versatility).
-  - An auto-throttling define function for defining third part modules.
-  - Undefine module..?
-  - Should circular dependencies throw at all..? Would it suffice if circ
-    dependencies were indicated in the log?
-  - As a developer I want to seee quickly...
-    -> A list of defined modules and their dependencies.
-    -> A list of required undefined modules.
-    -> A list of defined pending modules.
-*/
 
 (function (glob, factory) {
 
@@ -45,6 +29,21 @@
   // Default palikka instance which is used by the static Palikka methods.
   var P = new Palikka();
 
+  // Module states.
+  var stateReady = 'ready';
+  var stateLoading = 'loading';
+  var stateUndefined = 'undefined';
+
+  // Error messages.
+  var errorModuleId = 'Module id must be a non-empty string.';
+
+  // Report symbols mapping.
+  var reportSymbols = {
+    'ready': '[v]',
+    'loading': '[o]',
+    'undefined': '[x]'
+  };
+
   /**
    * Module
    * ******
@@ -66,7 +65,7 @@
 
     // Make sure module id is a string.
     if (!id || typeof id !== 'string') {
-      throw Error('Module must have an id (string).');
+      throwError(errorModuleId);
     }
 
     // Make sure module is not already defined.
@@ -74,14 +73,32 @@
       return;
     }
 
-    // Make sure the module does not have a circular dependency.
-    var circularDependency;
-    if (dependencies.length && (circularDependency = getFirstCircularDependency(palikka, id, dependencies))) {
-      throw Error('Circular dependency between ' + id + ' and ' + circularDependency + '.');
+    // Validate dependencies.
+    for (var i = 0; i < dependencies.length; i++) {
+
+      var depId = dependencies[i];
+      var dep = palikka._modules[depId];
+
+      // Make sure the module id is valid
+      if (!depId || typeof depId !== 'string') {
+        throwError(errorModuleId);
+      }
+
+      // Make sure the module does not require itself.
+      if (depId === id) {
+        throwError('Module cannot have itself as a dependency.');
+      }
+
+      // Make sure the module does not have a circular dependency.
+      if (dep && dep.dependencies.indexOf(id) > -1) {
+        throwError('Circular dependency between ' + id + ' and ' + depId + '.');
+      }
+
     }
 
     // Setup instance data.
     instance.id = id;
+    instance.order = ++palikka._counter;
     instance.dependencies = dependencies;
     instance.ready = false;
     instance.value = undefined;
@@ -91,14 +108,31 @@
 
     // Load dependency modules and resolve the module.
     if (dependencies.length) {
-      loadModules(palikka, dependencies, onDependenciesLoaded);
+      loadModules.call(palikka, dependencies, onDependenciesLoaded);
     }
     else {
-      onDependenciesLoaded([], {});
+      onDependenciesLoaded();
     }
 
-    // Module resolver function.
+    // Helper function for resolving the module's value. Checks if the value is
+    // a promise in which case the promises fulfilled value will be used as the
+    // module's value.
     function resolve(value) {
+
+      // TODO: What happens if the promise is rejected? Should there be some
+      // kind of warning in the fail handler?
+
+      if (value && typeof value.then === 'function') {
+        value.then(finalize);
+      }
+      else {
+        finalize(value);
+      }
+
+    }
+
+    // Helper function to finalize the module's defintion procedure.
+    function finalize(value) {
 
       // Update instance ready state and value.
       instance.ready = true;
@@ -114,21 +148,21 @@
     }
 
     // A callback function for when dependency modules are loaded.
-    function onDependenciesLoaded(dependencies, dependenciesHash) {
+    function onDependenciesLoaded() {
 
       if (typeof factory === 'function') {
 
         var isDeferred = false;
-        var value = factory.apply({
-          id: id,
-          dependencies: dependenciesHash,
-          defer: function (resolver) {
-            isDeferred = true;
-            resolver(function (value) {
-              resolve(value);
-            });
-          }
-        }, dependencies);
+        var defer = function (resolver) {
+          isDeferred = true;
+          resolver(function (value) {
+            resolve(value);
+          });
+        };
+        var req = function (id) {
+          return getModuleValue.call(palikka, id);
+        };
+        var value = factory.call(id, req, defer);
 
         if (!isDeferred) {
           resolve(value);
@@ -160,51 +194,58 @@
 
     this._modules = {};
     this._queues = {};
+    this._counter = 0;
 
   }
 
   /**
-   * Define a module or multiple modules.
-   *
    * @public
    * @memberof Palikka
-   * @param {Array|String} ids
-   * @param {Array|String} [dependencies]
-   * @param {Function|Object} factory
-   * @returns {Palikka}
+   * @see Palikka.prototype.define
    */
   Palikka.define = function (ids, dependencies, factory) {
 
-    return P.define.apply(P, arguments);
+    var argsLength = arguments.length;
+
+    argsLength > 2 ? P.define(ids, dependencies, factory) :
+    argsLength > 1 ? P.define(ids, dependencies) :
+    P.define(ids);
+
+    return Palikka;
 
   };
 
   /**
-   * Require modules.
-   *
    * @public
    * @memberof Palikka
-   * @param {Array|String} modules
-   * @param {Function} callback
-   * @returns {Palikka}
+   * @see Palikka.prototype.require
    */
   Palikka.require = function (modules, callback) {
 
-    return P.require.apply(P, arguments);
+    P.require(modules, callback);
+    return Palikka;
 
   };
 
   /**
-   * Log modules.
-   *
    * @public
    * @memberof Palikka
-   * @param {Array|String} modules
-   * @returns {Palikka}
+   * @see Palikka.prototype.status
    */
-  Palikka.log = function (modules) {
+  Palikka.status = function (modules, logger) {
 
-    return P.log.apply(P, arguments);
+    return P.status(modules, logger);
+
+  };
+
+  /**
+   * @public
+   * @memberof Palikka
+   * @see Palikka.prototype.data
+   */
+  Palikka.data = function () {
+
+    return P.data();
 
   };
 
@@ -215,7 +256,7 @@
    * @memberof Palikka.prototype
    * @param {Array|String} ids
    * @param {Array|String} [dependencies]
-   * @param {Function|Object} factory
+   * @param {Function|Object} [factory]
    * @returns {Palikka}
    */
   Palikka.prototype.define = function (ids, dependencies, factory) {
@@ -226,7 +267,7 @@
     var factory = hasDeps ? factory : dependencies;
 
     if (!ids.length) {
-      throw Error('define method must have id(s).');
+      throwError('define method must have id(s).');
     }
 
     for (var i = 0; i < ids.length; i++) {
@@ -248,50 +289,62 @@
    */
   Palikka.prototype.require = function (modules, callback) {
 
+    var instance = this;
+
     modules = [].concat(modules);
 
     if (!modules.length) {
-      throw Error('require method must have id(s).');
+      throwError('require method must have id(s).');
     }
 
     if (typeof callback !== 'function') {
-      throw Error('require method must have a callback function.');
+      throwError('require method must have a callback function.');
     }
 
-    loadModules(this, modules, function (modules, modulesHash) {
-      callback.apply(modulesHash, modules);
+    loadModules.call(instance, modules, function () {
+      callback(function (id) {
+        return getModuleValue.call(instance, id);
+      });
     });
 
-    return this;
+    return instance;
 
   };
 
   /**
-   * Log modules.
+   * Report the current state of defined modules and their dependencies.
    *
    * @public
    * @memberof Palikka.prototype
-   * @param {Array|String} modules
+   * @param {Array|String} [ids]
+   * @param {Function} [logger]
    * @returns {Palikka}
    */
-  Palikka.prototype.log = function (modules) {
+  Palikka.prototype.status = function (ids, logger) {
 
-    var modulesData = this._modules;
-    var moduleIds = module ? [].concat(modules) : Object.keys(modulesData);
-    for (var i = 0; i < moduleIds.length; i++) {
-      var module = modulesData[moduleIds[i]];
-      var moduleState = module.ready ? '[✓]' : '[✗]';
-      var dependencies = module.dependencies;
-      console.log(moduleState + '——> ' + module.id);
-      for (var ii = 0; ii < dependencies.length; ii++) {
-        var depId = dependencies[ii];
-        var depModule = modulesData[depId];
-        var depState = !depModule ? ' [?]' : depModule.ready ? ' [✓]' : ' [✗]';
-        console.log('   ' + depState + '——> ' + depId);
-      }
+    return generateReport.call(this, ids, logger);
+
+  };
+
+  /**
+   * Get the current data of defined modules. Returns an array containing clones
+   * of the defined module instances in same the order they were defined.
+   *
+   * @public
+   * @memberof Palikka.prototype
+   * @returns {Object}
+   */
+  Palikka.prototype.data = function () {
+
+    var data = this._modules;
+    var ids = Object.keys(data);
+    var ret = {};
+
+    for (var i = 0; i < ids.length; i++) {
+      ret[ids[i]] = getModuleData(data[ids[i]]);
     }
 
-    return this;
+    return ret;
 
   };
 
@@ -304,87 +357,153 @@
    * Load modules.
    *
    * @private
-   * @param {Palikka} palikka
-   * @param {Array} modules
+   * @param {Array} ids
    * @param {Function} callback
    */
-  function loadModules(palikka, modules, callback) {
+  function loadModules(ids, callback) {
 
-    var modules = [].concat(modules);
-    var modulesLength = modules.length;
-    var readyCounter = 0;
-    var retModules = [];
-    var retModulesHash = {};
-    var loadModule = function (i, module) {
-      retModules[i] = module.value;
-      retModulesHash[module.id] = module.value;
-      if (++readyCounter === modulesLength) {
-        callback(retModules, retModulesHash);
+    var palikka = this;
+    var modulesIds = [].concat(ids);
+    var modulesLength = modulesIds.length;
+    var counter = 0;
+
+    for (var i = 0; i < modulesIds.length; i++) {
+
+      var id = modulesIds[i];
+
+      if (!id || typeof id !== 'string') {
+        throwError(errorModuleId);
       }
-    };
 
-    for (var i = 0; i < modules.length; i++) {
-      (function (i) {
+      var module = palikka._modules[id];
 
-        var id = modules[i];
-
-        if (!id || typeof id !== 'string') {
-          throw Error('Module must have an id (string).');
+      if (module && module.ready) {
+        if (++counter === modulesLength) {
+          callback();
         }
+      }
+      else {
+        var queues = palikka._queues;
+        var queue = queues[id] = queues[id] || [];
+        queue[queue.length] = function () {
+          if (++counter === modulesLength) {
+            callback();
+          }
+        };
+      }
 
-        var module = palikka._modules[id];
-
-        if (module && module.ready) {
-          loadModule(i, module);
-        }
-        else {
-          var queues = palikka._queues;
-          var queue = queues[id] = queues[id] || [];
-          queue[queue.length] = function (module) {
-            loadModule(i, module);
-          };
-        }
-
-      })(i);
     }
 
   }
 
   /**
-   * Return the first circular dependency's id or null.
+   * Get a module's value by module id from a Palikka instance. Returns
+   * undefined if the module is not found.
    *
    * @private
-   * @param {Palikka} palikka
    * @param {String} id
-   * @param {Array} dependencies
-   * @returns {Null|String}
+   * @returns {*}
    */
-  function getFirstCircularDependency(palikka, id, dependencies) {
+  function getModuleValue(id) {
 
-    var ret = null;
-    var modules = palikka._modules;
-
-    for (var i = 0; i < dependencies.length; i++) {
-
-      var dependency = modules[dependencies[i]];
-
-      if (dependency) {
-        var depDependencies = dependency.dependencies;
-        for (var ii = 0; i < depDependencies.length; ii++) {
-          if (!ret && depDependencies[ii] === id) {
-            ret = dependency.id;
-            break;
-          }
-        }
-      }
-
-      if (ret) {
-        break;
-      }
-
+    if (!id || typeof id !== 'string') {
+      throwError(errorModuleId);
     }
 
-    return ret;
+    var module = this._modules[id];
+
+    if (!module || !module.ready) {
+      throwError('Required module ' + id + ' is not ready.');
+    }
+
+    return module.value;
+
+  }
+
+  /**
+   * Return a clone of a module instance.
+   *
+   * @private
+   * @param {Module} module
+   */
+  function getModuleData(module) {
+
+    return {
+      id: module.id,
+      order: module.order,
+      dependencies: module.dependencies,
+      ready: module.ready,
+      value: module.value
+    };
+
+  }
+
+  /**
+   * Generate report data.
+   *
+   * @private
+   * @param {Array|String} [ids]
+   * @param {Function} [logger]
+   * @returns {Object}
+   */
+  function generateReport(ids, logger) {
+
+    var report = '';
+    var moduleIds = ids && typeof ids !== 'function' ? ids : null;
+    var loggerFn = typeof ids === 'function' ? ids : typeof logger === 'function' ? logger : defaultLogger;
+    var modules = this._modules;
+    var modulesArray = (moduleIds ? [].concat(moduleIds) : Object.keys(modules))
+    .filter(function (id) {
+      return modules[id];
+    })
+    .map(function (id) {
+      return getModuleData(modules[id]);
+    })
+    .sort(function (a, b) {
+      return a.order < b.order ? -1 : a.order > b.order ? 1 : 0;
+    });
+
+    for (var i = 0; i < modulesArray.length; i++) {
+      var module = modules[i];
+      var state = module.ready ? stateReady : stateLoading;
+      report += loggerFn(module.id, null, state);
+      for (var ii = 0; ii < module.dependencies.length; ii++) {
+        var depId = module.dependencies[ii];
+        var dep = modules[depId];
+        var depState = !dep ? stateUndefined : dep.ready ? stateReady : stateLoading;
+        report += loggerFn(depId, module.id, depState);
+      }
+    }
+
+    return report;
+
+  }
+
+  /**
+   * Default logger function which is used to define the template for a report
+   * entry.
+   *
+   * @private
+   * @param {String} id
+   * @param {String|Null} parentId
+   * @param {String} state
+   * @returns {String}
+   */
+  function defaultLogger(id, parentId, state) {
+
+    return (parentId ? '    ' : '') + reportSymbols[state] + ' ' + id + '\n';
+
+  }
+
+  /**
+   * Throw library error.
+   *
+   * @private
+   * @param {String} message
+   */
+  function throwError(message) {
+
+    throw new Error('[Palikka] ' + message);
 
   }
 
