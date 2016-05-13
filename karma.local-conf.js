@@ -31,7 +31,9 @@ module.exports = function (config) {
 
   // possible values: 'dots', 'progress', 'story'
   // https://npmjs.org/browse/keyword/karma-reporter
-  stn.reporters = ['dots'];
+  stn.reporters = [
+    'story'
+  ];
 
   stn.preprocessors = {
     './palikka.js': ['coverage']
@@ -70,7 +72,11 @@ module.exports = function (config) {
   };
 
   stn.browsers = [
-    'Chrome'
+    'Chrome',
+    'Firefox',
+    'IE9',
+    'IE10',
+    'IE11'
   ];
 
   stn.captureTimeout = 60000;

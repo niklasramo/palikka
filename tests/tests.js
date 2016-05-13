@@ -1,10 +1,5 @@
 (function (Q) {
 
-  // TODO
-  // ****
-  // - Require tests
-  // - Logger tests
-
   /**
    * Configuration.
    */
@@ -41,11 +36,11 @@
 
   });
 
-  Q.test('Should have a static "status" method.', function (assert) {
+  Q.test('Should have a static "log" method.', function (assert) {
 
     assert.expect(1);
 
-    assert.strictEqual(typeof Palikka.status, 'function');
+    assert.strictEqual(typeof Palikka.log, 'function');
 
   });
 
@@ -54,6 +49,15 @@
     assert.expect(1);
 
     assert.strictEqual(typeof Palikka.data, 'function');
+
+  });
+
+  Q.test('"define" and "require" methods should return the Palikka constructor.', function (assert) {
+
+    assert.expect(2);
+
+    assert.strictEqual(Palikka.define('a'), Palikka);
+    assert.strictEqual(Palikka.require('a', function () {}), Palikka);
 
   });
 
@@ -83,13 +87,13 @@
 
   });
 
-  Q.test('Should have a "status" method.', function (assert) {
+  Q.test('Should have a "log" method.', function (assert) {
 
     var palikka = new Palikka();
 
     assert.expect(1);
 
-    assert.strictEqual(typeof palikka.status, 'function');
+    assert.strictEqual(typeof palikka.log, 'function');
 
   });
 
@@ -100,6 +104,17 @@
     assert.expect(1);
 
     assert.strictEqual(typeof palikka.data, 'function');
+
+  });
+
+  Q.test('"define" and "require" methods should return Palikka instance.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(2);
+
+    assert.strictEqual(palikka.define('a'), palikka);
+    assert.strictEqual(palikka.require('a', function () {}), palikka);
 
   });
 
@@ -239,7 +254,9 @@
     var palikka = new Palikka();
     var obj = {};
     var arr = [];
+    var func = function () {};
     var results = [
+      {type: 'function', 'value': func},
       {type: 'object', 'value': {}},
       {type: 'array', 'value': []},
       {type: 'string', 'value': 'foo'},
@@ -270,33 +287,34 @@
 
   });
 
-  Q.test('Factory function\'s context should be the module\'s id', function (assert) {
+  Q.test('Factory\'s context should be the global object', function (assert) {
 
     var palikka = new Palikka();
 
     assert.expect(1);
 
     palikka.define('a', function () {
-      assert.strictEqual(this[0], 'a');
+      assert.strictEqual(this, window);
     });
 
   });
 
-  Q.test('Factory function should have two arguments both of which are functions.', function (assert) {
+  Q.test('Factory should have three arguments.', function (assert) {
 
     var palikka = new Palikka();
 
-    assert.expect(3);
+    assert.expect(4);
 
     palikka.define('a', function () {
-      assert.strictEqual(arguments.length, 2, 'Has two arguments.');
+      assert.strictEqual(arguments.length, 3, 'Has three arguments.');
       assert.strictEqual(typeof arguments[0], 'function', 'First argument is a function.');
       assert.strictEqual(typeof arguments[1], 'function', 'Second argument is a function.');
+      assert.strictEqual(arguments[2], 'a', 'Third argument is the moule\'s id.');
     });
 
   });
 
-  Q.test('Factory function\'s require argument should return a module\'s value when provided with a valid module id, assuming the module is ready.', function (assert) {
+  Q.test('Factory\'s require argument should return a module\'s value when provided with a valid module id, assuming the module is ready.', function (assert) {
 
     var palikka = new Palikka();
 
@@ -390,6 +408,40 @@
 
   });
 
+  if (typeof Promise === 'function') {
+    Q.test('Factory should accept a "thenable" (promise) as a return value in which case the final value of the promise will be set as the module\'s value.', function (assert) {
+
+      var palikka = new Palikka();
+      var done = assert.async();
+
+      assert.expect(2);
+
+      palikka
+      .require('a', function (req) {
+        assert.strictEqual(req('a'), 'aValue', 'Fulfilled promise works as supposed to.');
+      })
+      .require('b', function (req) {
+        assert.strictEqual(req('b'), 'bValue', 'Rejected promise works as supposed to.');
+        done();
+      })
+      .define('a', function () {
+        return new Promise(function (resolve) {
+          window.setTimeout(function () {
+            resolve('aValue');
+          }, 100);
+        });
+      })
+      .define('b', function () {
+        return new Promise(function (resolve, reject) {
+          window.setTimeout(function () {
+            reject('bValue');
+          }, 100);
+        });
+      });
+
+    });
+  }
+
   Q.test('Should define a module with dependencies.', function (assert) {
 
     var palikka = new Palikka();
@@ -412,6 +464,7 @@
 
     var palikka = new Palikka();
     var results = [
+      {type: 'function', 'value': function () {}},
       {type: 'object', 'value': {}},
       {type: 'empty string', 'value': ''},
       {type: 'number', 'value': 1},
@@ -464,6 +517,37 @@
 
   Q.module('palikka.require()');
 
+  Q.test('Should call the callback after the required modules are ready.', function (assert) {
+
+    var palikka = new Palikka();
+    var done = assert.async();
+
+    assert.expect(4);
+
+    palikka
+    .require('a', function (req) {
+      assert.strictEqual(req('a'), 'aValue', 'Callback\'s require argument fetches dependency module\'s value correctly.');
+      assert.throws(function () {
+        req('b');
+      }, undefined, 'Callback\'s require argument throws when an undefined module is required.');
+    })
+    .require(['a', 'b'], function (req) {
+      assert.strictEqual(req('b'), 'bValue', 'Callback waits for the dependencies to load correctly.');
+      assert.strictEqual(req('c'), 'cValue', 'Callback\'s require argument has access to all ready module\'s in the instance even if they are not explicitly required.');
+      done();
+    })
+    .define('a', 'aValue')
+    .define('c', 'cValue')
+    .define('b', function (req, defer) {
+      return defer(function (resolve) {
+        window.setTimeout(function () {
+          resolve('bValue');
+        }, 100);
+      });
+    });
+
+  });
+
   Q.test('Should throw an error if called without arguments', function (assert) {
 
     var palikka = new Palikka();
@@ -472,6 +556,22 @@
 
     assert.throws(function () {
       palikka.require();
+    });
+
+  });
+
+  Q.test('Should throw an error if called with only one argument', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(2);
+
+    assert.throws(function () {
+      palikka.require('a');
+    });
+
+    assert.throws(function () {
+      palikka.require(['a', 'b']);
     });
 
   });
@@ -505,7 +605,7 @@
   });
 
 
-  Q.test('Require method should throw an error if the second argument is not a function', function (assert) {
+  Q.test('Should throw an error if the second argument is not a function', function (assert) {
 
     var palikka = new Palikka();
     var results = [
@@ -532,11 +632,40 @@
 
   });
 
+  Q.test('Callback should have one argument that is a function.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(2);
+
+    palikka
+    .require('a', function () {
+      assert.strictEqual(arguments.length, 1, 'Has one argument.');
+      assert.strictEqual(typeof arguments[0], 'function', 'The argument is a function.');
+    })
+    .define('a');
+
+  });
+
+  Q.test('Callback\'s context should be the global object.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(1);
+
+    palikka
+    .require('a', function () {
+      assert.strictEqual(this, window);
+    })
+    .define('a');
+
+  });
+
   /**
-   * .status() tests.
+   * .log() tests.
    */
 
-  Q.module('.status()');
+  Q.module('.log()');
 
   /**
    * .data() tests.

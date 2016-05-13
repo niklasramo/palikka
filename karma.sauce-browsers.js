@@ -8,38 +8,21 @@ data = [
   ['Windows 10', 'microsoftedge', '20.10240'],
   // Desktop - Firefox
   ['Linux', 'firefox', '41.0'],
-  ['Windows 7', 'firefox', '41.0'],
-  ['Windows 8', 'firefox', '41.0'],
-  ['Windows 8.1', 'firefox', '41.0'],
   ['Windows 10', 'firefox', '41.0'],
-  ['OS X 10.8', 'firefox', '41.0'],
-  ['OS X 10.9', 'firefox', '41.0'],
-  ['OS X 10.10', 'firefox', '41.0'],
   ['OS X 10.11', 'firefox', '41.0'],
   // Desktop - Chrome
   ['Linux', 'chrome', '45.0'],
-  ['Windows 7', 'chrome', '45.0'],
-  ['Windows 8', 'chrome', '45.0'],
-  ['Windows 8.1', 'chrome', '45.0'],
   ['Windows 10', 'chrome', '45.0'],
-  ['OS X 10.8', 'chrome', '45.0'],
-  ['OS X 10.9', 'chrome', '45.0'],
-  ['OS X 10.10', 'chrome', '45.0'],
   ['OS X 10.11', 'chrome', '45.0'],
   // Desktop - Safari
   ['OS X 10.8', 'safari', '6.0'],
   ['OS X 10.9', 'safari', '7.0'],
   ['OS X 10.10', 'safari', '8.0'],
-  ['OS X 10.11', 'safari', '8.1'],
   // Mobile - iOS
   ['OS X 10.10', 'iphone', '7.1'],
   ['OS X 10.10', 'iphone', '8.4'],
   ['OS X 10.10', 'iphone', '9.0'],
   // Mobile - Android
-  ['Linux', 'android', '4.0'],
-  ['Linux', 'android', '4.1'],
-  ['Linux', 'android', '4.2'],
-  ['Linux', 'android', '4.3'],
   ['Linux', 'android', '4.4'],
   ['Linux', 'android', '5.1']
 ],

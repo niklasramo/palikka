@@ -40,8 +40,8 @@
   // Report symbols mapping.
   var reportSymbols = {
     'ready': '[v]',
-    'loading': '[o]',
-    'undefined': '[x]'
+    'loading': '[x]',
+    'undefined': '[ ]'
   };
 
   /**
@@ -115,15 +115,12 @@
     }
 
     // Helper function for resolving the module's value. Checks if the value is
-    // a promise in which case the promises fulfilled value will be used as the
-    // module's value.
+    // a promise in which case the promises fulfilled/rejected value will be
+    // used as the module's value.
     function resolve(value) {
 
-      // TODO: What happens if the promise is rejected? Should there be some
-      // kind of warning in the fail handler?
-
       if (value && typeof value.then === 'function') {
-        value.then(finalize);
+        value.then(finalize, finalize);
       }
       else {
         finalize(value);
@@ -162,7 +159,7 @@
         var req = function (id) {
           return getModuleValue.call(palikka, id);
         };
-        var value = factory.call(id, req, defer);
+        var value = factory(req, defer, id);
 
         if (!isDeferred) {
           resolve(value);
@@ -230,11 +227,11 @@
   /**
    * @public
    * @memberof Palikka
-   * @see Palikka.prototype.status
+   * @see Palikka.prototype.log
    */
-  Palikka.status = function (modules, logger) {
+  Palikka.log = function (modules, logger) {
 
-    return P.status(modules, logger);
+    return P.log(modules, logger);
 
   };
 
@@ -312,7 +309,8 @@
   };
 
   /**
-   * Report the current state of defined modules and their dependencies.
+   * Return a status report of the current state of defined modules and their
+   * dependencies.
    *
    * @public
    * @memberof Palikka.prototype
@@ -320,7 +318,7 @@
    * @param {Function} [logger]
    * @returns {Palikka}
    */
-  Palikka.prototype.status = function (ids, logger) {
+  Palikka.prototype.log = function (ids, logger) {
 
     return generateReport.call(this, ids, logger);
 
@@ -491,7 +489,7 @@
    */
   function defaultLogger(id, parentId, state) {
 
-    return (parentId ? '    ' : '') + reportSymbols[state] + ' ' + id + '\n';
+    return (parentId ? '    -> ' : '') + reportSymbols[state] + ' ' + id + '\n';
 
   }
 

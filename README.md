@@ -50,10 +50,10 @@ Palikka.define('d', ['a', 'b'], function (req, defer) {
 });
 ```
 
-When you start having tens or hundreds of modules it's handy to check the status of the modules with `.status()` method. Especially helpful for quick debugging.
+When you start having tens or hundreds of modules it's handy to check the status of the modules with `.log()` method. Especially helpful for quick debugging.
 
 ```
-console.log(Palikka.status());
+console.log(Palikka.log());
 ```
 
 You can also fetch the data of all modules with `.data()` method.
@@ -81,7 +81,7 @@ modSystem
 
 * [Palikka.define( ids, [ dependencies ], [ factory ] )](#define)
 * [Palikka.require( ids, callback )](#require)
-* [Palikka.status( [ ids ], [ logger ] )](#status)
+* [Palikka.log( [ ids ], [ logger ] )](#log)
 * [Palikka.data()](#data)
 
 #### `Palikka.define( ids, [ dependencies ], [ factory ] )`
@@ -108,8 +108,10 @@ Define a module or multiple modules. After a module is defined another module ca
   * Optional.
   * Default: `undefined`.
   * If the factory is a function it is called once after all dependencies have loaded and it's return value will be assigned as the module's value.
-  * The factory function receives two arguments. The first argument is a function that returns a dependency's value when provided with the dependency's id. The second argument is a promise-like function that defers the initiation of the module when called.
-  * The factory function's context is the id of the module.
+  * The factory function receives three arguments:
+    * The first argument is a function that returns a module's value when provided with the module's id. The required module's don't have to be the dependency module's, but if the provided module is not ready yet an error will be thrown.
+    * The second argument is a promise-like function that defers the initiation of the module when called.
+    * The third argument is the defined module's id (string).
   * If the factory is anything else than a function it is directly assigned as the module's value after the dependencies have loaded.
 
 **Returns** &nbsp;&mdash;&nbsp; *Function / Object*
@@ -166,7 +168,7 @@ Require modules and call the callback function after they have loaded.
 
 **Returns** &nbsp;&mdash;&nbsp; *function*
 
-If `.define()` is called on a Palikka instance the instance is returned. Otherwise if the method is called on the `Palikka` constructor function then `Palikka` constructor is returned.
+If `.require()` is called on a Palikka instance the instance is returned. Otherwise if the method is called on the `Palikka` constructor function then `Palikka` constructor is returned.
 
 **Usage**
 
@@ -181,19 +183,19 @@ Palikka
 });
 ```
 
-#### `Palikka.status( [ ids ], [ logger ] )`
+#### `Palikka.log( [ ids ], [ logger ] )`
 
-Returns a nicely formatted list (string) of all the defined modules and their dependencies in the same order they were defined. The list also indicates a module's current state: *ready* `[v]` / *loading* `[o]` / *undefined* `[x]`).
+Returns a nicely formatted list (string) of all the defined modules and their dependencies in the same order they were defined. The list also indicates a module's current state: *ready* `[v]` / *loading* `[x]` / *undefined* `[ ]`).
 
 **Explicit syntax variations**
 
-`palikka.status();`
+`palikka.log();`
 
-`palikka.status( ids );`
+`palikka.log( ids );`
 
-`palikka.status( logger );`
+`palikka.log( logger );`
 
-`palikka.status( ids, logger );`
+`palikka.log( ids, logger );`
 
 **Parameters**
 
@@ -215,16 +217,16 @@ Palikka
 .define('c', ['a', 'b'], null)
 .define('d', ['c', 'x'], null);
 
-console.log(Palikka.status());
+console.log(Palikka.log());
 
 // [v] a
 // [v] b
 // [v] c
-//     [v] a
-//     [v] b
-// [o] d
-//     [v] c
-//     [x] x
+//     -> [v] a
+//     -> [v] b
+// [x] d
+//     -> [v] c
+//     -> [ ] x
 ```
 
 #### `Palikka.data()`

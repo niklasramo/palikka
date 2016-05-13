@@ -13,6 +13,7 @@ module.exports = function (config) {
   stn.plugins = [
     'karma-qunit',
     'karma-sauce-launcher',
+    'karma-story-reporter',
     'karma-coveralls',
     'karma-coverage'
   ];
@@ -33,7 +34,7 @@ module.exports = function (config) {
   // possible values: 'dots', 'progress', 'story'
   // https://npmjs.org/browse/keyword/karma-reporter
   stn.reporters = [
-    'story',
+    'progress',
     'coverage',
     'saucelabs'
   ];

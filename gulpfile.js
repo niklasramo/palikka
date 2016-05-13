@@ -32,7 +32,9 @@ gulp.task('validate', function () {
 
 gulp.task('clean', function (cb) {
 
-  rimraf('./coverage', cb);
+  rimraf('./*.log', function () {
+    rimraf('./coverage', cb);
+  });
 
 });
 
