@@ -94,7 +94,7 @@ gulp.task('test', function (done) {
 gulp.task('default', function (done) {
 
   if (process.env.CI) {
-    runSequence('validate', 'test', 'compress', 'clean', cb);
+    runSequence('validate', 'test', 'compress', 'clean', done);
   }
   else {
     runSequence('validate', 'test', 'compress', done);
