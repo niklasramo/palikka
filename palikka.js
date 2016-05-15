@@ -462,7 +462,7 @@
     });
 
     for (var i = 0; i < modulesArray.length; i++) {
-      var module = modules[i];
+      var module = modulesArray[i];
       var state = module.ready ? stateReady : stateLoading;
       report += loggerFn(module.id, null, state);
       for (var ii = 0; ii < module.dependencies.length; ii++) {

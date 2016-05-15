@@ -665,12 +665,145 @@
    * .log() tests.
    */
 
-  Q.module('.log()');
+  Q.module('palikka.log()');
+
+  Q.test('Should return an empty string when there are no modules defined.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(1);
+
+    assert.strictEqual(palikka.log(), '');
+
+  });
+
+  Q.test('Should return a string containing data about all the defined modules.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(7);
+
+    palikka
+    .define('a', 'aValue')
+    .define('b', ['a'], 'bValue')
+    .define('c', ['a', 'b', 'x'], {});
+
+    assert.deepEqual(palikka.log().split('\n'), [
+      '[v] a',
+      '[v] b',
+      '    -> [v] a',
+      '[x] c',
+      '    -> [v] a',
+      '    -> [v] b',
+      '    -> [ ] x',
+      ''
+    ], 'Logs all modules correctly when called without arguments.');
+
+    assert.deepEqual(palikka.log('c').split('\n'), [
+      '[x] c',
+      '    -> [v] a',
+      '    -> [v] b',
+      '    -> [ ] x',
+      ''
+    ], 'Logs a single module correctly when called with one argument that is a defined module\'s id.');
+
+    assert.deepEqual(palikka.log(['a', 'c']).split('\n'), [
+      '[v] a',
+      '[x] c',
+      '    -> [v] a',
+      '    -> [v] b',
+      '    -> [ ] x',
+      ''
+    ], 'Logs multiple modules correctly when called with one argument that is an array of defined module ids.');
+
+    assert.deepEqual(palikka.log(['a', 'c']), palikka.log(['c', 'a']), 'Logs modules always in the order they were defined.');
+
+    assert.deepEqual(palikka.log(['a', 'c', 'z']), palikka.log(['c', 'a']), 'Filters out ids of modules that are undefined.');
+
+    assert.deepEqual(palikka.log(function (id, parentId, state) {
+      return id + '-' + parentId + '-' + state + '\n';
+    }).split('\n'), [
+      'a-null-ready',
+      'b-null-ready',
+      'a-b-ready',
+      'c-null-loading',
+      'a-c-ready',
+      'b-c-ready',
+      'x-c-undefined',
+      ''
+    ], 'Logger function works correclty as the first argument.');
+
+    assert.deepEqual(palikka.log(['c', 'a'], function (id, parentId, state) {
+      return id + '-' + parentId + '-' + state + '\n';
+    }).split('\n'), [
+      'a-null-ready',
+      'c-null-loading',
+      'a-c-ready',
+      'b-c-ready',
+      'x-c-undefined',
+      ''
+    ], 'Logger function works correctly as the second argument.');
+
+  });
 
   /**
    * .data() tests.
    */
 
-  Q.module('.data()');
+  Q.module('palikka.data()');
+
+  Q.test('Should return an empty object when there are no modules defined.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(2);
+
+    var data = palikka.data();
+
+    assert.strictEqual(typeof data, 'object', 'Return value is an object.');
+    assert.strictEqual(Object.keys(data).length, 0, 'Returned object is empty.');
+
+  });
+
+  Q.test('Should return an object containing data about all the defined modules.', function (assert) {
+
+    var palikka = new Palikka();
+
+    assert.expect(19);
+
+    palikka
+    .define('a', 'aValue')
+    .define('b', ['a'], 'bValue')
+    .define('c', ['a', 'b', 'x'], {});
+
+    var data = palikka.data();
+
+    assert.strictEqual(Object.keys(data).length, 3, 'Return data has correct keys.');
+    assert.strictEqual(Object.keys(data['a']).length, 5, 'Module data has correct keys.');
+
+    assert.strictEqual(data.a.id, 'a', 'Module data has correct id.');
+    assert.strictEqual(data.b.id, 'b', 'Module data has correct id.');
+    assert.strictEqual(data.c.id, 'c', 'Module data has correct id.');
+
+    assert.strictEqual(data.a.order, 1, 'Module data has correct order.');
+    assert.strictEqual(data.b.order, 2, 'Module data has correct order.');
+    assert.strictEqual(data.c.order, 3, 'Module data has correct order.');
+
+    assert.strictEqual(data.a.dependencies.length, 0, 'Module data has correct amount of dependencies.');
+    assert.strictEqual(data.b.dependencies.length, 1, 'Module data has correct amount of dependencies.');
+    assert.strictEqual(data.c.dependencies.length, 3, 'Module data has correct amount of dependencies.');
+
+    assert.strictEqual(data.b.dependencies[0], 'a', 'Module data has correct dependencies.');
+    assert.strictEqual(data.c.dependencies.join(''), 'abx', 'Module data has correct dependencies.');
+
+    assert.strictEqual(data.a.ready, true, 'Module data has correct state.');
+    assert.strictEqual(data.b.ready, true, 'Module data has correct state.');
+    assert.strictEqual(data.c.ready, false, 'Module data has correct state.');
+
+    assert.strictEqual(data.a.value, 'aValue', 'Module data has correct value.');
+    assert.strictEqual(data.b.value, 'bValue', 'Module data has correct value.');
+    assert.strictEqual(data.c.value, undefined, 'Module data has correct value.');
+
+  });
 
 })(QUnit);
