@@ -692,27 +692,27 @@
       '[v] a',
       '[v] b',
       '    -> [v] a',
-      '[x] c',
+      '[-] c',
       '    -> [v] a',
       '    -> [v] b',
-      '    -> [ ] x',
+      '    -> [x] x',
       ''
     ], 'Logs all modules correctly when called without arguments.');
 
     assert.deepEqual(palikka.log('c').split('\n'), [
-      '[x] c',
+      '[-] c',
       '    -> [v] a',
       '    -> [v] b',
-      '    -> [ ] x',
+      '    -> [x] x',
       ''
     ], 'Logs a single module correctly when called with one argument that is a defined module\'s id.');
 
     assert.deepEqual(palikka.log(['a', 'c']).split('\n'), [
       '[v] a',
-      '[x] c',
+      '[-] c',
       '    -> [v] a',
       '    -> [v] b',
-      '    -> [ ] x',
+      '    -> [x] x',
       ''
     ], 'Logs multiple modules correctly when called with one argument that is an array of defined module ids.');
 
@@ -723,12 +723,12 @@
     assert.deepEqual(palikka.log(function (id, parentId, state) {
       return id + '-' + parentId + '-' + state + '\n';
     }).split('\n'), [
-      'a-null-ready',
-      'b-null-ready',
-      'a-b-ready',
-      'c-null-loading',
-      'a-c-ready',
-      'b-c-ready',
+      'a-null-defined',
+      'b-null-defined',
+      'a-b-defined',
+      'c-null-instantiated',
+      'a-c-defined',
+      'b-c-defined',
       'x-c-undefined',
       ''
     ], 'Logger function works correclty as the first argument.');
@@ -736,10 +736,10 @@
     assert.deepEqual(palikka.log(['c', 'a'], function (id, parentId, state) {
       return id + '-' + parentId + '-' + state + '\n';
     }).split('\n'), [
-      'a-null-ready',
-      'c-null-loading',
-      'a-c-ready',
-      'b-c-ready',
+      'a-null-defined',
+      'c-null-instantiated',
+      'a-c-defined',
+      'b-c-defined',
       'x-c-undefined',
       ''
     ], 'Logger function works correctly as the second argument.');

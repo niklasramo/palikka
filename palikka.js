@@ -30,8 +30,8 @@
   var P = new Palikka();
 
   // Module states.
-  var stateReady = 'ready';
-  var stateLoading = 'loading';
+  var stateDefined = 'defined';
+  var stateInstantiated = 'instantiated';
   var stateUndefined = 'undefined';
 
   // Error messages.
@@ -39,9 +39,9 @@
 
   // Report symbols mapping.
   var reportSymbols = {
-    'ready': '[v]',
-    'loading': '[x]',
-    'undefined': '[ ]'
+    'defined': '[v]',
+    'instantiated': '[-]',
+    'undefined': '[x]'
   };
 
   /**
@@ -463,12 +463,12 @@
 
     for (var i = 0; i < modulesArray.length; i++) {
       var module = modulesArray[i];
-      var state = module.ready ? stateReady : stateLoading;
+      var state = module.ready ? stateDefined : stateInstantiated;
       report += loggerFn(module.id, null, state);
       for (var ii = 0; ii < module.dependencies.length; ii++) {
         var depId = module.dependencies[ii];
         var dep = modules[depId];
-        var depState = !dep ? stateUndefined : dep.ready ? stateReady : stateLoading;
+        var depState = !dep ? stateUndefined : dep.ready ? stateDefined : stateInstantiated;
         report += loggerFn(depId, module.id, depState);
       }
     }

@@ -13,7 +13,7 @@ First of all, include [Palikka](https://raw.githubusercontent.com/niklasramo/pal
 
 You can define new modules using the `.define()` method.
 
-```
+```javascript
 Palikka
 .define('c', ['a', 'b'], function (req) {
   var a = req('a');
@@ -27,7 +27,7 @@ Palikka
 
 Also you can just `.require()` modules if there is no need to define a new module.
 
-```
+```javascript
 Palikka.require(['a', 'b'], function (req) {
   var a = req('a');
   var b = req('b');
@@ -38,7 +38,7 @@ Palikka.require(['a', 'b'], function (req) {
 
 Sometimes a module's initiation needs to be delayed.
 
-```
+```javascript
 Palikka.define('d', ['a', 'b'], function (req, defer) {
   var a = req('a');
   var b = req('b');
@@ -52,19 +52,19 @@ Palikka.define('d', ['a', 'b'], function (req, defer) {
 
 When you start having tens or hundreds of modules it's handy to check the status of the modules with `.log()` method. Especially helpful for quick debugging.
 
-```
+```javascript
 console.log(Palikka.log());
 ```
 
 You can also fetch the data of all modules with `.data()` method.
 
-```
+```javascript
 var modules = Palikka.data();
 ```
 
 `Palikka` is also constructor function that creates a new module system instance when initiated with `new` keyword.
 
-```
+```javascript
 var modSystem = new Palikka();
 
 modSystem
@@ -86,7 +86,7 @@ modSystem
 
 #### `Palikka.define( ids, [ dependencies ], [ factory ] )`
 
-Define a module or multiple modules. After a module is defined another module can not be defined with the same id, naturally. Undefining a module is not possible either. If you try to define a module with an existing module id Palikka will silently ignore the define command. Palikka does not support circular dependencies, but it does detect them for you automatically and throw an error instantly when you try to define a module with a circular dependency.
+Define a module or multiple modules. After a module is defined another module cannot be defined with the same id, naturally. Undefining a module is not possible either. If you try to define a module with an existing module id Palikka will silently ignore the define command. Palikka does not support circular dependencies, but it does detect them for you automatically and throws an error instantly when you try to define a module with a circular dependency.
 
 **Explicit syntax variations**
 
@@ -148,9 +148,8 @@ Palikka.define('delayed', function (req, defer) {
 // Define multiple modules at once.
 // Handy for importing third party libraries.
 var obj = {a: 'I am A', b: 'I am B'};
-Palikka.define(['a', 'b'], function () {
-  // "this" is the defined module's id
-  return obj[this];
+Palikka.define(['a', 'b'], function (req, defer, id) {
+  return obj[id];
 });
 ```
 
@@ -185,7 +184,10 @@ Palikka
 
 #### `Palikka.log( [ ids ], [ logger ] )`
 
-Returns a nicely formatted list (string) of all the defined modules and their dependencies in the same order they were defined. The list also indicates a module's current state: *ready* `[v]` / *loading* `[x]` / *undefined* `[ ]`).
+Returns a nicely formatted list (string) of all the defined modules and their dependencies in the same order they were defined. The list also indicates a module's current state. A module has three possible states:
+  * **undefined** `[x]` -  The module is not yet defined with `define` method.
+  * **instantiated** `[-]` - The module is defined with `define` method, but it's final value is not yet ready (due to dependencies not being loaded yet or deferred initiation).
+  * **defined** `[v]` - The module is defined with `define` method and it's final value is ready to be *required*.
 
 **Explicit syntax variations**
 
@@ -214,8 +216,8 @@ Returns a nicely formatted list (string) of all the defined modules and their de
 Palikka
 .define('a')
 .define('b')
-.define('c', ['a', 'b'], null)
-.define('d', ['c', 'x'], null);
+.define('c', ['a', 'b'], {})
+.define('d', ['c', 'x'], {});
 
 console.log(Palikka.log());
 
@@ -224,9 +226,9 @@ console.log(Palikka.log());
 // [v] c
 //     -> [v] a
 //     -> [v] b
-// [x] d
+// [-] d
 //     -> [v] c
-//     -> [ ] x
+//     -> [x] x
 ```
 
 #### `Palikka.data()`
