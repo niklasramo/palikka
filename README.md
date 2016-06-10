@@ -3,9 +3,9 @@
 [![Build Status](https://travis-ci.org/niklasramo/palikka.svg?branch=v1.0.0)](https://travis-ci.org/niklasramo/palikka)
 [![Coverage Status](https://coveralls.io/repos/niklasramo/palikka/badge.svg?branch=v1.0.0)](https://coveralls.io/r/niklasramo/palikka?branch=v1.0.0)
 
-A tiny and very simple module system implementation with [AMD](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) insipired API. Basically it just keeps track of your modules and their dependencies making sure that a module is initiated only after the module's dependencies have loaded. That's pretty much it. Palikka is heavily influenced by [RequireJS](http://requirejs.org/) and the original goal was actually to build an over-simplistic version of it by leaving out the script loading functionality and taking some shortcuts. Palikka supports modern browsers (IE9+) and Node.js.
+A simple [AMD](https://github.com/amdjs/amdjs-api/blob/master/AMD.md) insipired module system for keeping your codebase organized. Supports modern browsers (IE9+) and Node.js.
 
-You should also check out [modulejs](https://larsjung.de/modulejs/) library, which is very similar to Palikka.
+Palikka is heavily influenced by [RequireJS](http://requirejs.org/) and [modulejs](https://larsjung.de/modulejs/) libraries and you should definitely check them out too.
 
 ## Getting started
 
@@ -42,11 +42,10 @@ Sometimes a module's initiation needs to be delayed.
 Palikka.define('d', ['a', 'b'], function (req, defer) {
   var a = req('a');
   var b = req('b');
-  return defer(function (resolve) {
-    window.setTimeout(function () {
-      resolve(a + ' another ' + b + '!');
-    }, 1000);
-  });
+  var done = defer();
+  window.setTimeout(function () {
+    done(a + ' another ' + b + '!');
+  }, 1000);
 });
 ```
 
@@ -110,7 +109,7 @@ Define a module or multiple modules. After a module is defined another module ca
   * If the factory is a function it is called once after all dependencies have loaded and it's return value will be assigned as the module's value.
   * The factory function receives three arguments:
     * The first argument is a function that returns a module's value when provided with the module's id. The required module's don't have to be the dependency module's, but if the provided module is not ready yet an error will be thrown.
-    * The second argument is a promise-like function that defers the initiation of the module when called.
+    * The second argument is a callback that returns another callback when called. The returned callback accepts any value as it's first argument which will used the module's value. The module is defined instantly after the returned callback is called.
     * The third argument is the defined module's id (string).
   * If the factory is anything else than a function it is directly assigned as the module's value after the dependencies have loaded.
 
@@ -138,11 +137,10 @@ Palikka.define('foobar', ['foo', 'bar'], function (req) {
 
 // Define a module using deferred initiation.
 Palikka.define('delayed', function (req, defer) {
-  return defer(function (resolve) {
-    setTimeout(function () {
-      resolve('I am delayed...');
-    }, 2000);
-  });
+  var done = defer(); 
+  setTimeout(function () {
+    done('I am delayed...');
+  }, 2000);
 });
 
 // Define multiple modules at once.

@@ -1,3 +1,4 @@
+var package = require('./package.json');
 var fs = require('fs');
 var gulp = require('gulp');
 var jscs = require('gulp-jscs');
@@ -5,9 +6,9 @@ var karma = require('karma');
 var uglify = require('gulp-uglify');
 var rename = require('gulp-rename');
 var size = require('gulp-size');
-var argv = require('yargs').argv;
 var rimraf = require('rimraf');
 var runSequence = require('run-sequence');
+var jsdocParse = require('jsdoc-parse');
 var fileExists = function (filePath) {
   try {
     return fs.statSync(filePath).isFile();
@@ -24,9 +25,44 @@ if (fileExists('./.env')) {
 gulp.task('validate', function () {
 
   return gulp
-  .src('./palikka.js')
+  .src(package.main)
   .pipe(jscs())
   .pipe(jscs.reporter());
+
+});
+
+gulp.task('compress', function() {
+
+  var mainMinified = package.main.replace('./', '').replace('.js', '.min.js');
+
+  return gulp
+  .src(package.main)
+  .pipe(size({title: 'development'}))
+  .pipe(uglify({
+    preserveComments: 'some'
+  }))
+  .pipe(size({title: 'minified'}))
+  .pipe(size({title: 'gzipped', gzip: true}))
+  .pipe(rename(mainMinified))
+  .pipe(gulp.dest('./'));
+
+});
+
+gulp.task('docs', function (cb) {
+
+  jsdocParse({src: package.main}).pipe(process.stdout);
+  cb();
+
+});
+
+gulp.task('test', function (done) {
+
+  (new karma.Server({
+    configFile: __dirname + '/karma.conf.js',
+    action: 'run'
+  }, function (exitCode) {
+    done(exitCode);
+  })).start();
 
 });
 
@@ -38,66 +74,13 @@ gulp.task('clean', function (cb) {
 
 });
 
-gulp.task('compress', function() {
-
-  return gulp
-  .src('./palikka.js')
-  .pipe(size({title: 'development'}))
-  .pipe(uglify({
-    preserveComments: 'some'
-  }))
-  .pipe(size({title: 'minified'}))
-  .pipe(size({title: 'gzipped', gzip: true}))
-  .pipe(rename('palikka.min.js'))
-  .pipe(gulp.dest('./'));
-
-});
-
-gulp.task('test', function (done) {
-
-  var isLocal = !!argv.local;
-  var configPath = isLocal ? '/karma.local-conf.js' : '/karma.sauce-conf.js';
-  var browserMapper = {
-    'safari': 'Safari',
-    'ie9': 'IE9',
-    'ie10': 'IE10',
-    'ie11': 'IE11',
-    'firefox': 'Firefox',
-    'chrome': 'Chrome'
-  };
-  var opts = {
-    configFile: __dirname + configPath,
-    action: 'run'
-  };
-
-  if (argv.reporters) {
-    opts.reporters = argv.reporters.split(',');
-  }
-
-  if (argv.browsers) {
-    if (isLocal) {
-      opts.browsers = argv.browsers.split(',').map(function (browserName) {
-        return browserMapper[browserName.toLowerCase()] || '';
-      });
-    }
-    else {
-      opts.browsers = require('./karma.sauce-browsers.js').getBrowsers(argv.browsers);
-    }
-  }
-
-  (new karma.Server(opts, function (exitCode) {
-    done(exitCode);
-  })).start();
-
-});
-
 gulp.task('default', function (done) {
 
   if (process.env.CI) {
-    runSequence('validate', 'test', 'compress', 'clean', done);
+    runSequence('validate', 'compress', 'test', 'clean', done);
   }
   else {
-    runSequence('validate', 'test', 'compress', done);
+    runSequence('validate', 'compress', 'test', done);
   }
 
 });

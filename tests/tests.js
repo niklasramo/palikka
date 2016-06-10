@@ -318,13 +318,7 @@
 
     var palikka = new Palikka();
 
-    assert.expect(6);
-
-    assert.throws(function () {
-      palikka.define('fail', function (req, defer) {
-        defer();
-      });
-    }, undefined, 'Error is thrown when defer is called without an argument');
+    assert.expect(5);
 
     palikka
     .define('a', 'aValue')
@@ -350,19 +344,23 @@
 
   Q.test('Factory\'s defer argument should delay the initiation of the module.', function (assert) {
 
+    // TODO: Add test for checking that defer's resolver can not be called twice effectively.
+
     var palikka = new Palikka();
     var done = assert.async();
     var isAsync = false;
+    var isAsync2 = false;
 
-    assert.expect(2);
+    assert.expect(4);
+
+    // Default syntax
 
     palikka
     .define('a', function (req, defer) {
-      return defer(function (resolve) {
-        setTimeout(function () {
-          resolve('foo');
-        }, 10);
-      });
+      var done = defer();
+      setTimeout(function () {
+        done('foo');
+      }, 10);
     })
     .define('b', 'a', function (req) {
       return req('a');
@@ -370,10 +368,30 @@
     .require(['a', 'b'], function (req) {
       assert.strictEqual(isAsync, true);
       assert.strictEqual(req('a'), req('b'));
-      done();
     });
 
     isAsync = true;
+
+    // Promise like syntax
+
+    palikka
+    .define('a2', function (req, defer) {
+      return defer(function (resolve) {
+        setTimeout(function () {
+          resolve('foo2');
+        }, 10);
+      });
+    })
+    .define('b2', 'a2', function (req) {
+      return req('a2');
+    })
+    .require(['a2', 'b2'], function (req) {
+      assert.strictEqual(isAsync2, true);
+      assert.strictEqual(req('a2'), req('b2'));
+      done();
+    });
+
+    isAsync2 = true;
 
   });
 

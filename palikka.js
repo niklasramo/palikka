@@ -62,6 +62,7 @@
   function Module(palikka, id, dependencies, factory) {
 
     var instance = this;
+    var isResolved = false;
 
     // Make sure module id is a string.
     if (!id || typeof id !== 'string') {
@@ -119,11 +120,14 @@
     // used as the module's value.
     function resolve(value) {
 
-      if (value && typeof value.then === 'function') {
-        value.then(finalize, finalize);
-      }
-      else {
-        finalize(value);
+      if (!isResolved) {
+        isResolved = true;
+        if (value && typeof value.then === 'function') {
+          value.then(finalize, finalize);
+        }
+        else {
+          finalize(value);
+        }
       }
 
     }
@@ -151,10 +155,17 @@
 
         var isDeferred = false;
         var defer = function (resolver) {
-          isDeferred = true;
-          resolver(function (value) {
-            resolve(value);
-          });
+          if (!isDeferred) {
+            isDeferred = true;
+            if (typeof resolver === 'function') {
+              resolver(function (value) {
+                resolve(value);
+              });
+            }
+            else {
+              return resolve;
+            }
+          }
         };
         var req = function (id) {
           return getModuleValue.call(palikka, id);
@@ -247,14 +258,24 @@
   };
 
   /**
-   * Define a module or multiple modules.
+   * Define a module or multiple modules. After a module is instantiated it can
+   * not be undefined anymore and no other module can be defined with the same
+   * id. Defining a module with a circular dependency results in an error.
    *
    * @public
    * @memberof Palikka.prototype
    * @param {Array|String} ids
+   *   - Module id(s). Each module must have a unique id.
    * @param {Array|String} [dependencies]
-   * @param {Function|Object} [factory]
-   * @returns {Palikka}
+   *   - Define multiple dependenies as an array of module ids and a single
+   *     dependency as a string.
+   * @param {*|Palikka~Factory} [factory]
+   *   - If the factory is a function it is called once after all dependencies
+   *     have loaded and it's return value will be assigned as the module's
+   *     value. Otherwise the provided value is directly assigned as the
+   *     module's value after the dependencies have loaded.
+   * @returns {Object}
+   *   - Returns the method's context.
    */
   Palikka.prototype.define = function (ids, dependencies, factory) {
 
@@ -276,12 +297,53 @@
   };
 
   /**
+   * @callback Palikka~Factory
+   * @param {Palikka~FactoryRequire} require
+   *   - Returns the value of a dependency module when provided with a module id
+   *     as the first argument.
+   * @param {Palikka~FactoryDefer} defer
+   *   - Defers the definition of the module.
+   * @param {String} id
+   *   - Id of the module which is being defined.
+   */
+
+  /**
+   * Returns the value of a module when provided with a module id as the first
+   * argument. If the provided module id does not exist an error will be thrown.
+   *
+   * @callback Palikka~FactoryRequire
+   * @param {String} id
+   *   - Id of the module.
+   * @returns {*}
+   *   - Value of the module.
+   */
+
+  /**
+   * When called the module will be defined asynchronously. Returns a resolver
+   * function that needs to be called to finish the module definition process.
+   * The returned resolver function accepts one argument which will be assigned
+   * as the value of the module.
+   *
+   * @callback Palikka~FactoryDefer
+   * @returns {Palikka~FactoryResolver} resolver
+   */
+
+  /**
+   * When called the module will be instantly defined with the provided value.
+   *
+   * @callback Palikka~FactoryResolver
+   * @param {*} [value]
+   */
+
+  /**
    * Require modules.
    *
    * @public
    * @memberof Palikka.prototype
    * @param {Array|String} modules
-   * @param {Function} callback
+   *   - An array of module ids or a single module id as a string.
+   * @param {Palikka~RequireCallback} callback
+   *   - Called after all the provided modules are defined.
    * @returns {Palikka}
    */
   Palikka.prototype.require = function (modules, callback) {
@@ -309,14 +371,26 @@
   };
 
   /**
+   * @callback Palikka~RequireCallback
+   * @param {Palikka~FactoryRequire} require
+   *   - Returns the value of a dependency module when provided with a module id
+   *     as the first argument.
+   */
+
+  /**
    * Return a status report of the current state of defined modules and their
    * dependencies.
    *
    * @public
    * @memberof Palikka.prototype
    * @param {Array|String} [ids]
+   *   - An array of module ids or a single module id as a string.
    * @param {Function} [logger]
-   * @returns {Palikka}
+   *   - Callback that will be called for each instantiated module and their
+   *     dependencies. Responsible for generating the log report.
+   * @returns {String}
+   *   - Returns nicely formatted report of all the currently instantiated
+   *     modules and their dependencies.
    */
   Palikka.prototype.log = function (ids, logger) {
 
@@ -356,7 +430,9 @@
    *
    * @private
    * @param {Array} ids
+   *   - An array of module ids (string).
    * @param {Function} callback
+   *   - Called after all the provided modules are defined.
    */
   function loadModules(ids, callback) {
 
@@ -483,8 +559,11 @@
    *
    * @private
    * @param {String} id
+   *   - Id of the module.
    * @param {String|Null} parentId
+   *   - Id of the parent module or null if the module is a root level module.
    * @param {String} state
+   *   - Possible values are: "undefined", "instantiated" or "defined".
    * @returns {String}
    */
   function defaultLogger(id, parentId, state) {
