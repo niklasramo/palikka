@@ -35,13 +35,25 @@
   var stateUndefined = 'undefined';
 
   // Error messages.
-  var errorModuleId = 'Module id must be a non-empty string.';
+  var errors = {
+    invalidModuleId: 'Module id must be a non-empty string.',
+    selfAsDep: 'Module cannot have itself as a dependency.',
+    noDefineId: 'Define method must have id(s).',
+    noRequireId: 'Require method must have id(s).',
+    noRequireCb: 'Require method must have a callback function.',
+    moduleNotReady: function (id) {
+      return 'Required module (' + id + ') is not ready.';
+    },
+    circDep: function (id, depId) {
+      return 'Circular dependency between ' + id + ' and ' + depId + '.';
+    }
+  };
 
   // Report symbols mapping.
   var reportSymbols = {
     'defined': '[v]',
     'instantiated': '[-]',
-    'undefined': '[x]'
+    'undefined': '[ ]'
   };
 
   /**
@@ -66,7 +78,7 @@
 
     // Make sure module id is a string.
     if (!id || typeof id !== 'string') {
-      throwError(errorModuleId);
+      throwError(errors.invalidModuleId);
     }
 
     // Make sure module is not already defined.
@@ -82,17 +94,17 @@
 
       // Make sure the module id is valid
       if (!depId || typeof depId !== 'string') {
-        throwError(errorModuleId);
+        throwError(errors.invalidModuleId);
       }
 
       // Make sure the module does not require itself.
       if (depId === id) {
-        throwError('Module cannot have itself as a dependency.');
+        throwError(errors.selfAsDep);
       }
 
       // Make sure the module does not have a circular dependency.
       if (dep && dep.dependencies.indexOf(id) > -1) {
-        throwError('Circular dependency between ' + id + ' and ' + depId + '.');
+        throwError(errors.circDep(id, depId));
       }
 
     }
@@ -285,7 +297,7 @@
     var factory = hasDeps ? factory : dependencies;
 
     if (!ids.length) {
-      throwError('define method must have id(s).');
+      throwError(errors.noDefineId);
     }
 
     for (var i = 0; i < ids.length; i++) {
@@ -353,11 +365,11 @@
     modules = [].concat(modules);
 
     if (!modules.length) {
-      throwError('require method must have id(s).');
+      throwError(errors.noRequireId);
     }
 
     if (typeof callback !== 'function') {
-      throwError('require method must have a callback function.');
+      throwError(errors.noRequireCb);
     }
 
     loadModules.call(instance, modules, function () {
@@ -446,7 +458,7 @@
       var id = modulesIds[i];
 
       if (!id || typeof id !== 'string') {
-        throwError(errorModuleId);
+        throwError(errors.invalidModuleId);
       }
 
       var module = palikka._modules[id];
@@ -481,13 +493,13 @@
   function getModuleValue(id) {
 
     if (!id || typeof id !== 'string') {
-      throwError(errorModuleId);
+      throwError(errors.invalidModuleId);
     }
 
     var module = this._modules[id];
 
     if (!module || !module.ready) {
-      throwError('Required module ' + id + ' is not ready.');
+      throwError(errors.moduleNotReady(id));
     }
 
     return module.value;
