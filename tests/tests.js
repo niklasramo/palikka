@@ -707,30 +707,30 @@
     .define('c', ['a', 'b', 'x'], {});
 
     assert.deepEqual(palikka.log().split('\n'), [
-      '[v] a',
-      '[v] b',
-      '    -> [v] a',
-      '[-] c',
-      '    -> [v] a',
-      '    -> [v] b',
-      '    -> [x] x',
+      '(v) a',
+      '(v) b',
+      '    (v) a',
+      '(-) c',
+      '    (v) a',
+      '    (v) b',
+      '    ( ) x',
       ''
     ], 'Logs all modules correctly when called without arguments.');
 
     assert.deepEqual(palikka.log('c').split('\n'), [
-      '[-] c',
-      '    -> [v] a',
-      '    -> [v] b',
-      '    -> [x] x',
+      '(-) c',
+      '    (v) a',
+      '    (v) b',
+      '    ( ) x',
       ''
     ], 'Logs a single module correctly when called with one argument that is a defined module\'s id.');
 
     assert.deepEqual(palikka.log(['a', 'c']).split('\n'), [
-      '[v] a',
-      '[-] c',
-      '    -> [v] a',
-      '    -> [v] b',
-      '    -> [x] x',
+      '(v) a',
+      '(-) c',
+      '    (v) a',
+      '    (v) b',
+      '    ( ) x',
       ''
     ], 'Logs multiple modules correctly when called with one argument that is an array of defined module ids.');
 
@@ -741,12 +741,12 @@
     assert.deepEqual(palikka.log(function (id, parentId, state) {
       return id + '-' + parentId + '-' + state + '\n';
     }).split('\n'), [
-      'a-null-defined',
-      'b-null-defined',
-      'a-b-defined',
-      'c-null-instantiated',
-      'a-c-defined',
-      'b-c-defined',
+      'a-null-ready',
+      'b-null-ready',
+      'a-b-ready',
+      'c-null-defined',
+      'a-c-ready',
+      'b-c-ready',
       'x-c-undefined',
       ''
     ], 'Logger function works correclty as the first argument.');
@@ -754,10 +754,10 @@
     assert.deepEqual(palikka.log(['c', 'a'], function (id, parentId, state) {
       return id + '-' + parentId + '-' + state + '\n';
     }).split('\n'), [
-      'a-null-defined',
-      'c-null-instantiated',
-      'a-c-defined',
-      'b-c-defined',
+      'a-null-ready',
+      'c-null-defined',
+      'a-c-ready',
+      'b-c-ready',
       'x-c-undefined',
       ''
     ], 'Logger function works correctly as the second argument.');

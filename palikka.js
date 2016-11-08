@@ -1,6 +1,6 @@
 /*!
  * @license
- * Palikka v1.0.0-beta
+ * Palikka v1.0.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2016 Niklas Rämö <inramo@gmail.com>
  * Released under the MIT license
@@ -30,17 +30,17 @@
   var P = new Palikka();
 
   // Module states.
+  var stateReady = 'ready';
   var stateDefined = 'defined';
-  var stateInstantiated = 'instantiated';
   var stateUndefined = 'undefined';
 
   // Error messages.
   var errors = {
     invalidModuleId: 'Module id must be a non-empty string.',
     selfAsDep: 'Module cannot have itself as a dependency.',
-    noDefineId: 'Define method must have id(s).',
-    noRequireId: 'Require method must have id(s).',
-    noRequireCb: 'Require method must have a callback function.',
+    noDefineId: '.define() method must have an id.',
+    noRequireId: '.require() method must have an id.',
+    noRequireCb: '.require() method must have a callback function.',
     moduleNotReady: function (id) {
       return 'Required module (' + id + ') is not ready.';
     },
@@ -51,9 +51,9 @@
 
   // Report symbols mapping.
   var reportSymbols = {
-    'defined': '[v]',
-    'instantiated': '[-]',
-    'undefined': '[ ]'
+    'ready': '(v)',
+    'defined': '(-)',
+    'undefined': '( )'
   };
 
   /**
@@ -69,7 +69,7 @@
    * @param {Palikka} palikka
    * @param {String} id
    * @param {Array} dependencies
-   * @param {Function|Object} factory
+   * @param {*} factory
    */
   function Module(palikka, id, dependencies, factory) {
 
@@ -270,7 +270,7 @@
   };
 
   /**
-   * Define a module or multiple modules. After a module is instantiated it can
+   * Define a module or multiple modules. After a module is defined it can
    * not be undefined anymore and no other module can be defined with the same
    * id. Defining a module with a circular dependency results in an error.
    *
@@ -279,8 +279,7 @@
    * @param {Array|String} ids
    *   - Module id(s). Each module must have a unique id.
    * @param {Array|String} [dependencies]
-   *   - Define multiple dependenies as an array of module ids and a single
-   *     dependency as a string.
+   *   - Define one or more dependenies.
    * @param {*|Palikka~Factory} [factory]
    *   - If the factory is a function it is called once after all dependencies
    *     have loaded and it's return value will be assigned as the module's
@@ -355,7 +354,7 @@
    * @param {Array|String} modules
    *   - An array of module ids or a single module id as a string.
    * @param {Palikka~RequireCallback} callback
-   *   - Called after all the provided modules are defined.
+   *   - Called after all the provided modules are defined and ready.
    * @returns {Palikka}
    */
   Palikka.prototype.require = function (modules, callback) {
@@ -398,11 +397,11 @@
    * @param {Array|String} [ids]
    *   - An array of module ids or a single module id as a string.
    * @param {Function} [logger]
-   *   - Callback that will be called for each instantiated module and their
+   *   - Callback that will be called for each defined module and their
    *     dependencies. Responsible for generating the log report.
    * @returns {String}
-   *   - Returns nicely formatted report of all the currently instantiated
-   *     modules and their dependencies.
+   *   - Returns nicely formatted report of all the currently defined modules
+   *     and their dependencies.
    */
   Palikka.prototype.log = function (ids, logger) {
 
@@ -551,12 +550,12 @@
 
     for (var i = 0; i < modulesArray.length; i++) {
       var module = modulesArray[i];
-      var state = module.ready ? stateDefined : stateInstantiated;
+      var state = module.ready ? stateReady : stateDefined;
       report += loggerFn(module.id, null, state);
       for (var ii = 0; ii < module.dependencies.length; ii++) {
         var depId = module.dependencies[ii];
         var dep = modules[depId];
-        var depState = !dep ? stateUndefined : dep.ready ? stateDefined : stateInstantiated;
+        var depState = !dep ? stateUndefined : dep.ready ? stateReady : stateDefined;
         report += loggerFn(depId, module.id, depState);
       }
     }
@@ -575,12 +574,12 @@
    * @param {String|Null} parentId
    *   - Id of the parent module or null if the module is a root level module.
    * @param {String} state
-   *   - Possible values are: "undefined", "instantiated" or "defined".
+   *   - Possible values are: "undefined", "defined" or "ready".
    * @returns {String}
    */
   function defaultLogger(id, parentId, state) {
 
-    return (parentId ? '    -> ' : '') + reportSymbols[state] + ' ' + id + '\n';
+    return (parentId ? '    ' : '') + reportSymbols[state] + ' ' + id + '\n';
 
   }
 
