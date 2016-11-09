@@ -44,16 +44,16 @@ Palikka.define('d', ['a', 'b'], function (req, defer) {
 });
 ```
 
-When you start having tens or hundreds of modules it's handy to check the status of the modules with `.log()` method. Especially helpful for quick debugging.
+When you start having tens or hundreds of modules it's handy to check the status of the modules with `.getLog()` method. Especially helpful for quick debugging.
 
 ```javascript
-console.log(Palikka.log());
+console.log(Palikka.getLog());
 ```
 
-You can also fetch the current data of all modules with `.data()` method.
+You can also fetch the current data of all modules with `.getData()` method.
 
 ```javascript
-var modules = Palikka.data();
+var modules = Palikka.getData();
 ```
 
 `Palikka` is also constructor function that creates a new independent module system instance when initiated with `new` keyword.
@@ -81,8 +81,8 @@ anotherModuleSystem
 
 * [.define()](#define)
 * [.require()](#require)
-* [.log()](#log)
-* [.data()](#data)
+* [.getLog()](#log)
+* [.getData()](#data)
 
 ### .define()
 
@@ -130,7 +130,7 @@ Palikka.define('foobar', ['foo', 'bar'], function (req) {
 
 // Define a module using deferred initiation.
 Palikka.define('delayed', function (req, defer) {
-  var done = defer(); 
+  var done = defer();
   setTimeout(function () {
     done('I am delayed...');
   }, 2000);
@@ -174,16 +174,14 @@ Palikka
 });
 ```
 
-### .log()
+### .getLog()
 
 Returns a tidy list of all the currently defined modules and their dependencies in the exact order they were defined. The list also indicates each module's current state &mdash; ***undefined*** `( )`, ***defined*** `(-)` or ***ready*** `(v)`.
 
-**`.log( [ ids ], [ logger ] )`**
+**`.getLog( [ ids ] )`**
 
 * **ids** &nbsp;&mdash;&nbsp; *Array / String*
   * Module id(s). Optional.
-* **logger** &nbsp;&mdash;&nbsp; *Function*
-  * A callback function that should return a string. Used for generating the status log. Called for each module and dependency module. Optional.
 
 **Returns** &nbsp;&mdash;&nbsp; *String*
 
@@ -197,18 +195,18 @@ Palikka
 .define('d', ['c', 'x'], {});
 
 // Log a single module.
-console.log(Palikka.log('a'));
+console.log(Palikka.getLog('a'));
 // (v) a
 
-// Log multiple modules. 
-console.log(Palikka.log(['a', 'c']));
+// Log multiple modules.
+console.log(Palikka.getLog(['a', 'c']));
 // (v) a
 // (v) c
 //     (v) a
 //     (v) b
 
 // Log all modules.
-console.log(Palikka.log());
+console.log(Palikka.getLog());
 // (v) a
 // (v) b
 // (v) c
@@ -219,7 +217,7 @@ console.log(Palikka.log());
 //     ( ) x
 ```
 
-### .data()
+### .getData()
 
 Returns an object containing some helpful information about all the currently defined modules.
 
@@ -232,7 +230,7 @@ Palikka
 .define('a', 'foo')
 .define('b', 'a', 'bar');
 
-var data = Palikka.data();
+var data = Palikka.getData();
 // {
 //   a: {
 //     id: "a",

@@ -26,7 +26,7 @@
 
   'use strict';
 
-  // Default palikka instance which is used by the static Palikka methods.
+  // Default Palikka instance which is used by the static Palikka methods.
   var P = new Palikka();
 
   // Module states.
@@ -250,22 +250,22 @@
   /**
    * @public
    * @memberof Palikka
-   * @see Palikka.prototype.log
+   * @see Palikka.prototype.getLog
    */
-  Palikka.log = function (modules, logger) {
+  Palikka.getLog = function (modules) {
 
-    return P.log(modules, logger);
+    return P.getLog(modules);
 
   };
 
   /**
    * @public
    * @memberof Palikka
-   * @see Palikka.prototype.data
+   * @see Palikka.prototype.getData
    */
-  Palikka.data = function () {
+  Palikka.getData = function () {
 
-    return P.data();
+    return P.getData();
 
   };
 
@@ -389,23 +389,21 @@
    */
 
   /**
-   * Return a status report of the current state of defined modules and their
-   * dependencies.
+   * Returns a tidy list of all the currently defined modules and their
+   * dependencies in the exact order they were defined. The list also indicates
+   * each module's current state: undefined '( )', defined '(-)' or ready '(v)'.
    *
    * @public
    * @memberof Palikka.prototype
    * @param {Array|String} [ids]
    *   - An array of module ids or a single module id as a string.
-   * @param {Function} [logger]
-   *   - Callback that will be called for each defined module and their
-   *     dependencies. Responsible for generating the log report.
    * @returns {String}
    *   - Returns nicely formatted report of all the currently defined modules
    *     and their dependencies.
    */
-  Palikka.prototype.log = function (ids, logger) {
+  Palikka.prototype.getLog = function (ids) {
 
-    return generateReport.call(this, ids, logger);
+    return generateReport.call(this, ids);
 
   };
 
@@ -417,7 +415,7 @@
    * @memberof Palikka.prototype
    * @returns {Object}
    */
-  Palikka.prototype.data = function () {
+  Palikka.prototype.getData = function () {
 
     var data = this._modules;
     var ids = Object.keys(data);
@@ -528,14 +526,12 @@
    *
    * @private
    * @param {Array|String} [ids]
-   * @param {Function} [logger]
    * @returns {Object}
    */
-  function generateReport(ids, logger) {
+  function generateReport(ids) {
 
     var report = '';
     var moduleIds = ids && typeof ids !== 'function' ? ids : null;
-    var loggerFn = typeof ids === 'function' ? ids : typeof logger === 'function' ? logger : defaultLogger;
     var modules = this._modules;
     var modulesArray = (moduleIds ? [].concat(moduleIds) : Object.keys(modules))
     .filter(function (id) {
@@ -551,12 +547,12 @@
     for (var i = 0; i < modulesArray.length; i++) {
       var module = modulesArray[i];
       var state = module.ready ? stateReady : stateDefined;
-      report += loggerFn(module.id, null, state);
+      report += generateReportItem(module.id, null, state);
       for (var ii = 0; ii < module.dependencies.length; ii++) {
         var depId = module.dependencies[ii];
         var dep = modules[depId];
         var depState = !dep ? stateUndefined : dep.ready ? stateReady : stateDefined;
-        report += loggerFn(depId, module.id, depState);
+        report += generateReportItem(depId, module.id, depState);
       }
     }
 
@@ -577,7 +573,7 @@
    *   - Possible values are: "undefined", "defined" or "ready".
    * @returns {String}
    */
-  function defaultLogger(id, parentId, state) {
+  function generateReportItem(id, parentId, state) {
 
     return (parentId ? '    ' : '') + reportSymbols[state] + ' ' + id + '\n';
 
