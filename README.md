@@ -81,8 +81,8 @@ anotherModuleSystem
 
 * [.define()](#define)
 * [.require()](#require)
-* [.getLog()](#log)
-* [.getData()](#data)
+* [.getLog()](#getlog)
+* [.getData()](#getdata)
 
 ### .define()
 
@@ -110,7 +110,7 @@ Define one or more modules. After a module is defined another module cannot be d
 
 If `.define()` is called on a Palikka instance the instance is returned. Otherwise if the method is called on the `Palikka` constructor function then `Palikka` constructor is returned.
 
-**Usage**
+**Examples**
 
 ```javascript
 // Define a module with a factory function.
@@ -161,7 +161,7 @@ Require one or more modules and do stuff after they have loaded.
 
 If `.require()` is called on a Palikka instance the instance is returned. Otherwise if the method is called on the `Palikka` constructor function then `Palikka` constructor is returned.
 
-**Usage**
+**Examples**
 
 ```javascript
 Palikka
@@ -185,7 +185,7 @@ Returns a tidy list of all the currently defined modules and their dependencies 
 
 **Returns** &nbsp;&mdash;&nbsp; *String*
 
-**Usage**
+**Examples**
 
 ```javascript
 Palikka
@@ -223,7 +223,7 @@ Returns an object containing some helpful information about all the currently de
 
 **Returns** &nbsp;&mdash;&nbsp; *Object*
 
-**Usage**
+**Examples**
 
 ```javascript
 Palikka
