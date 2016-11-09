@@ -1,5 +1,4 @@
 /*!
- * @license
  * Palikka v1.0.0
  * https://github.com/niklasramo/palikka
  * Copyright (c) 2016 Niklas Rämö <inramo@gmail.com>
@@ -153,7 +152,7 @@
 
       // Process palikka callback queue.
       var queues = palikka._queues;
-      var queue = queues[id] = (queues[id] || []).slice(0);
+      var queue = queues[id] = (queues[id] || []).concat();
       for (var i = 0; i < queue.length; i++) {
         queue[i](instance);
       }
@@ -403,7 +402,7 @@
    */
   Palikka.prototype.getLog = function (ids) {
 
-    return generateReport.call(this, ids);
+    return generateLog.call(this, ids);
 
   };
 
@@ -522,13 +521,13 @@
   }
 
   /**
-   * Generate report data.
+   * Generate log data.
    *
    * @private
    * @param {Array|String} [ids]
    * @returns {Object}
    */
-  function generateReport(ids) {
+  function generateLog(ids) {
 
     var report = '';
     var moduleIds = ids && typeof ids !== 'function' ? ids : null;
@@ -547,12 +546,12 @@
     for (var i = 0; i < modulesArray.length; i++) {
       var module = modulesArray[i];
       var state = module.ready ? stateReady : stateDefined;
-      report += generateReportItem(module.id, null, state);
+      report += generateLogEntry(module.id, null, state);
       for (var ii = 0; ii < module.dependencies.length; ii++) {
         var depId = module.dependencies[ii];
         var dep = modules[depId];
         var depState = !dep ? stateUndefined : dep.ready ? stateReady : stateDefined;
-        report += generateReportItem(depId, module.id, depState);
+        report += generateLogEntry(depId, module.id, depState);
       }
     }
 
@@ -573,7 +572,7 @@
    *   - Possible values are: "undefined", "defined" or "ready".
    * @returns {String}
    */
-  function generateReportItem(id, parentId, state) {
+  function generateLogEntry(id, parentId, state) {
 
     return (parentId ? '    ' : '') + reportSymbols[state] + ' ' + id + '\n';
 
